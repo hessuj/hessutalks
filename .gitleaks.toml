@@ -1,0 +1,6 @@
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Vendoroidut kirjastot ja testien kiinteät testiarvot"
+paths = ['''public/assets/vendor/''']

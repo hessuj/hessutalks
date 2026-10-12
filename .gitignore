@@ -1,0 +1,11 @@
+/vendor/
+/var/
+/build/
+/.phpunit.cache/
+/node_modules/
+/VERSION
+config.php
+*.sqlite
+*.sqlite-*
+.DS_Store
+.ftp-deploy-sync-state*.json

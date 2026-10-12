@@ -1,0 +1,12 @@
+includes:
+    - vendor/phpstan/phpstan-strict-rules/rules.neon
+
+parameters:
+    level: 8
+    phpVersion: 80400
+    paths:
+        - src
+        - public/index.php
+        - bin
+    treatPhpDocTypesAsCertain: false
+    reportUnmatchedIgnoredErrors: true

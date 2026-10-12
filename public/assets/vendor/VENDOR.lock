@@ -1,0 +1,5 @@
+# libsodium.js 0.8.4 (https://github.com/jedisct1/libsodium.js)
+# qrcode-generator 83b7e8fe3fddd3b0368dbafd6ce56995bd25e3c8 (https://github.com/kazuhikoarase/qrcode-generator)
+b798a071cc28a98ac5fd781d22995af58eea08ca1bcfe59d281bdd122141a541  sodium.js
+5d6f10ef3e530b45536ee0aa40fa54a46220cc78984df6992a9d48e9a741e8f7  sodium-sumo.js
+79ec86f82856005b1c887905cfccfcfbec3821ca61c7fd5a952faa5f778f791c  qrcode.js

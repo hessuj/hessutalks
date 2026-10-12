@@ -1,0 +1,232 @@
+# HessuTalks CI/CD
+#
+#   push / pull request:  laatu + tietoturvatestit
+#   push main-haaraan:     kaikkien testien jälkeen deploy hessujarvinen.com-webhotelliin (FTPS)
+#
+# Kaikki actionit on kiinnitetty commit-SHA:han (toimitusketjun suojaus). Dependabot päivittää ne.
+
+name: CI/CD
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  PHP_VERSION: '8.4'
+
+jobs:
+  # ---------------------------------------------------------------- PHP: testit ja staattinen analyysi
+  php:
+    name: PHP – PHPUnit, PHPStan, composer audit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+
+      - uses: shivammathur/setup-php@eb7c497e18156a6bbabfef1d3a82760b9eda3962 # 2.40.0
+        with:
+          php-version: ${{ env.PHP_VERSION }}
+          extensions: sodium, pdo_sqlite, mbstring, openssl, intl
+          coverage: none
+          tools: composer:v2
+
+      - name: Validoi composer.json
+        run: composer validate --strict --no-check-lock
+
+      - name: Asenna riippuvuudet
+        run: |
+          if [ -f composer.lock ]; then
+            composer install --no-interaction --no-progress --prefer-dist
+          else
+            echo "::warning::composer.lock puuttuu – ratkaistaan riippuvuudet ja tallennetaan lukitustiedosto artefaktiksi."
+            composer update --no-interaction --no-progress --prefer-dist
+          fi
+
+      - name: Tallenna composer.lock (jos luotiin)
+        if: hashFiles('composer.lock') != ''
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: composer-lock
+          path: composer.lock
+          retention-days: 7
+
+      - name: Syntaksitarkistus
+        run: find src bin public tests templates -name '*.php' -print0 | xargs -0 -n1 php -l > /dev/null
+
+      - name: PHPStan (taso 8 + strict rules)
+        run: vendor/bin/phpstan analyse --no-progress --memory-limit=1G
+
+      - name: PHPUnit – yksikkö- ja tietoturvatestit
+        run: vendor/bin/phpunit --testdox
+
+      - name: Haavoittuvat riippuvuudet (composer audit)
+        run: composer audit --no-interaction --abandoned=report
+
+  # ---------------------------------------------------------------- selain: kryptotestit ja vendor-eheys
+  frontend:
+    name: Frontend – vendor-eheys ja kryptotestit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: '22'
+      - name: Vendoroitujen kirjastojen SHA-256-tarkistus
+        run: scripts/verify-vendor.sh
+      - name: JavaScript-syntaksi
+        run: for f in public/assets/js/*.js; do node --check "$f"; done
+      - name: Kryptografian yhteentoimivuustestit
+        run: node --test tests/js/*.test.mjs
+
+  # ---------------------------------------------------------------- SAST
+  semgrep:
+    name: SAST – Semgrep
+    runs-on: ubuntu-latest
+    container:
+      image: semgrep/semgrep
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+      - name: Semgrep (PHP, JS, OWASP Top 10, salaisuudet)
+        run: >
+          semgrep scan --error --metrics=off
+          --config p/php --config p/javascript --config p/owasp-top-ten --config p/secrets
+          --exclude public/assets/vendor --exclude tests
+
+  # ---------------------------------------------------------------- salaisuuksien vuodot
+  gitleaks:
+    name: Salaisuudet – Gitleaks
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: gitleaks/gitleaks-action@ff98106e4c7b2bc287b24eaf42907196329070c7 # v2.3.9
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # ---------------------------------------------------------------- DAST
+  dast:
+    name: DAST – OWASP ZAP baseline
+    runs-on: ubuntu-latest
+    needs: php
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+      - uses: shivammathur/setup-php@eb7c497e18156a6bbabfef1d3a82760b9eda3962 # 2.40.0
+        with:
+          php-version: ${{ env.PHP_VERSION }}
+          extensions: sodium, pdo_sqlite, mbstring, openssl, intl
+          coverage: none
+          tools: composer:v2
+      - name: Asenna ja käynnistä sovellus
+        run: |
+          if [ -f composer.lock ]; then composer install --no-dev --no-interaction --no-progress; else composer update --no-dev --no-interaction --no-progress; fi
+          php bin/init.php --dev > /dev/null
+          export HESSUTALKS_CONFIG="$PWD/var/config.php"
+          CODE=$(php bin/seed-demo.php)
+          echo "EVENT_CODE=$CODE" >> "$GITHUB_ENV"
+          nohup php -d expose_php=0 -S 0.0.0.0:8080 -t public bin/dev-router.php > var/server.log 2>&1 &
+          for i in $(seq 1 20); do curl -fsS http://localhost:8080/healthz && break; sleep 1; done
+          # Varmista, että skanneri löytää kaikki sivut
+          printf 'http://localhost:8080/\nhttp://localhost:8080/k/%s\nhttp://localhost:8080/admin\nhttp://localhost:8080/tietosuoja\n' "$CODE" > var/urls.txt
+          curl -fsS -o /dev/null "http://localhost:8080/k/$CODE"
+      - name: ZAP baseline -skannaus
+        uses: zaproxy/action-baseline@de8ad967d3548d44ef623df22cf95c3b0baf8b25 # v0.15.0
+        with:
+          target: http://localhost:8080/k/${{ env.EVENT_CODE }}
+          rules_file_name: .zap/rules.tsv
+          cmd_options: '-a -I'
+          allow_issue_writing: false
+          fail_action: true
+          artifact_name: zap-raportti
+      - name: Palvelimen loki
+        if: failure()
+        run: cat var/server.log || true
+
+  # ---------------------------------------------------------------- deploy
+  deploy:
+    name: Deploy – hessujarvinen.com
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: [php, frontend, semgrep, gitleaks, dast]
+    runs-on: ubuntu-latest
+    environment:
+      name: production
+      url: https://hessujarvinen.com/softa/hessutalks/
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+      - uses: shivammathur/setup-php@eb7c497e18156a6bbabfef1d3a82760b9eda3962 # 2.40.0
+        with:
+          php-version: ${{ env.PHP_VERSION }}
+          extensions: sodium, pdo_sqlite, mbstring, openssl, intl
+          coverage: none
+          tools: composer:v2
+
+      - name: Rakenna julkaisupaketti
+        run: |
+          if [ -f composer.lock ]; then
+            composer install --no-dev --no-interaction --no-progress --optimize-autoloader --classmap-authoritative
+          else
+            composer update --no-dev --no-interaction --no-progress --optimize-autoloader --classmap-authoritative
+          fi
+          scripts/verify-vendor.sh
+          mkdir -p build/app build/public
+          cp -r src templates migrations vendor build/app/
+          mkdir -p build/app/bin && cp bin/init.php build/app/bin/
+          git rev-parse --short HEAD > build/app/VERSION
+          printf 'Require all denied\n' > build/app/.htaccess
+          cp -r public/. build/public/
+
+      - name: Lähetä sovelluskoodi (~/hessutalks-app, webrootin ulkopuolelle)
+        uses: SamKirkland/FTP-Deploy-Action@110f9186c050f71550953127052e77650219c287 # v4.4.0
+        with:
+          server: ${{ secrets.FTP_SERVER }}
+          username: ${{ secrets.FTP_USERNAME }}
+          password: ${{ secrets.FTP_PASSWORD }}
+          protocol: ftps
+          local-dir: build/app/
+          server-dir: hessutalks-app/
+          state-name: .ftp-deploy-sync-state-app.json
+
+      - name: Lähetä julkiset tiedostot (~/public_html/softa/hessutalks)
+        uses: SamKirkland/FTP-Deploy-Action@110f9186c050f71550953127052e77650219c287 # v4.4.0
+        with:
+          server: ${{ secrets.FTP_SERVER }}
+          username: ${{ secrets.FTP_USERNAME }}
+          password: ${{ secrets.FTP_PASSWORD }}
+          protocol: ftps
+          local-dir: build/public/
+          server-dir: public_html/softa/hessutalks/
+          state-name: .ftp-deploy-sync-state-public.json
+
+      - name: Savutesti tuotannossa
+        run: |
+          set -e
+          URL=https://hessujarvinen.com/softa/hessutalks
+          curl -fsS "$URL/healthz"
+          H=$(curl -fsS -D - -o /dev/null "$URL/")
+          echo "$H" | grep -qi '^content-security-policy:' || { echo "CSP puuttuu"; exit 1; }
+          echo "$H" | grep -qi '^strict-transport-security:' || { echo "HSTS puuttuu"; exit 1; }
+          # Sovelluskoodi ja data eivät saa näkyä webissä
+          for p in vendor/autoload.php src/App.php ../../hessutalks-data/config.php .htaccess; do
+            code=$(curl -s -o /dev/null -w '%{http_code}' "$URL/$p")
+            case "$code" in 200) echo "VUOTO: $p ($code)"; exit 1;; esac
+          done
+          echo "Tuotanto OK"

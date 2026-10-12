@@ -1,0 +1,47 @@
+# HessuTalks – Apache-asetukset (cPanel)
+Options -Indexes -MultiViews
+ServerSignature Off
+
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+
+  # Pakota HTTPS
+  RewriteCond %{HTTPS} !=on
+  RewriteCond %{HTTP:X-Forwarded-Proto} !=https
+  RewriteRule ^ https://%{HTTP_HOST}%{REQUEST_URI} [R=301,L]
+
+  # Estä piilotiedostot (.git, .env, .htaccess) ja lukitustiedostot
+  RewriteRule (^|/)\. - [F,L]
+  RewriteRule \.(lock|md|sql|sqlite|ini|log|sh|dist)$ - [F,L]
+
+  # Kaikki muu kuin olemassa olevat staattiset tiedostot -> index.php
+  RewriteCond %{REQUEST_FILENAME} !-f
+  RewriteRule ^ index.php [L,QSA]
+</IfModule>
+
+# Vain index.php saa suorittaa PHP:tä tässä hakemistossa
+<FilesMatch "\.(php|phtml|phar)$">
+  Require all denied
+</FilesMatch>
+<Files "index.php">
+  Require all granted
+</Files>
+
+<IfModule mod_headers.c>
+  Header always set X-Content-Type-Options "nosniff"
+  Header always set Referrer-Policy "no-referrer"
+  Header always set X-Frame-Options "DENY"
+  Header always set Strict-Transport-Security "max-age=31536000; includeSubDomains"
+  Header always set Cross-Origin-Resource-Policy "same-origin"
+  Header always set Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=(), usb=()"
+  Header always set Content-Security-Policy "default-src 'none'; frame-ancestors 'none'; base-uri 'none'" "expr=%{CONTENT_TYPE} !~ m#text/html#"
+  Header always unset X-Powered-By
+  <FilesMatch "\.(js|css|svg)$">
+    Header set Cache-Control "public, max-age=604800, immutable"
+  </FilesMatch>
+</IfModule>
+
+<IfModule mod_mime.c>
+  AddType application/javascript .js
+  AddType image/svg+xml .svg
+</IfModule>
