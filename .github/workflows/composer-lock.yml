@@ -1,0 +1,33 @@
+# Käsin käynnistettävä: ratkaisee PHP-riippuvuudet ja commitoi composer.lock-tiedoston.
+# Käytä, kun composer.json muuttuu tai lukitustiedosto halutaan uusia.
+name: Päivitä composer.lock
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  lock:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: shivammathur/setup-php@eb7c497e18156a6bbabfef1d3a82760b9eda3962 # 2.40.0
+        with:
+          php-version: '8.4'
+          extensions: sodium, pdo_sqlite, mbstring, openssl, intl
+          coverage: none
+          tools: composer:v2
+      - name: Ratkaise riippuvuudet
+        run: composer update --no-interaction --no-progress --no-install
+      - name: Tarkista haavoittuvuudet
+        run: composer audit --locked --no-interaction
+      - name: Commitoi composer.lock
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add composer.lock
+          git diff --cached --quiet && { echo "Ei muutoksia"; exit 0; }
+          git commit -m "Päivitä composer.lock"
+          git push
