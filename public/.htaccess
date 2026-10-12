@@ -33,6 +33,8 @@ ServerSignature Off
   Header always set X-Frame-Options "DENY"
   Header always set Strict-Transport-Security "max-age=31536000; includeSubDomains"
   Header always set Cross-Origin-Resource-Policy "same-origin"
+  Header always set Cross-Origin-Opener-Policy "same-origin"
+  Header always set Cross-Origin-Embedder-Policy "require-corp"
   Header always set Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=(), usb=()"
   Header always set Content-Security-Policy "default-src 'none'; frame-ancestors 'none'; base-uri 'none'" "expr=%{CONTENT_TYPE} !~ m#text/html#"
   Header always unset X-Powered-By

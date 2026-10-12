@@ -13,7 +13,7 @@
 
   <noscript><p class="notice error">Lomake vaatii JavaScriptin, koska viesti salataan selaimessasi ennen lähetystä.</p></noscript>
 
-  <form id="ask-form" class="ask-form" novalidate hidden>
+  <form id="ask-form" class="ask-form" method="post" action="#" novalidate hidden>
     <div id="nick-pick">
       <label for="nickname">Nimimerkki</label>
       <input id="nickname" name="nickname" type="text" minlength="2" maxlength="24" required

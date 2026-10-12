@@ -34,6 +34,7 @@ final class SecurityHeaders
             ->withHeader('Referrer-Policy', 'no-referrer')
             ->withHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=(), payment=(), usb=(), interest-cohort=()')
             ->withHeader('Cross-Origin-Opener-Policy', 'same-origin')
+            ->withHeader('Cross-Origin-Embedder-Policy', 'require-corp')
             ->withHeader('Cross-Origin-Resource-Policy', 'same-origin')
             ->withHeader('Cache-Control', 'no-store, max-age=0')
             ->withHeader('X-Robots-Tag', 'noindex, nofollow');
