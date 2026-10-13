@@ -12,7 +12,19 @@ Osoite: <https://hessujarvinen.com/hessutalks/>
 2. Osallistuja avaa sivun, valitsee nimimerkin ja kirjoittaa kysymyksen tai palautteen.
 3. Viesti ja nimimerkki salataan osallistujan selaimessa luennoitsijan julkisella avaimella.
 4. Luennoitsija avaa viestit omassa selaimessaan tunnuslauseella. Ne päivittyvät reaaliaikaisesti,
-   ja yksittäisen kysymyksen voi näyttää projektorilla.
+   ja QR-koodin, yksittäisen kysymyksen tai kysymyslistan voi näyttää projektorilla.
+
+### Esitys projektorilla
+
+Kun projektori on kytketty jatketuksi näytöksi (ei peilaus), luennon *…projektorille*-napit avaavat
+erillisen esitysikkunan (`/admin/esitys`) toiselle näytölle. Hallintanäkymä jää läppärin näytölle.
+
+- Chrome ja Edge sijoittavat ikkunan automaattisesti (Window Management API). Ensimmäisellä kerralla
+  selain kysyy luvan *ikkunoiden hallintaan*. Jos ponnahdusikkuna estyy luvan kysymisen takia, paina nappia uudelleen.
+- Muissa selaimissa ikkuna aukeaa tavallisena ikkunana: raahaa se projektorin näytölle.
+- Kaksoisklikkaus tai F-näppäin vaihtaa koko näytön tilaan, Esc palauttaa.
+- Kysymyslista päivittyy automaattisesti. Palautteet eivät näy listassa yleisölle.
+- *Tyhjennä projektori* tyhjentää näytön. Näyttö tyhjenee myös uloskirjautuessa ja hallintasivun sulkeutuessa.
 
 ### Ei henkilötietoja
 

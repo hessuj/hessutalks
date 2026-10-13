@@ -75,7 +75,7 @@
     }
     return fetch(API + path, opts).then(function (res) {
       return res.json().catch(function () { return {}; }).then(function (data) {
-        if (res.status === 401) { secretKey = null; showLogin('Istunto on päättynyt. Kirjaudu uudelleen.'); throw new Error('401'); }
+        if (res.status === 401) { secretKey = null; presenterEnd(); showLogin('Istunto on päättynyt. Kirjaudu uudelleen.'); throw new Error('401'); }
         if (!res.ok) throw new Error(data.error || ('Virhe ' + res.status));
         if (data && typeof data.csrf === 'string') csrf = data.csrf;
         return data;
@@ -366,16 +366,69 @@
     return qr.createDataURL(cell, 4);
   }
 
-  function stage(nodes) {
-    var close = h('button.btn.ghost.small.stage-close', { type: 'button', text: 'Sulje (Esc)' });
-    var el = h('div.stage', { role: 'dialog', 'aria-modal': 'true' }, close, nodes);
-    function remove() { el.remove(); document.removeEventListener('keydown', onKey); }
-    function onKey(e) { if (e.key === 'Escape') remove(); }
-    close.addEventListener('click', remove);
-    document.addEventListener('keydown', onKey);
-    document.body.appendChild(el);
-    close.focus();
-    if (el.requestFullscreen) el.requestFullscreen().catch(function () {});
+  // ================================================================ esitysnäyttö (projektori)
+  //
+  // Esitysikkuna (/admin/esitys) avataan jatketulle näytölle, jolloin hallintanäkymä jää
+  // läppärin näytölle. Ikkunassa ei ole salausavainta: tämä ikkuna lähettää sille vain
+  // näytettävän tekstin postMessagella saman originin sisällä.
+
+  var ORIGIN = window.location.origin;
+  var presenterWin = null;
+  var presenterMsg = null;    // viimeisin sisältö; lähetetään uudelleen, kun ikkuna ilmoittaa olevansa valmis
+  var presenterLive = null;   // funktio, joka tuottaa päivittyvän sisällön (kysymyslista)
+  var presenterNote = h('span.hint');
+
+  function presenterOpen() { return !!presenterWin && !presenterWin.closed; }
+
+  function presenterPost(msg) {
+    if (presenterOpen()) presenterWin.postMessage(msg, ORIGIN);
+  }
+
+  /** Valitsee näytön, joka ei ole tämän ikkunan näyttö (Window Management API, Chrome/Edge). */
+  function extendedScreen() {
+    if (typeof window.getScreenDetails !== 'function') return Promise.resolve(null);
+    return window.getScreenDetails().then(function (d) {
+      var cur = d.currentScreen;
+      var others = d.screens.filter(function (s) {
+        return s.availLeft !== cur.availLeft || s.availTop !== cur.availTop;
+      });
+      return others.filter(function (s) { return !s.isPrimary; })[0] || others[0] || null;
+    }).catch(function () { return null; });
+  }
+
+  function openPresenter() {
+    return extendedScreen().then(function (scr) {
+      var features = scr
+        ? 'popup,left=' + scr.availLeft + ',top=' + scr.availTop + ',width=' + scr.availWidth + ',height=' + scr.availHeight + ',fullscreen'
+        : 'popup,width=1024,height=768';
+      // Ei noopeneria: esitysikkuna tarvitsee avaajan viestien lähettäjän tunnistamiseen.
+      presenterWin = window.open(BASE + '/admin/esitys', 'hessutalks-esitys', features);
+      if (!presenterWin) {
+        presenterNote.textContent = 'Selain esti ikkunan. Salli ponnahdusikkunat tai paina nappia uudelleen.';
+      } else if (scr) {
+        presenterNote.textContent = 'Esitysnäyttö avattu toiselle näytölle. Kaksoisklikkaa sitä tai paina F, jos se ei ole koko ruudun kokoinen.';
+      } else {
+        presenterNote.textContent = 'Siirrä esitysikkuna projektorin näytölle ja kaksoisklikkaa sitä (koko näyttö). Automaattinen sijoitus toimii Chromessa ja Edgessä.';
+      }
+    });
+  }
+
+  /** Näyttää sisällön projektorilla. live = funktio, jolla sisältö päivitetään kyselyjen välissä. */
+  function present(msg, live) {
+    presenterMsg = msg;
+    presenterLive = live || null;
+    if (presenterOpen()) { presenterPost(msg); return; }
+    openPresenter();
+  }
+
+  window.addEventListener('message', function (ev) {
+    if (ev.origin !== ORIGIN || !presenterOpen() || ev.source !== presenterWin) return;
+    if (ev.data && ev.data.type === 'ready' && presenterMsg) presenterPost(presenterMsg);
+  });
+
+  function presenterEnd() {
+    presenterMsg = null; presenterLive = null;
+    presenterPost({ type: 'end' });
   }
 
   function showEvent(id) {
@@ -397,8 +450,14 @@
             h('p.big-code', { text: event.code }),
             h('p.url', null, h('a', { href: url, target: '_blank', rel: 'noopener', text: url })),
             h('p', null,
-              h('button.btn.small', { type: 'button', text: 'Näytä projektorilla', onclick: function () {
-                stage([h('p.stage-code', { text: event.code }), h('img', { src: qrDataUrl(url, 10), alt: 'QR-koodi' }), h('p.stage-url', { text: url })]);
+              h('button.btn.small', { type: 'button', text: 'QR-koodi projektorille', onclick: function () {
+                present({ type: 'qr', code: event.code, url: url });
+              } }), ' ',
+              h('button.btn.small', { type: 'button', text: 'Kysymykset projektorille', onclick: function () {
+                present(listMessage(), listMessage);
+              } }), ' ',
+              h('button.btn.ghost.small', { type: 'button', text: 'Tyhjennä projektori', onclick: function () {
+                present({ type: 'blank' });
               } }), ' ',
               h('button.btn.ghost.small', { type: 'button', text: event.open ? 'Sulje kysymykset' : 'Avaa kysymykset', onclick: function () {
                 api('POST', 'events/' + id + '/status', { status: event.open ? 'closed' : 'open' }).then(function (r) { event = r.event; renderHead(); });
@@ -407,8 +466,24 @@
                 if (!window.confirm('Poistetaanko luento "' + event.title + '" ja kaikki sen viestit pysyvästi?')) return;
                 api('POST', 'events/' + id + '/delete', {}).then(function () { return loadState(); }).then(function () { showEvents('Luento poistettu.'); });
               } })),
-            h('p.hint', { text: event.open ? 'Kysymykset ovat auki.' : 'Kysymykset on suljettu. Osallistujat eivät voi lähettää uusia viestejä.' })))
+            h('p.hint', { text: event.open ? 'Kysymykset ovat auki.' : 'Kysymykset on suljettu. Osallistujat eivät voi lähettää uusia viestejä.' }),
+            h('p', null, presenterNote)))
       );
+    }
+
+    // Projektorin kysymyslista: käsiteltävät kysymykset, vanhin ensin. Palautteita ei näytetä yleisölle.
+    var LIST_MAX = 10;
+    function listMessage() {
+      var bad = nickConflicts();
+      var shown = items.filter(function (it) {
+        var m = it.msg;
+        return m && m.k !== 'feedback' && m.e === event.code && typeof m.t === 'string' && typeof m.n === 'string' &&
+          !bad[it.nickname_id] && (it.status === 'new' || it.status === 'answered');
+      }).slice(-LIST_MAX);
+      return {
+        type: 'list', title: event.title,
+        items: shown.map(function (it) { return { nick: it.msg.n, text: it.msg.t }; })
+      };
     }
 
     function filterButton(key, label) {
@@ -447,6 +522,10 @@
         return it.status === filter;
       }).slice().reverse();
       countEl.textContent = visible.length + ' / ' + items.length + ' viestiä';
+      if (presenterLive === listMessage) {
+        var next = listMessage();
+        if (JSON.stringify(next) !== JSON.stringify(presenterMsg)) { presenterMsg = next; presenterPost(next); }
+      }
       listEl.replaceChildren();
       if (!visible.length) {
         listEl.appendChild(h('li.empty', { text: items.length ? 'Ei viestejä tällä suodattimella.' : 'Ei vielä viestejä. Uudet viestit tulevat näkyviin automaattisesti.' }));
@@ -466,8 +545,8 @@
           bad[it.nickname_id] ? notice('Sama nimimerkkivaraus on käyttänyt eri nimimerkkejä.', 'error') : null,
           m ? h('p.q-text', { text: String(m.t) }) : null,
           h('div.q-actions', null,
-            m ? h('button.btn.small', { type: 'button', text: 'Näytä isona', onclick: function () {
-              stage([h('p.stage-url', { text: m.n }), h('p.stage-q', { text: String(m.t) })]);
+            m ? h('button.btn.small', { type: 'button', text: 'Näytä projektorilla', onclick: function () {
+              present({ type: 'question', nick: typeof m.n === 'string' ? m.n : '?', text: String(m.t) });
               if (it.status === 'new') setStatus(it, 'answered');
             } }) : null,
             it.status !== 'answered' ? h('button.btn.ghost.small', { type: 'button', text: 'Merkitse vastatuksi', onclick: function () { setStatus(it, 'answered'); } }) : null,
@@ -592,5 +671,6 @@
     .catch(function (e) { mount(notice('Alustus epäonnistui: ' + e.message, 'error')); });
 
   // Lukitse avain, jos välilehti suljetaan tai sivu ladataan uudelleen.
-  window.addEventListener('pagehide', function () { if (secretKey) sodium.memzero(secretKey); secretKey = null; });
+  // Tyhjennä myös esitysnäyttö, ettei purettu sisältö jää sinne näkyviin.
+  window.addEventListener('pagehide', function () { if (secretKey) sodium.memzero(secretKey); secretKey = null; presenterEnd(); });
 })();

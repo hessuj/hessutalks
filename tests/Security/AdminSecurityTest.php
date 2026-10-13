@@ -242,6 +242,47 @@ final class AdminSecurityTest extends AppTestCase
         self::assertSame(409, $r->status);
     }
 
+    // ------------------------------------------------------------ esitysnäyttö (projektori)
+
+    public function testPresenterPageRequiresLogin(): void
+    {
+        $r = $this->request('GET', '/admin/esitys');
+        self::assertSame(401, $r->status);
+        self::assertStringNotContainsString('presenter.js', $r->body);
+        self::assertSame(405, $this->request('POST', '/admin/esitys', [])->status);
+    }
+
+    public function testPresenterPageHasNoKeysDataOrAdminUi(): void
+    {
+        $this->createKeys();
+        $this->createEvent();
+        $csrf = $this->loginAdmin();
+        $r = $this->request('GET', '/admin/esitys');
+        self::assertSame(200, $r->status);
+        self::assertStringContainsString('js/presenter.js', $r->body);
+        // Esitysikkuna ei pura viestejä: ei salauskirjastoa, ei hallinnan skriptiä, CSRF-tokenia eikä dataa.
+        self::assertStringNotContainsString('sodium', $r->body);
+        self::assertStringNotContainsString('admin.js', $r->body);
+        self::assertStringNotContainsString($csrf, $r->body);
+        self::assertStringNotContainsString('Testiluento', $r->body);
+        self::assertStringNotContainsString('topbar', $r->body);
+        self::assertStringStartsWith(SecurityHeaders::CSP, $r->headers['Content-Security-Policy'] ?? '');
+        self::assertSame('DENY', $r->headers['X-Frame-Options'] ?? null);
+    }
+
+    public function testPresenterScriptAcceptsOnlyOpenerMessagesAndUsesTextContent(): void
+    {
+        $js = (string) file_get_contents(dirname(__DIR__, 2) . '/public/assets/js/presenter.js');
+        self::assertStringContainsString('ev.origin !== window.location.origin', $js);
+        self::assertStringContainsString('ev.source !== window.opener', $js);
+        self::assertSame(0, preg_match('/\\.(innerHTML|outerHTML)\\b|insertAdjacentHTML|document\\.write/', $js));
+        self::assertStringNotContainsString('sodium', $js);
+        // Hallinta lähettää viestit vain omaan originiinsa, ei koskaan '*'.
+        $admin = (string) file_get_contents(dirname(__DIR__, 2) . '/public/assets/js/admin.js');
+        self::assertStringNotContainsString("postMessage(msg, '*')", $admin);
+        self::assertSame(0, preg_match('/postMessage\([^)]*[\'"]\*[\'"]/', $admin . $js));
+    }
+
     // ------------------------------------------------------------ turvaotsakkeet
 
     public function testSecurityHeadersOnEveryResponse(): void
@@ -253,6 +294,7 @@ final class AdminSecurityTest extends AppTestCase
             $this->request('GET', '/k/' . $code),
             $this->request('GET', '/admin'),
             $this->request('GET', '/admin/api/state'),
+            $this->request('GET', '/admin/esitys'),
             $this->request('GET', '/olematon'),
             $this->request('POST', '/api/questions', []),
         ];
