@@ -396,21 +396,49 @@
     }).catch(function () { return null; });
   }
 
+  // Ikkuna avataan ensin kohtuullisen kokoisena kohdenäytön keskelle. Se suurennetaan vasta, kun on
+  // varmistettu, että selain todella sijoitti sen sinne: muuten ylisuuri ikkuna jäisi väärälle näytölle.
+  var PRESENTER_W = 960;
+  var PRESENTER_H = 600;
+  var presenterScreen = null;   // kohdenäyttö, jonka kokoiseksi ikkuna suurennetaan, kun se on valmis
+
   function openPresenter() {
     return extendedScreen().then(function (scr) {
-      var features = scr
-        ? 'popup,left=' + scr.availLeft + ',top=' + scr.availTop + ',width=' + scr.availWidth + ',height=' + scr.availHeight + ',fullscreen'
-        : 'popup,width=1024,height=768';
+      var features = 'popup,width=' + PRESENTER_W + ',height=' + PRESENTER_H;
+      if (scr) {
+        features += ',left=' + Math.round(scr.availLeft + (scr.availWidth - PRESENTER_W) / 2) +
+          ',top=' + Math.round(scr.availTop + (scr.availHeight - PRESENTER_H) / 2);
+      }
       // Ei noopeneria: esitysikkuna tarvitsee avaajan viestien lähettäjän tunnistamiseen.
       presenterWin = window.open(BASE + '/admin/esitys', 'hessutalks-esitys', features);
+      presenterScreen = presenterWin ? scr : null;
       if (!presenterWin) {
         presenterNote.textContent = 'Selain esti ikkunan. Salli ponnahdusikkunat tai paina nappia uudelleen.';
-      } else if (scr) {
-        presenterNote.textContent = 'Esitysnäyttö avattu toiselle näytölle. Kaksoisklikkaa sitä tai paina F, jos se ei ole koko ruudun kokoinen.';
-      } else {
+      } else if (!scr) {
         presenterNote.textContent = 'Siirrä esitysikkuna projektorin näytölle ja kaksoisklikkaa sitä (koko näyttö). Automaattinen sijoitus toimii Chromessa ja Edgessä.';
       }
     });
+  }
+
+  function isOnScreen(win, scr) {
+    var x = win.screenX + win.outerWidth / 2;
+    var y = win.screenY + win.outerHeight / 2;
+    return x >= scr.availLeft && x < scr.availLeft + scr.availWidth &&
+      y >= scr.availTop && y < scr.availTop + scr.availHeight;
+  }
+
+  /** Suurentaa esitysikkunan kohdenäytön kokoiseksi, jos ikkuna on kohdenäytöllä. */
+  function fitPresenter() {
+    var scr = presenterScreen;
+    presenterScreen = null;
+    if (!scr || !presenterOpen()) return;
+    if (!isOnScreen(presenterWin, scr)) {
+      presenterNote.textContent = 'Selain ei sijoittanut ikkunaa toiselle näytölle. Raahaa se projektorille ja kaksoisklikkaa sitä (koko näyttö).';
+      return;
+    }
+    presenterWin.moveTo(scr.availLeft, scr.availTop);
+    presenterWin.resizeTo(scr.availWidth, scr.availHeight);
+    presenterNote.textContent = 'Esitysnäyttö avattu toiselle näytölle. Kaksoisklikkaa sitä tai paina F: koko näyttö.';
   }
 
   /** Näyttää sisällön projektorilla. live = funktio, jolla sisältö päivitetään kyselyjen välissä. */
@@ -423,7 +451,9 @@
 
   window.addEventListener('message', function (ev) {
     if (ev.origin !== ORIGIN || !presenterOpen() || ev.source !== presenterWin) return;
-    if (ev.data && ev.data.type === 'ready' && presenterMsg) presenterPost(presenterMsg);
+    if (!ev.data || ev.data.type !== 'ready') return;
+    fitPresenter();
+    if (presenterMsg) presenterPost(presenterMsg);
   });
 
   function presenterEnd() {
@@ -471,7 +501,8 @@
       );
     }
 
-    // Projektorin kysymyslista: käsiteltävät kysymykset, vanhin ensin. Palautteita ei näytetä yleisölle.
+    // Projektorin kysymyslista: käsiteltävät kysymykset, uusin ensin (jos kaikki eivät mahdu, vanhimmat jäävät pois).
+    // Palautteita ei näytetä yleisölle.
     var LIST_MAX = 10;
     function listMessage() {
       var bad = nickConflicts();
@@ -479,7 +510,7 @@
         var m = it.msg;
         return m && m.k !== 'feedback' && m.e === event.code && typeof m.t === 'string' && typeof m.n === 'string' &&
           !bad[it.nickname_id] && (it.status === 'new' || it.status === 'answered');
-      }).slice(-LIST_MAX);
+      }).slice(-LIST_MAX).reverse();
       return {
         type: 'list', title: event.title,
         items: shown.map(function (it) { return { nick: it.msg.n, text: it.msg.t }; })
