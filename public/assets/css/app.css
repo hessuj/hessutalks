@@ -189,7 +189,7 @@ details.optional summary { cursor: pointer; font-weight: 600; color: var(--accen
 
 /* ---- projektori- ja esitysnäkymät ---- */
 .stage {
-  position: fixed; inset: 0; z-index: 10;
+  position: fixed; inset: 0; z-index: 10; max-width: none;
   background: var(--screen); border: var(--frame-w) solid var(--frame);
   display: flex; flex-direction: column; align-items: center; justify-content: center;
   padding: 4vh 5vw; text-align: center; gap: 3vh;
@@ -203,8 +203,8 @@ details.optional summary { cursor: pointer; font-weight: 600; color: var(--accen
   display: grid; align-content: start; gap: 1.6vh; overflow: hidden; min-height: 0; flex: 0 1 auto;
 }
 .stage .stage-list li { border-left: .5vw solid var(--accent); padding: .4vh 1.2vw; }
-.stage .stage-nick { display: block; font: 600 min(1.8vw, 2.4vh)/1.2 var(--sans); color: var(--accent); }
-.stage .stage-list-text { display: block; font: 600 min(2.6vw, 3.4vh)/1.3 var(--sans); white-space: pre-wrap; overflow-wrap: anywhere; }
+.stage .stage-nick { display: block; font: 600 min(1.5vw, 2vh)/1.2 var(--sans); color: var(--accent); }
+.stage .stage-list-text { display: block; font: 600 min(2.1vw, 2.8vh)/1.3 var(--sans); white-space: pre-wrap; overflow-wrap: anywhere; }
 
 /* Esitysikkuna (/admin/esitys) jatketulla näytöllä */
 body.presenter { padding: 0; min-height: 0; height: 100vh; overflow: hidden; }

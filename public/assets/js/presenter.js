@@ -52,7 +52,23 @@
       ol.appendChild(li);
     });
     show(h('p', 'stage-url', title), items.length ? ol : h('p', 'stage-q', 'Ei kysymyksiä.'));
+    trimList();
   }
+
+  // Piilottaa listan lopusta kohdat, jotka eivät mahdu kokonaan näkyviin (ei puoliksi leikattuja rivejä).
+  function trimList() {
+    var ol = root.querySelector('.stage-list');
+    if (!ol) return;
+    var li = ol.children;
+    for (var i = 0; i < li.length; i++) li[i].hidden = false;
+    var bottom = ol.getBoundingClientRect().bottom;
+    var full = false;
+    for (i = 0; i < li.length; i++) {
+      if (!full && i > 0 && li[i].getBoundingClientRect().bottom > bottom + 1) full = true;
+      li[i].hidden = full;
+    }
+  }
+  window.addEventListener('resize', trimList);
 
   function onMessage(ev) {
     if (ev.origin !== window.location.origin || !window.opener || ev.source !== window.opener) return;

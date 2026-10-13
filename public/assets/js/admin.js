@@ -501,7 +501,8 @@
       );
     }
 
-    // Projektorin kysymyslista: käsiteltävät kysymykset, vanhin ensin. Palautteita ei näytetä yleisölle.
+    // Projektorin kysymyslista: käsiteltävät kysymykset, uusin ensin (jos kaikki eivät mahdu, vanhimmat jäävät pois).
+    // Palautteita ei näytetä yleisölle.
     var LIST_MAX = 10;
     function listMessage() {
       var bad = nickConflicts();
@@ -509,7 +510,7 @@
         var m = it.msg;
         return m && m.k !== 'feedback' && m.e === event.code && typeof m.t === 'string' && typeof m.n === 'string' &&
           !bad[it.nickname_id] && (it.status === 'new' || it.status === 'answered');
-      }).slice(-LIST_MAX);
+      }).slice(-LIST_MAX).reverse();
       return {
         type: 'list', title: event.title,
         items: shown.map(function (it) { return { nick: it.msg.n, text: it.msg.t }; })
