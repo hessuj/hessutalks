@@ -196,6 +196,7 @@ jobs:
           mkdir -p build/app
           cp -r public/. build/
           cp -r src templates migrations vendor build/app/
+          mkdir -p build/app/bin && cp bin/init.php build/app/bin/
           git rev-parse --short HEAD > build/app/VERSION
           printf 'Require all denied\n' > build/app/.htaccess
           # Varmistus: paketissa ei saa olla asetuksia, tietokantoja eikä git-dataa
@@ -248,7 +249,7 @@ jobs:
             echo "$H" | grep -qi '^strict-transport-security:' || fail "HSTS-otsake puuttuu"
           fi
           # Sovelluskoodi ei saa näkyä webissä
-          for p in app/ app/VERSION app/vendor/autoload.php app/src/App.php app/migrations/001_init.sql .htaccess .ftp-deploy-sync-state.json; do
+          for p in app/ app/VERSION app/bin/init.php app/vendor/autoload.php app/src/App.php app/migrations/001_init.sql .htaccess .ftp-deploy-sync-state.json; do
             c=$(curl -s -o /dev/null -w '%{http_code}' "$URL/$p")
             echo "$p -> $c"
             case "$c" in 200) fail "VUOTO: $URL/$p palautti 200";; esac

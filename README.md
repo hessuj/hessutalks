@@ -72,7 +72,7 @@ käsiksi tietokantaan eikä muihin sivuston osiin.
    Varmista, että laajennukset `sodium`, `pdo_sqlite`, `mbstring` ja `intl` ovat päällä (*Select PHP Version → Extensions*).
 2. **FTP-tili:** cPanel → *FTP Accounts* → esim. `deploy-hessutalks@hessujarvinen.com`.
    Directory-kentäksi sovelluksen kansio sivuston juuren (`public_html`) alla: `public_html/hessutalks`.
-3. **GitHub:** repo → *Settings → Environments* → luo ympäristö `production` ja lisää siihen secretit:
+3. **GitHub:** (julkaisu käynnistyy pushista `main`-haaraan tai *Actions → CI/CD → Run workflow*) repo → *Settings → Environments* → luo ympäristö `production` ja lisää siihen secretit:
    - `FTP_SERVER`: esim. `ftp.hessujarvinen.com`
    - `FTP_USERNAME`: FTP-tilin koko käyttäjätunnus
    - `FTP_PASSWORD`: FTP-tilin salasana
@@ -80,20 +80,20 @@ käsiksi tietokantaan eikä muihin sivuston osiin.
    Jos sovellus ei ole osoitteessa `https://hessujarvinen.com/hessutalks`, lisää
    *Settings → Secrets and variables → Actions → Variables* -kohtaan muuttuja `APP_URL`.
    Halutessasi lisää ympäristöön *Required reviewers* → itsesi, jolloin jokainen julkaisu odottaa hyväksyntääsi.
-4. **Asetustiedosto:** aja omalla koneellasi repon juuressa:
+4. **Asetustiedosto:** kun sovellus on julkaistu kerran, avaa cPanel → *Terminal* ja aja:
    ```sh
-   php bin/init.php --origin=https://hessujarvinen.com --base=/hessutalks \
-       --data=/home/CPANEL-KÄYTTÄJÄ/hessutalks-data --out=config.php
+   php ~/public_html/hessutalks/app/bin/init.php --origin=https://hessujarvinen.com --base=/hessutalks
    ```
-   `--base` on sovelluksen polku URL:ssa ja `--data` kotihakemistosi alla oleva kansio
-   (cPanelin etusivulla näkyy *Home Directory*). Komento tulostaa **käyttöönottotunnuksen**, joka kannattaa tallentaa hetkeksi.
-   Luo cPanelin *File Managerilla* kotihakemistoon kansio `hessutalks-data` (oikeudet `700`), lataa `config.php` sinne
-   (oikeudet `600`) ja poista se omalta koneeltasi. Sovellus löytää tiedoston automaattisesti.
-5. **Julkaisu:** push `main`-haaraan tai *Actions → CI/CD → Run workflow*.
-6. **Ensimmäinen kirjautuminen:** avaa `https://hessujarvinen.com/hessutalks/admin`, syötä käyttöönottotunnus ja luo passkey.
+   Komento luo tiedoston `~/hessutalks-data/config.php` suoraan oikeaan paikkaan kotihakemistoon
+   sivuston ulkopuolelle oikeilla tiedosto-oikeuksilla. Se tulostaa **käyttöönottotunnuksen**, joka kannattaa tallentaa hetkeksi.
+   Sovellus löytää asetukset automaattisesti.
+
+   *Jos cPanelissa ei ole Terminalia:* aja sama komento omalla koneella repon juuressa (`php bin/init.php … --data=/home/CPANEL-KÄYTTÄJÄ/hessutalks-data --out=config.php`,
+   vaatii PHP:n, esim. `brew install php`). Lataa sitten `config.php` File Managerilla kotihakemiston kansioon `hessutalks-data` (oikeudet `700`/`600`).
+5. **Ensimmäinen kirjautuminen:** avaa `https://hessujarvinen.com/hessutalks/admin`, syötä käyttöönottotunnus ja luo passkey.
    Luo sen jälkeen salausavaimet tunnuslauseella. Tallenna tunnuslause salasanojen hallintaan
    ja talleta ladattu varmuuskopiotiedosto turvaan.
-7. **Varapasskey:** lisää *Asetukset*-sivulta toinen passkey esimerkiksi puhelimeen.
+6. **Varapasskey:** lisää *Asetukset*-sivulta toinen passkey esimerkiksi puhelimeen.
 
 ## Kehitys omalla koneella
 
