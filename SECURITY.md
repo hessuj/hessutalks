@@ -23,6 +23,7 @@ Ilmoita haavoittuvuuksista yksityisesti GitHubin *Security → Report a vulnerab
 | CSRF | Tarkka Origin-vertailu, `Sec-Fetch-Site`-tarkistus, CSRF-token, vain JSON-pyynnöt |
 | XSS viestien kautta | CSP ilman inline-skriptejä. Purettu sisältö lisätään DOMiin vain `textContent`illa. Templatet escapoidaan. |
 | Toisen nimimerkin käyttö | Varaus sidotaan satunnaiseen 256-bittiseen omistajatunnisteeseen, josta palvelimella on vain tiiviste |
+| Projektorin esitysikkuna | Esitysikkunassa ei ole salausavainta eikä salauskirjastoa. Hallintaikkuna lähettää sille vain näytettävän tekstin `postMessage`lla omaan originiinsa. Esitysikkuna hyväksyy viestit vain avaajaltaan ja samasta originista, ja se vaatii kirjautumisen. Näyttö tyhjennetään, kun hallintaikkuna suljetaan. |
 | Viestin siirto toiselle luennolle | Luennon koodi on salatun viestin sisällä. Ylläpitonäkymä varoittaa ristiriidasta. |
 | Roskapostitus | Nimimerkki- ja luentokohtaiset rajat sekä luentokohtaiset enimmäismäärät |
 | Luentokoodien arvailu | Avaruus 31⁶ ≈ 887 milj. Epäonnistuneita hakuja rajoitetaan palvelun tasolla. |

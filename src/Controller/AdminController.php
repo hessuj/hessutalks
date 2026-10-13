@@ -45,6 +45,21 @@ final class AdminController
     }
 
     /**
+     * Esitysikkuna projektorille. Sivu ei sisällä dataa eikä salauskirjastoa: se näyttää vain sen,
+     * minkä kirjautuneen ylläpitäjän ikkuna (avaaja) lähettää sille postMessagella.
+     */
+    public function presenter(): Response
+    {
+        if (!$this->auth->isAuthenticated()) {
+            return Response::html('<!doctype html><meta charset="utf-8"><title>Kirjautuminen vaaditaan</title><p>Kirjautuminen vaaditaan.</p>', 401);
+        }
+        return Response::html($this->view->render('presenter', [
+            'pageTitle' => 'Esitys',
+            'scripts' => ['vendor/qrcode.js', 'js/presenter.js'],
+        ], 'presenter_layout'));
+    }
+
+    /**
      * Ohjaa /admin/api/* -pyynnöt. Kaikki POST-pyynnöt vaativat saman originin ja CSRF-tokenin;
      * kaikki paitsi kirjautumiseen liittyvät vaativat kirjautumisen.
      */

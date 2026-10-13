@@ -87,6 +87,9 @@ final class App
             if ($path === '/admin' || $path === '/admin/') {
                 return $req->method === 'GET' ? $this->admin->page() : Response::error('Metodia ei tueta.', 405);
             }
+            if ($path === '/admin/esitys') {
+                return $req->method === 'GET' ? $this->admin->presenter() : Response::error('Metodia ei tueta.', 405);
+            }
             if (str_starts_with($path, '/admin/api/')) {
                 $route = substr($path, strlen('/admin/api/'));
                 if (preg_match('#^[a-z0-9/_-]{1,64}$#', $route) !== 1) {
@@ -126,6 +129,18 @@ final class App
     private static function assetVersion(string $appRoot): string
     {
         $file = $appRoot . '/VERSION';
-        return is_file($file) ? trim((string) file_get_contents($file)) : 'dev';
+        if (is_file($file)) {
+            return trim((string) file_get_contents($file));
+        }
+        // Kehityksessä ei ole VERSION-tiedostoa (CI kirjoittaa sen). Versio lasketaan resurssien
+        // muokkausajoista, jotta selaimen välimuisti (immutable) ei tarjoa vanhaa JS:ää tai CSS:ää.
+        $mtime = 0;
+        foreach (['css', 'js'] as $dir) {
+            $assets = glob($appRoot . '/public/assets/' . $dir . '/*');
+            foreach ($assets === false ? [] : $assets as $asset) {
+                $mtime = max($mtime, (int) filemtime($asset));
+            }
+        }
+        return 'dev-' . $mtime;
     }
 }
