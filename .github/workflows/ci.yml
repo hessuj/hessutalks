@@ -219,20 +219,24 @@ jobs:
         run: |
           set -e
           URL="${APP_URL%/}"
+          fail() { echo "::error title=Savutesti::$1"; exit 1; }
           code=$(curl -s -o /dev/null -w '%{http_code}' "$URL/healthz")
+          echo "::notice title=Savutesti::$URL/healthz -> $code"
           if [ "$code" = 503 ]; then
-            echo "::warning::Sovellus on julkaistu, mutta asetustiedostoa ~/hessutalks-data/config.php ei vielä löydy (HTTP 503)."
+            echo "::warning title=Savutesti::Sovellus on julkaistu, mutta asetustiedostoa ~/hessutalks-data/config.php ei vielä löydy (HTTP 503)."
+          elif [ "$code" = 404 ]; then
+            fail "$URL/healthz palautti 404. Onko FTP-tilin hakemisto sama kuin APP_URL ($URL)?"
           elif [ "$code" != 200 ]; then
-            echo "healthz palautti $code"; exit 1
+            fail "$URL/healthz palautti $code"
           else
             H=$(curl -fsS -D - -o /dev/null "$URL/")
-            echo "$H" | grep -qi '^content-security-policy:' || { echo "CSP puuttuu"; exit 1; }
-            echo "$H" | grep -qi '^strict-transport-security:' || { echo "HSTS puuttuu"; exit 1; }
+            echo "$H" | grep -qi '^content-security-policy:' || fail "CSP-otsake puuttuu"
+            echo "$H" | grep -qi '^strict-transport-security:' || fail "HSTS-otsake puuttuu"
           fi
           # Sovelluskoodi ei saa näkyä webissä
           for p in app/ app/VERSION app/vendor/autoload.php app/src/App.php app/migrations/001_init.sql .htaccess .ftp-deploy-sync-state.json; do
             c=$(curl -s -o /dev/null -w '%{http_code}' "$URL/$p")
-            case "$c" in 200) echo "VUOTO: $p ($c)"; exit 1;; esac
             echo "$p -> $c"
+            case "$c" in 200) fail "VUOTO: $URL/$p palautti 200";; esac
           done
-          echo "Tuotanto OK"
+          echo "::notice title=Savutesti::Tuotanto OK"
