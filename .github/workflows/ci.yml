@@ -170,7 +170,7 @@ jobs:
   # Sovelluksen julkinen osoite asetetaan repon muuttujaan APP_URL (Settings → Variables).
   deploy:
     name: Deploy – hessujarvinen.com
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    if: (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && github.ref == 'refs/heads/main'
     needs: [php, frontend, semgrep, gitleaks, dast]
     runs-on: ubuntu-latest
     environment:
