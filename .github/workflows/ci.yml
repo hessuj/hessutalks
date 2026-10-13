@@ -215,6 +215,20 @@ jobs:
           server-dir: ./
           state-name: .ftp-deploy-sync-state.json
 
+      - name: Diagnostiikka – mihin tiedostot päätyivät
+        if: always()
+        run: |
+          URL="${APP_URL%/}"
+          BASE="${URL%/*}"
+          for u in "$URL/" "$URL/index.php" "$URL/assets/favicon.svg" "$URL/assets/css/app.css" "$URL/healthz" "$URL/index.php/healthz" \
+                   "$BASE/" "$BASE/softa/hessutalks/assets/favicon.svg" "$BASE/hessutalks/assets/favicon.svg"; do
+            out=$(curl -s -L --max-time 20 -o body.tmp -w '%{http_code} %{content_type} %{url_effective}' "$u" || echo "curl-virhe")
+            title=$(grep -o -i '<title>[^<]*' body.tmp 2>/dev/null | head -1 | sed 's/<title>//I' | tr -d '\r\n' | cut -c1-60)
+            first=$(head -c 80 body.tmp 2>/dev/null | tr -d '\r\n' | tr -c '[:print:]' ' ')
+            echo "::notice title=Diagnostiikka::$u -> $out | title: $title | alku: $first"
+          done
+          rm -f body.tmp
+
       - name: Savutesti tuotannossa
         run: |
           set -e
