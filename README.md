@@ -33,6 +33,13 @@ erillisen esitysikkunan (`/admin/esitys`) toiselle näytölle. Hallintanäkymä 
   käyttää varattua nimimerkkiä, ja seuraavalla luennolla sama nimimerkki ehdotetaan valmiiksi.
 - Ei sähköposteja, nimiä, evästeitä, analytiikkaa eikä IP-osoitteiden tallennusta osallistujista.
 
+### Kieli
+
+Osallistujan sivut ovat suomeksi ja englanniksi (hallinta aina suomeksi). Kieli tulee selaimen
+asetuksista, ja sen voi vaihtaa yläkulman FI/EN-kytkimestä. Valinta muistetaan vain selaimessa
+(localStorage). Käännökset ovat tiedostossa `src/I18n.php`, ja testi varmistaa, että jokaisella
+avaimella on molemmat kielet.
+
 ## Tietoturva lyhyesti
 
 | Kerros | Ratkaisu |
