@@ -129,6 +129,18 @@ final class App
     private static function assetVersion(string $appRoot): string
     {
         $file = $appRoot . '/VERSION';
-        return is_file($file) ? trim((string) file_get_contents($file)) : 'dev';
+        if (is_file($file)) {
+            return trim((string) file_get_contents($file));
+        }
+        // Kehityksessä ei ole VERSION-tiedostoa (CI kirjoittaa sen). Versio lasketaan resurssien
+        // muokkausajoista, jotta selaimen välimuisti (immutable) ei tarjoa vanhaa JS:ää tai CSS:ää.
+        $mtime = 0;
+        foreach (['css', 'js'] as $dir) {
+            $assets = glob($appRoot . '/public/assets/' . $dir . '/*');
+            foreach ($assets === false ? [] : $assets as $asset) {
+                $mtime = max($mtime, (int) filemtime($asset));
+            }
+        }
+        return 'dev-' . $mtime;
     }
 }
