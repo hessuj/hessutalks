@@ -4,7 +4,7 @@ Päästä päähän salattu kysymys- ja palautekanava luennoille ja puheille.
 Osallistujat liittyvät luennolle koodilla tai QR-koodilla ja lähettävät kysymyksiä nimimerkillä.
 Vain luennoitsija voi lukea viestit.
 
-Osoite: <https://hessujarvinen.com/softa/hessutalks/>
+Osoite: <https://hessujarvinen.com/hessutalks/>
 
 ## Miten se toimii
 
@@ -58,7 +58,7 @@ Kun kaikki menevät läpi `main`-haarassa, sovellus julkaistaan FTPS:llä webhot
 Hakemistorakenne webhotellissa:
 
 ```
-~/hessujarvinen.com/softa/hessutalks/   FTP-tunnuksen juuri = sovelluksen URL-kansio  ← deploy
+~/public_html/hessutalks/               FTP-tunnuksen juuri = sovelluksen URL-kansio  ← deploy
     index.php, .htaccess, assets/       julkiset tiedostot
     app/                                sovelluskoodi, suora pääsy estetty
 ~/hessutalks-data/                      config.php, tietokanta, istunnot  ← webrootin ulkopuolella,
@@ -71,18 +71,18 @@ käsiksi tietokantaan eikä muihin sivuston osiin.
 1. **PHP-versio:** cPanel → *MultiPHP Manager* → hessujarvinen.com → **PHP 8.4** (ea-php84).
    Varmista, että laajennukset `sodium`, `pdo_sqlite`, `mbstring` ja `intl` ovat päällä (*Select PHP Version → Extensions*).
 2. **FTP-tili:** cPanel → *FTP Accounts* → esim. `deploy-hessutalks@hessujarvinen.com`.
-   Directory-kentäksi sovelluksen URL-kansio, esim. `hessujarvinen.com/softa/hessutalks`.
+   Directory-kentäksi sovelluksen kansio sivuston juuren (`public_html`) alla: `public_html/hessutalks`.
 3. **GitHub:** repo → *Settings → Environments* → luo ympäristö `production` ja lisää siihen secretit:
    - `FTP_SERVER`: esim. `ftp.hessujarvinen.com`
    - `FTP_USERNAME`: FTP-tilin koko käyttäjätunnus
    - `FTP_PASSWORD`: FTP-tilin salasana
 
-   Jos sovellus ei ole osoitteessa `https://hessujarvinen.com/softa/hessutalks`, lisää
+   Jos sovellus ei ole osoitteessa `https://hessujarvinen.com/hessutalks`, lisää
    *Settings → Secrets and variables → Actions → Variables* -kohtaan muuttuja `APP_URL`.
    Halutessasi lisää ympäristöön *Required reviewers* → itsesi, jolloin jokainen julkaisu odottaa hyväksyntääsi.
 4. **Asetustiedosto:** aja omalla koneellasi repon juuressa:
    ```sh
-   php bin/init.php --origin=https://hessujarvinen.com --base=/softa/hessutalks \
+   php bin/init.php --origin=https://hessujarvinen.com --base=/hessutalks \
        --data=/home/CPANEL-KÄYTTÄJÄ/hessutalks-data --out=config.php
    ```
    `--base` on sovelluksen polku URL:ssa ja `--data` kotihakemistosi alla oleva kansio
@@ -90,7 +90,7 @@ käsiksi tietokantaan eikä muihin sivuston osiin.
    Luo cPanelin *File Managerilla* kotihakemistoon kansio `hessutalks-data` (oikeudet `700`), lataa `config.php` sinne
    (oikeudet `600`) ja poista se omalta koneeltasi. Sovellus löytää tiedoston automaattisesti.
 5. **Julkaisu:** push `main`-haaraan tai *Actions → CI/CD → Run workflow*.
-6. **Ensimmäinen kirjautuminen:** avaa `https://hessujarvinen.com/softa/hessutalks/admin`, syötä käyttöönottotunnus ja luo passkey.
+6. **Ensimmäinen kirjautuminen:** avaa `https://hessujarvinen.com/hessutalks/admin`, syötä käyttöönottotunnus ja luo passkey.
    Luo sen jälkeen salausavaimet tunnuslauseella. Tallenna tunnuslause salasanojen hallintaan
    ja talleta ladattu varmuuskopiotiedosto turvaan.
 7. **Varapasskey:** lisää *Asetukset*-sivulta toinen passkey esimerkiksi puhelimeen.
