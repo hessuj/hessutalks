@@ -6,6 +6,7 @@ namespace HessuTalks\Controller;
 
 use HessuTalks\Config;
 use HessuTalks\Http\Request;
+use HessuTalks\I18n;
 use HessuTalks\Http\Response;
 use HessuTalks\Repository\EventRepository;
 use HessuTalks\Repository\KeyRepository;
@@ -42,50 +43,54 @@ final class ParticipantController
 
     public function home(Request $req): Response
     {
+        $lang = I18n::fromRequest($req);
         $input = $req->query['k'] ?? null;
         if (is_string($input) && $input !== '') {
             $code = EventRepository::normalizeCode($input);
             if ($code !== null) {
-                return Response::redirect($this->config->url('/k/' . $code));
+                return Response::redirect($this->config->url('/k/' . $code) . self::langQuery($req));
             }
-            return Response::html($this->view->render('home', [
-                'pageTitle' => 'Liity',
-                'error' => 'Koodissa on 6 merkkiä, esimerkiksi ABC234.',
-            ]), 400);
+            return $this->page($req, 'home', [
+                'pageTitle' => I18n::t($lang, 'home.title'),
+                'error' => I18n::t($lang, 'home.code_error'),
+            ], 400);
         }
-        return Response::html($this->view->render('home', ['pageTitle' => 'Liity']));
+        return $this->page($req, 'home', ['pageTitle' => I18n::t($lang, 'home.title')]);
     }
 
-    public function privacy(): Response
+    public function privacy(Request $req): Response
     {
-        return Response::html($this->view->render('privacy', ['pageTitle' => 'Tietosuoja']));
+        $lang = I18n::fromRequest($req);
+        return $this->page($req, 'privacy_' . $lang, ['pageTitle' => I18n::t($lang, 'privacy.title')]);
     }
 
-    public function event(string $rawCode): Response
+    public function event(string $rawCode, Request $req): Response
     {
         $code = EventRepository::normalizeCode($rawCode);
         $event = $code === null ? null : $this->events->findByCode($code);
         // Sama vastaus tuntemattomalle ja virheelliselle koodille (ei vihjeitä arvailijalle).
         if ($event === null) {
             if (!$this->limiter->hit('lookup_fail', self::FAILED_LOOKUP_LIMIT, self::WINDOW)) {
-                return $this->message('Liian monta yritystä', 'Odota hetki ja yritä uudelleen.', 429);
+                return $this->message($req, 'page.too_many', 429);
             }
-            return $this->message('Luentoa ei löytynyt', 'Tarkista koodi luennoitsijan diasta.', 404);
+            return $this->message($req, 'page.not_found', 404);
         }
         if (!$this->events->isOpen($event)) {
-            return $this->message('Kysymykset on suljettu', 'Tämän luennon kysymysten vastaanotto on päättynyt. Kiitos osallistumisesta!', 410);
+            return $this->message($req, 'page.closed', 410);
         }
         $pk = $this->keys->publicKey();
         if ($pk === null) {
-            return $this->message('Ei vielä käytössä', 'Luennoitsija ei ole vielä viimeistellyt salausasetuksia.', 503);
+            return $this->message($req, 'page.not_ready', 503);
         }
-        return Response::html($this->view->render('event', [
+        $lang = I18n::fromRequest($req);
+        return $this->page($req, 'event', [
             'pageTitle' => (string) $event['title'],
             'event' => $event,
             'publicKey' => $pk,
             'formToken' => $this->formToken->issue((int) $event['id']),
-            'scripts' => ['vendor/sodium.js', 'js/participant.js'],
-        ]));
+            'jsStrings' => (string) json_encode(I18n::jsStrings($lang), JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR),
+            'scripts' => ['vendor/sodium.js', 'js/lang.js', 'js/participant.js'],
+        ]);
     }
 
     /** Varaa nimimerkin luennolle. Palauttaa omistajatunnisteen, jonka selain tallentaa. */
@@ -95,19 +100,19 @@ final class ParticipantController
         if ($ctx instanceof Response) {
             return $ctx;
         }
-        [$eventId, $in] = $ctx;
+        [$eventId, $in, $lang] = $ctx;
 
         $nick = NicknameRepository::clean($in['nickname'] ?? null);
         if ($nick === null) {
-            return Response::error('Nimimerkissä pitää olla 2–24 merkkiä: kirjaimia, numeroita, välilyöntejä tai merkkejä _ . -', 422);
+            return Response::error(I18n::t($lang, 'err.nickname_format'), 422);
         }
         if (!$this->limiter->hit('claim|' . $eventId, self::CLAIM_LIMIT_PER_EVENT, self::WINDOW)
             || $this->nicknames->countForEvent($eventId) >= NicknameRepository::MAX_PER_EVENT) {
-            return Response::error('Liian monta nimimerkkivarausta juuri nyt. Odota hetki.', 429);
+            return Response::error(I18n::t($lang, 'err.claim_rate'), 429);
         }
         $claim = $this->nicknames->claim($eventId, $nick);
         if ($claim === null) {
-            return Response::error('Nimimerkki on jo käytössä tällä luennolla. Valitse toinen.', 409);
+            return Response::error(I18n::t($lang, 'err.nickname_taken'), 409);
         }
         return Response::json(['nickname' => $nick, 'secret' => $claim['secret']], 201);
     }
@@ -118,22 +123,22 @@ final class ParticipantController
         if ($ctx instanceof Response) {
             return $ctx;
         }
-        [$eventId, $in] = $ctx;
+        [$eventId, $in, $lang] = $ctx;
 
         $nick = NicknameRepository::clean($in['nickname'] ?? null);
         $secret = is_string($in['secret'] ?? null) ? $in['secret'] : '';
         $nicknameId = $nick === null ? null : $this->nicknames->verify($eventId, $nick, $secret);
         if ($nicknameId === null) {
-            return Response::json(['error' => 'Nimimerkkiä ei ole varattu tälle selaimelle. Valitse nimimerkki uudelleen.', 'reason' => 'nickname'], 403);
+            return Response::json(['error' => I18n::t($lang, 'err.nickname_not_claimed'), 'reason' => 'nickname'], 403);
         }
         if (!QuestionRepository::isValidCiphertext($in['ciphertext'] ?? null)) {
-            return Response::error('Virheellinen viesti.', 422);
+            return Response::error(I18n::t($lang, 'err.invalid_message'), 422);
         }
         if (!$this->limiter->hit('submit|' . $nicknameId, self::SUBMIT_LIMIT_PER_NICK, self::WINDOW)) {
-            return Response::error('Liian monta viestiä lyhyessä ajassa. Odota hetki.', 429);
+            return Response::error(I18n::t($lang, 'err.submit_rate'), 429);
         }
         if ($this->questions->countForEvent($eventId) >= self::EVENT_MAX_QUESTIONS) {
-            return Response::error('Luennon viestikiintiö on täynnä.', 429);
+            return Response::error(I18n::t($lang, 'err.quota'), 429);
         }
         $this->questions->add($eventId, $nicknameId, (string) $in['ciphertext']);
         return Response::json(['ok' => true], 201);
@@ -141,30 +146,32 @@ final class ParticipantController
 
     /**
      * Yhteiset tarkistukset: sama origin, JSON, avoin luento ja voimassa oleva lomaketoken.
-     * @return array{0: int, 1: array<string, mixed>}|Response
+     * Virheilmoitusten kieli: JSON-kenttä lang, muuten Accept-Language.
+     * @return array{0: int, 1: array<string, mixed>, 2: string}|Response
      */
     private function openEventFromRequest(Request $req): array|Response
     {
+        $in = $req->json();
+        $lang = I18n::fromRequest($req, $in['lang'] ?? null);
         if (!$this->sameOrigin($req)) {
-            return Response::error('Virheellinen alkuperä.', 403);
+            return Response::error(I18n::t($lang, 'err.origin'), 403);
         }
         if (!str_starts_with((string) $req->header('content-type'), 'application/json')) {
-            return Response::error('Odotettiin JSON-dataa.', 415);
+            return Response::error(I18n::t($lang, 'err.json'), 415);
         }
-        $in = $req->json();
         $code = is_string($in['code'] ?? null) ? EventRepository::normalizeCode($in['code']) : null;
         $event = $code === null ? null : $this->events->findByCode($code);
         if ($event === null) {
-            return Response::error('Luentoa ei löytynyt.', 404);
+            return Response::error(I18n::t($lang, 'err.event_not_found'), 404);
         }
         $eventId = (int) $event['id'];
         if (!$this->events->isOpen($event)) {
-            return Response::error('Kysymysten vastaanotto on päättynyt.', 410);
+            return Response::error(I18n::t($lang, 'err.closed'), 410);
         }
         if (!is_string($in['token'] ?? null) || !$this->formToken->verify($in['token'], $eventId)) {
-            return Response::error('Lomake on vanhentunut. Lataa sivu uudelleen.', 403);
+            return Response::error(I18n::t($lang, 'err.token'), 403);
         }
-        return [$eventId, $in];
+        return [$eventId, $in, $lang];
     }
 
     /**
@@ -181,12 +188,35 @@ final class ParticipantController
         return $origin !== null && hash_equals($this->config->publicOrigin, $origin);
     }
 
-    private function message(string $heading, string $message, int $status): Response
+    /** Ilmoitussivu: otsikko avaimesta $key ja teksti avaimesta $key . '_text'. */
+    private function message(Request $req, string $key, int $status): Response
     {
-        return Response::html($this->view->render('message', [
-            'pageTitle' => $heading,
-            'heading' => $heading,
-            'message' => $message,
+        $lang = I18n::fromRequest($req);
+        return $this->page($req, 'message', [
+            'pageTitle' => I18n::t($lang, $key),
+            'heading' => I18n::t($lang, $key),
+            'message' => I18n::t($lang, $key . '_text'),
+        ], $status);
+    }
+
+    /**
+     * Osallistujan sivu valitulla kielellä ja kielikytkimellä.
+     * @param array<string, mixed> $vars
+     */
+    private function page(Request $req, string $template, array $vars, int $status = 200): Response
+    {
+        return Response::html($this->view->render($template, $vars + [
+            'lang' => I18n::fromRequest($req),
+            'langQuery' => self::langQuery($req),
+            'langSwitch' => true,
+            'scripts' => ['js/lang.js'],
         ]), $status);
+    }
+
+    /** '?lang=xx', jos käyttäjä on valinnut kielen; sisäiset linkit säilyttävät valinnan. */
+    private static function langQuery(Request $req): string
+    {
+        $lang = I18n::explicit($req);
+        return $lang === null ? '' : '?lang=' . $lang;
     }
 }

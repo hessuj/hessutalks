@@ -104,10 +104,10 @@ final class App
             return $this->participant->home($req);
         }
         if ($path === '/tietosuoja' && $req->method === 'GET') {
-            return $this->participant->privacy();
+            return $this->participant->privacy($req);
         }
         if (preg_match('#^/k/([A-Za-z0-9-]{1,12})/?$#', $path, $m) === 1 && $req->method === 'GET') {
-            return $this->participant->event($m[1]);
+            return $this->participant->event($m[1], $req);
         }
         if ($path === '/api/questions') {
             return $req->method === 'POST' ? $this->participant->submit($req) : Response::error('Metodia ei tueta.', 405);

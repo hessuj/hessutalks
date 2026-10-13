@@ -31,6 +31,15 @@
   var nickChange = document.getElementById('nick-change');
   var NICK_RE = /^[\p{L}\p{N}][\p{L}\p{N} _.\-]{1,23}$/u;
 
+  // Käyttöliittymän tekstit valitulla kielellä (palvelin välittää ne data-i18n-attribuutissa).
+  var STRINGS = {};
+  try { STRINGS = JSON.parse(root.dataset.i18n || '{}'); } catch (e) { STRINGS = {}; }
+  function t(key, params) {
+    var text = typeof STRINGS[key] === 'string' ? STRINGS[key] : key;
+    Object.keys(params || {}).forEach(function (k) { text = text.split('{' + k + '}').join(String(params[k])); });
+    return text;
+  }
+
   // ---------------------------------------------------------------- tallennus
 
   var memoryStore = null; // käytetään, jos localStorage ei ole käytettävissä (esim. yksityinen selaus)
@@ -96,7 +105,7 @@
       method: 'POST',
       credentials: 'omit',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body)
+      body: JSON.stringify(Object.assign({ lang: root.dataset.lang }, body))
     }).then(function (res) {
       return res.json().catch(function () { return {}; }).then(function (data) {
         return { ok: res.ok, status: res.status, data: data };
@@ -106,7 +115,7 @@
 
   function sodiumReady() {
     var s = window.sodium;
-    if (!s) return Promise.reject(new Error('Salauskirjasto puuttuu.'));
+    if (!s) return Promise.reject(new Error(t('crypto_missing')));
     return s.ready ? s.ready.then(function () { return s; }) : Promise.resolve(s);
   }
 
@@ -118,19 +127,19 @@
     var nick = nickInput.value.replace(/\s+/g, ' ').trim();
     if (!NICK_RE.test(nick)) {
       nickInput.focus();
-      return Promise.reject(new Error('Nimimerkissä pitää olla 2–24 merkkiä: kirjaimia, numeroita, välilyöntejä tai merkkejä _ . -'));
+      return Promise.reject(new Error(t('nickname_format')));
     }
     return postJson(root.dataset.nickEndpoint, { code: code, token: root.dataset.token, nickname: nick })
       .then(function (r) {
         if (!r.ok) {
           if (r.status === 409) nickInput.focus();
-          throw new Error(r.data.error || 'Nimimerkin varaus epäonnistui (' + r.status + ').');
+          throw new Error(r.data.error || t('claim_failed', { status: r.status }));
         }
         var claim = { nick: r.data.nickname, secret: r.data.secret, at: Date.now() };
         store.claims[code] = claim;
         store.lastNick = claim.nick;
         if (!saveStore(store)) {
-          show('Selaimesi ei salli tietojen tallennusta, joten nimimerkki muistetaan vain tämän sivun ajan.');
+          show(t('no_storage'));
         }
         renderNick();
         return claim;
@@ -144,7 +153,7 @@
   });
 
   nickChange.addEventListener('click', function () {
-    if (!window.confirm('Vaihdetaanko nimimerkki? Nykyinen nimimerkki pysyy varattuna tällä luennolla, eikä sitä voi enää käyttää.')) return;
+    if (!window.confirm(t('confirm_change'))) return;
     delete store.claims[code];
     saveStore(store);
     nickInput.value = '';
@@ -154,7 +163,7 @@
 
   sodiumReady().then(function (sodium) {
     var publicKey = sodium.from_base64(root.dataset.pk, sodium.base64_variants.ORIGINAL);
-    if (publicKey.length !== sodium.crypto_box_PUBLICKEYBYTES) throw new Error('Virheellinen avain.');
+    if (publicKey.length !== sodium.crypto_box_PUBLICKEYBYTES) throw new Error(t('bad_key'));
     renderNick();
     form.hidden = false;
 
@@ -163,11 +172,11 @@
       var body = text.value.trim();
       var kind = form.elements.kind.value === 'feedback' ? 'feedback' : 'question';
 
-      if (body.length < 2) { show('Kirjoita viesti ennen lähettämistä.', 'error'); text.focus(); return; }
-      if (body.length > 2000) { show('Viesti on liian pitkä. Enintään 2000 merkkiä.', 'error'); return; }
+      if (body.length < 2) { show(t('empty'), 'error'); text.focus(); return; }
+      if (body.length > 2000) { show(t('too_long'), 'error'); return; }
 
       sendBtn.disabled = true;
-      show('Lähetetään…');
+      show(t('sending'));
 
       ensureClaim().then(function (claim) {
         var payload = JSON.stringify({
@@ -197,11 +206,11 @@
             saveStore(store);
             renderNick();
           }
-          throw new Error(r.data.error || 'Lähetys epäonnistui (' + r.status + ').');
+          throw new Error(r.data.error || t('send_failed', { status: r.status }));
         }
         text.value = '';
         count.textContent = '0';
-        show(kind === 'feedback' ? 'Palaute lähetetty. Kiitos!' : 'Kysymys lähetetty. Kiitos!', 'ok');
+        show(kind === 'feedback' ? t('sent_feedback') : t('sent_question'), 'ok');
       }).catch(function (err) {
         show(err.message, 'error');
       }).then(function () {
@@ -209,6 +218,6 @@
       });
     });
   }).catch(function (err) {
-    show('Salausta ei voitu alustaa: ' + err.message, 'error');
+    show(t('crypto_failed', { error: err.message }), 'error');
   });
 })();
