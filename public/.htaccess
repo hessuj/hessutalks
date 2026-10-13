@@ -10,6 +10,9 @@ ServerSignature Off
   RewriteCond %{HTTP:X-Forwarded-Proto} !=https
   RewriteRule ^ https://%{HTTP_HOST}%{REQUEST_URI} [R=301,L]
 
+  # Sovelluskoodi (app/) ei ole suoraan saatavilla
+  RewriteRule ^app(/|$) - [F,L]
+
   # Estä piilotiedostot (.git, .env, .htaccess) ja lukitustiedostot
   RewriteRule (^|/)\. - [F,L]
   RewriteRule \.(lock|md|sql|sqlite|ini|log|sh|dist)$ - [F,L]

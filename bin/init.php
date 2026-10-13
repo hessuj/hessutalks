@@ -6,7 +6,7 @@
  * Tuotanto (aja omalla koneella tai cPanelin Terminalissa):
  *   php bin/init.php --origin=https://hessujarvinen.com --base=/softa/hessutalks \
  *       --data=/home/KÄYTTÄJÄ/hessutalks-data --out=config.php
- *   -> lataa config.php hakemistoon ~/hessutalks-data/ (EI public_html:n alle)
+ *   -> lataa config.php hakemistoon ~/hessutalks-data/ (kotihakemistoon, EI sivuston kansioon)
  *
  * Kehitys:
  *   php bin/init.php --dev

@@ -164,6 +164,10 @@ jobs:
         run: cat var/server.log || true
 
   # ---------------------------------------------------------------- deploy
+  # FTP-tunnus on rajattu sovelluksen omaan kansioon (FTP-juuri = sovelluksen URL-kansio).
+  # Julkaisu kirjoittaa vain index.php:n, assets/- ja app/-kansiot. Asetukset ja tietokanta ovat
+  # ~/hessutalks-data/-hakemistossa webrootin ulkopuolella, eikä julkaisu koske niihin.
+  # Sovelluksen julkinen osoite asetetaan repon muuttujaan APP_URL (Settings → Variables).
   deploy:
     name: Deploy – hessujarvinen.com
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
@@ -171,7 +175,9 @@ jobs:
     runs-on: ubuntu-latest
     environment:
       name: production
-      url: https://hessujarvinen.com/softa/hessutalks/
+      url: ${{ vars.APP_URL || 'https://hessujarvinen.com/softa/hessutalks' }}
+    env:
+      APP_URL: ${{ vars.APP_URL || 'https://hessujarvinen.com/softa/hessutalks' }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -185,52 +191,48 @@ jobs:
 
       - name: Rakenna julkaisupaketti
         run: |
-          if [ -f composer.lock ]; then
-            composer install --no-dev --no-interaction --no-progress --optimize-autoloader --classmap-authoritative
-          else
-            composer update --no-dev --no-interaction --no-progress --optimize-autoloader --classmap-authoritative
-          fi
+          composer install --no-dev --no-interaction --no-progress --optimize-autoloader --classmap-authoritative
           scripts/verify-vendor.sh
-          mkdir -p build/app build/public
+          mkdir -p build/app
+          cp -r public/. build/
           cp -r src templates migrations vendor build/app/
-          mkdir -p build/app/bin && cp bin/init.php build/app/bin/
           git rev-parse --short HEAD > build/app/VERSION
           printf 'Require all denied\n' > build/app/.htaccess
-          cp -r public/. build/public/
+          # Varmistus: paketissa ei saa olla asetuksia, tietokantoja eikä git-dataa
+          if find build \( -name 'config.php' -o -name '*.sqlite*' -o -name '.git' -o -name '.env' \) | grep -q .; then
+            echo "Paketissa on kiellettyjä tiedostoja"; exit 1
+          fi
+          find build -maxdepth 2 | sort
 
-      - name: Lähetä sovelluskoodi (~/hessutalks-app, webrootin ulkopuolelle)
+      - name: Lähetä FTPS:llä
         uses: SamKirkland/FTP-Deploy-Action@110f9186c050f71550953127052e77650219c287 # v4.4.0
         with:
           server: ${{ secrets.FTP_SERVER }}
           username: ${{ secrets.FTP_USERNAME }}
           password: ${{ secrets.FTP_PASSWORD }}
           protocol: ftps
-          local-dir: build/app/
-          server-dir: hessutalks-app/
-          state-name: .ftp-deploy-sync-state-app.json
-
-      - name: Lähetä julkiset tiedostot (~/public_html/softa/hessutalks)
-        uses: SamKirkland/FTP-Deploy-Action@110f9186c050f71550953127052e77650219c287 # v4.4.0
-        with:
-          server: ${{ secrets.FTP_SERVER }}
-          username: ${{ secrets.FTP_USERNAME }}
-          password: ${{ secrets.FTP_PASSWORD }}
-          protocol: ftps
-          local-dir: build/public/
-          server-dir: public_html/softa/hessutalks/
-          state-name: .ftp-deploy-sync-state-public.json
+          local-dir: build/
+          server-dir: ./
+          state-name: .ftp-deploy-sync-state.json
 
       - name: Savutesti tuotannossa
         run: |
           set -e
-          URL=https://hessujarvinen.com/softa/hessutalks
-          curl -fsS "$URL/healthz"
-          H=$(curl -fsS -D - -o /dev/null "$URL/")
-          echo "$H" | grep -qi '^content-security-policy:' || { echo "CSP puuttuu"; exit 1; }
-          echo "$H" | grep -qi '^strict-transport-security:' || { echo "HSTS puuttuu"; exit 1; }
-          # Sovelluskoodi ja data eivät saa näkyä webissä
-          for p in vendor/autoload.php src/App.php ../../hessutalks-data/config.php .htaccess; do
-            code=$(curl -s -o /dev/null -w '%{http_code}' "$URL/$p")
-            case "$code" in 200) echo "VUOTO: $p ($code)"; exit 1;; esac
+          URL="${APP_URL%/}"
+          code=$(curl -s -o /dev/null -w '%{http_code}' "$URL/healthz")
+          if [ "$code" = 503 ]; then
+            echo "::warning::Sovellus on julkaistu, mutta asetustiedostoa ~/hessutalks-data/config.php ei vielä löydy (HTTP 503)."
+          elif [ "$code" != 200 ]; then
+            echo "healthz palautti $code"; exit 1
+          else
+            H=$(curl -fsS -D - -o /dev/null "$URL/")
+            echo "$H" | grep -qi '^content-security-policy:' || { echo "CSP puuttuu"; exit 1; }
+            echo "$H" | grep -qi '^strict-transport-security:' || { echo "HSTS puuttuu"; exit 1; }
+          fi
+          # Sovelluskoodi ei saa näkyä webissä
+          for p in app/ app/VERSION app/vendor/autoload.php app/src/App.php app/migrations/001_init.sql .htaccess .ftp-deploy-sync-state.json; do
+            c=$(curl -s -o /dev/null -w '%{http_code}' "$URL/$p")
+            case "$c" in 200) echo "VUOTO: $p ($c)"; exit 1;; esac
+            echo "$p -> $c"
           done
           echo "Tuotanto OK"

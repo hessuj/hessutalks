@@ -11,9 +11,10 @@ use HessuTalks\Security\NativeSession;
 
 /**
  * Tuotantokäynnistys. Polut:
- *   ~/public_html/softa/hessutalks/   julkinen hakemisto (index.php, assets)
- *   ~/hessutalks-app/                 sovelluskoodi (src, vendor, templates, migrations)
- *   ~/hessutalks-data/                config.php, SQLite-kanta, istunnot (EI deployn ylikirjoittama)
+ *   <sovelluskansio>/                 index.php ja assets (FTP-deployn juuri)
+ *   <sovelluskansio>/app/             sovelluskoodi (src, vendor, templates, migrations), suora pääsy estetty
+ *   ~/hessutalks-data/                config.php, SQLite-kanta, istunnot – webrootin ulkopuolella,
+ *                                     deploy ei koske tähän
  */
 final class Bootstrap
 {
