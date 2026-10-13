@@ -196,18 +196,18 @@ details.optional summary { cursor: pointer; font-weight: 600; color: var(--accen
 }
 .stage .stage-code { font: 700 min(14vw, 18vh)/1 var(--mono); letter-spacing: .12em; margin: 0; }
 .stage .stage-url { font: 600 min(3.2vw, 4vh)/1.2 var(--sans); color: var(--accent); margin: 0; word-break: break-all; }
-.stage img { height: min(45vh, 60vw); width: auto; image-rendering: pixelated; background: #fff; padding: 12px; }
+.stage img { height: min(45vh, 60vw); width: auto; min-height: 0; flex: 0 1 auto; object-fit: contain; image-rendering: pixelated; background: #fff; padding: 12px; }
 .stage .stage-q { font: 600 min(5vw, 6.5vh)/1.3 var(--sans); max-width: 30ch; white-space: pre-wrap; overflow-wrap: anywhere; margin: 0; }
 .stage .stage-list {
   list-style: none; margin: 0; padding: 0; width: min(100%, 70rem); text-align: left;
-  display: grid; gap: 1.6vh; overflow: hidden; max-height: 78vh;
+  display: grid; align-content: start; gap: 1.6vh; overflow: hidden; min-height: 0; flex: 0 1 auto;
 }
 .stage .stage-list li { border-left: .5vw solid var(--accent); padding: .4vh 1.2vw; }
 .stage .stage-nick { display: block; font: 600 min(1.8vw, 2.4vh)/1.2 var(--sans); color: var(--accent); }
 .stage .stage-list-text { display: block; font: 600 min(2.6vw, 3.4vh)/1.3 var(--sans); white-space: pre-wrap; overflow-wrap: anywhere; }
 
 /* Esitysikkuna (/admin/esitys) jatketulla näytöllä */
-body.presenter { padding: 0; min-height: 100vh; }
+body.presenter { padding: 0; min-height: 0; height: 100vh; overflow: hidden; }
 :fullscreen body.presenter { cursor: none; }
 .presenter-hint {
   position: fixed; bottom: .5rem; right: .75rem; z-index: 11; margin: 0;
