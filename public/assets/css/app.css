@@ -231,3 +231,87 @@ body.presenter { padding: 0; min-height: 0; height: 100vh; overflow: hidden; }
 .nick-owned[hidden] { display: none; }
 .nick-owned p { margin: 0; }
 .nick-owned strong { color: var(--accent); }
+
+/* ---- kyselyt: osallistujan kortit ---- */
+.polls { display: grid; gap: 1rem; margin: 1.25rem 0 1.75rem; }
+.poll { border: 2px solid var(--accent); padding: 1rem 1.1rem; background: rgba(0, 0, 0, .12); }
+.poll .poll-prompt { font-size: 1.25rem; margin: .2rem 0 .8rem; overflow-wrap: anywhere; }
+.poll .notice { margin: .8rem 0 0; }
+.poll input[type="text"] { width: 100%; }
+.poll-choices { display: grid; gap: .5rem; margin-bottom: .9rem; }
+.poll-choice {
+  display: flex; align-items: center; gap: .7rem; cursor: pointer;
+  padding: .7rem .9rem; border: 2px solid var(--frame); font-weight: 600; overflow-wrap: anywhere;
+}
+.poll-choice:has(input:checked) { border-color: var(--accent); background: rgba(127, 211, 219, .14); }
+.poll-choice input { width: 1.2rem; height: 1.2rem; flex: none; accent-color: var(--accent); margin: 0; }
+.poll-scale { display: grid; grid-template-columns: repeat(5, 1fr); gap: .35rem; margin-bottom: .4rem; }
+.poll-scale.p7 { grid-template-columns: repeat(7, 1fr); }
+.poll-scale.wide { grid-template-columns: repeat(11, 1fr); }
+.poll-scale .poll-choice { justify-content: center; padding: .7rem 0; font: 700 1.05rem var(--mono); }
+.poll-scale .poll-choice input { position: absolute; opacity: 0; pointer-events: none; }
+.poll-scale .poll-choice:has(input:focus-visible) { outline: 3px solid var(--accent); outline-offset: 2px; }
+.poll-ends { display: flex; justify-content: space-between; gap: 1rem; font-size: .85rem; color: var(--ink-dim); margin-bottom: .9rem; }
+@media (max-width: 560px) {
+  .poll-scale.wide { grid-template-columns: repeat(6, 1fr); }
+}
+
+/* ---- kyselyt: hallinta ---- */
+.polls-admin { margin: 1.5rem 0 2rem; padding-top: 1rem; border-top: 2px solid var(--frame); }
+.polls-admin h2 { margin: 0; }
+.poll-list { display: grid; gap: 1rem; }
+.poll-card { border-left: 4px solid var(--frame); padding: .75rem 1rem; background: rgba(0, 0, 0, .12); }
+.poll-card[data-status="open"] { border-left-color: var(--ok); }
+.poll-card-head { display: flex; flex-wrap: wrap; gap: .5rem 1rem; align-items: center; }
+.poll-card-head .badge { margin-left: 0; }
+.badge.open { color: var(--ok); }
+.badge.draft { color: var(--accent); }
+.poll-card-prompt { font-size: 1.15rem; font-weight: 600; margin: .4rem 0 .6rem; overflow-wrap: anywhere; }
+.poll-card .q-actions { display: flex; flex-wrap: wrap; gap: .4rem; }
+.poll-card .url { font-size: .85rem; word-break: break-all; margin: .5rem 0 .2rem; }
+.poll-card .results { margin-top: .6rem; max-width: 46rem; }
+.poll-card .res-cloud { height: 16rem; }
+.poll-card .res-word { cursor: pointer; }
+.poll-hidden { display: flex; flex-wrap: wrap; gap: .3rem; align-items: center; margin-top: .4rem; }
+.poll-form { border: 2px solid var(--frame); padding: 1rem 1.1rem; margin-bottom: 1rem; max-width: 46rem; }
+.poll-form h3 { margin-top: 0; }
+.poll-form textarea, .poll-form input[type="text"], .poll-form select { width: 100%; }
+
+/* ---- kyselyt: tulokset (hallinta ja projektori) ---- */
+.results { --res-text: 1rem; }
+.res-row { display: grid; grid-template-columns: minmax(6rem, 2fr) 3fr 6.5em; gap: .4rem .8rem; align-items: center; margin: .35rem 0; font-size: var(--res-text); }
+.res-label { overflow-wrap: anywhere; }
+.res-track { height: 1.2em; background: rgba(0, 0, 0, .25); }
+.res-bar { display: block; height: 100%; width: 0; background: var(--accent); transition: width .6s ease; }
+.res-value { font-family: var(--mono); text-align: right; white-space: nowrap; }
+.res-columns { display: flex; align-items: stretch; gap: .5rem; height: 12rem; font-size: var(--res-text); }
+.res-col { flex: 1; display: flex; flex-direction: column; align-items: center; gap: .25rem; min-width: 0; }
+.res-col-value { font-family: var(--mono); min-height: 1.3em; }
+.res-col-track { flex: 1; width: 100%; display: flex; align-items: flex-end; background: rgba(0, 0, 0, .18); }
+.res-col-bar { display: block; width: 100%; height: 0; background: var(--accent); transition: height .6s ease; }
+.res-col-label { font: 700 1em var(--mono); }
+.res-ends { display: flex; justify-content: space-between; gap: 1rem; color: var(--ink-dim); font-size: calc(var(--res-text) * .85); margin-top: .3rem; }
+.res-stats { font-family: var(--mono); margin: .5rem 0 0; font-size: var(--res-text); }
+.res-cloud { position: relative; width: 100%; height: 20rem; overflow: hidden; font-family: var(--sans); }
+.res-word {
+  position: absolute; white-space: nowrap; font-weight: 700; line-height: 1.1;
+  transition: left .7s ease, top .7s ease, font-size .7s ease;
+}
+.res-c0 { color: var(--accent); }
+.res-c1 { color: var(--ink); }
+.res-c2 { color: var(--ok); }
+.res-c3 { color: #f4d78b; }
+.res-c4 { color: var(--ink-dim); }
+
+/* ---- kyselyt: projektori-ikkuna ---- */
+.stage.poll-stage { justify-content: flex-start; align-items: stretch; text-align: left; gap: 2vh; }
+.poll-stage-prompt { font: 700 min(4vw, 6vh)/1.2 var(--sans); margin: 0; overflow-wrap: anywhere; }
+.poll-stage-results { flex: 1; min-height: 0; display: flex; flex-direction: column; justify-content: center; --res-text: min(2.4vw, 3.4vh); }
+.poll-stage-results .res-columns { height: 100%; max-height: 55vh; }
+.poll-stage-results .res-row { margin: 1.4vh 0; }
+.poll-stage-results .res-track { height: 1.6em; }
+.poll-stage-results .res-cloud { height: 100%; flex: 1; }
+.poll-stage-foot { display: flex; align-items: center; gap: 2vw; }
+.poll-stage-foot img { height: min(16vh, 14vw); width: auto; image-rendering: pixelated; background: #fff; padding: 6px; }
+.poll-stage-url { font: 600 min(2.2vw, 3.2vh)/1.2 var(--sans); color: var(--accent); margin: 0; word-break: break-all; }
+.poll-stage-count { font: 600 min(2vw, 3vh)/1.2 var(--mono); margin: .5vh 0 0; }

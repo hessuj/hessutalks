@@ -14,6 +14,22 @@ Osoite: <https://hessujarvinen.com/hessutalks/>
 4. Luennoitsija avaa viestit omassa selaimessaan tunnuslauseella. Ne päivittyvät reaaliaikaisesti,
    ja QR-koodin, yksittäisen kysymyksen tai kysymyslistan voi näyttää projektorilla.
 
+### Kyselyt
+
+Luentoon voi liittää kyselyitä: monivalinta (yksi tai useita vastauksia), sanapilvi, Likert-asteikko
+(5 tai 7 kohtaa) ja asteikko 0–10.
+
+1. Luo kyselyt hallinnassa luennon sivulla valmiiksi ja lataa kunkin **QR-koodi** (PNG) luentokalvoon.
+2. Avaa kysely luennolla napista *Avaa kysely*. Kuulijat vastaavat kalvon QR-koodilla tai luennon
+   tavallisella sivulla, jolle avoimet kyselyt ilmestyvät automaattisesti.
+3. *Tulokset projektorille* avaa kyselyn tulokset omaan ikkunaansa. Kaaviot ja sanapilvi päivittyvät
+   reaaliajassa (muutaman sekunnin viiveellä), ja ikkunan alareunassa on QR-koodi myöhässä tuleville.
+4. Sanapilvessä sopimattoman sanan voi piilottaa klikkaamalla sitä hallinnan tuloksissa.
+
+Kyselyyn vastataan ilman nimimerkkiä. Vastaukset salataan selaimessa kuten kysymyksetkin, ja tulokset
+lasketaan luennoitsijan selaimessa, joten hallinnan pitää olla auki ja avattuna tunnuslauseella.
+Saman selaimen uusi vastaus korvaa aiemman.
+
 ### Esitys projektorilla
 
 Kun projektori on kytketty jatketuksi näytöksi (ei peilaus), luennon *…projektorille*-napit avaavat
@@ -23,7 +39,8 @@ erillisen esitysikkunan (`/admin/esitys`) toiselle näytölle. Hallintanäkymä 
   selain kysyy luvan *ikkunoiden hallintaan*. Jos ponnahdusikkuna estyy luvan kysymisen takia, paina nappia uudelleen.
 - Muissa selaimissa ikkuna aukeaa tavallisena ikkunana: raahaa se projektorin näytölle.
 - Kaksoisklikkaus tai F-näppäin vaihtaa koko näytön tilaan, Esc palauttaa.
-- Kysymyslista päivittyy automaattisesti. Palautteet eivät näy listassa yleisölle.
+- Kysymykset, palautteet ja jokainen kysely avautuvat omiin ikkunoihinsa, jotka voivat olla auki yhtä aikaa.
+  Listat ja tulokset päivittyvät automaattisesti. Napin painaminen tuo ikkunan eteen.
 - *Tyhjennä projektori* tyhjentää näytön. Näyttö tyhjenee myös uloskirjautuessa ja hallintasivun sulkeutuessa.
 
 ### Ei henkilötietoja
