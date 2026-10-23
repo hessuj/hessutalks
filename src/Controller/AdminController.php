@@ -11,6 +11,7 @@ use HessuTalks\Http\Response;
 use HessuTalks\Repository\EventRepository;
 use HessuTalks\Repository\KeyRepository;
 use HessuTalks\Repository\PasskeyRepository;
+use HessuTalks\Repository\PollRepository;
 use HessuTalks\Repository\QuestionRepository;
 use HessuTalks\Security\AuditLog;
 use HessuTalks\Security\ClientId;
@@ -24,6 +25,7 @@ final class AdminController
         private readonly AdminAuth $auth,
         private readonly EventRepository $events,
         private readonly QuestionRepository $questions,
+        private readonly PollRepository $polls,
         private readonly KeyRepository $keys,
         private readonly PasskeyRepository $passkeys,
         private readonly AuditLog $audit,
@@ -40,7 +42,7 @@ final class AdminController
             'mode' => $mode,
             'origin' => $this->config->publicOrigin,
             'bodyClass' => 'admin',
-            'scripts' => ['vendor/sodium-sumo.js', 'vendor/qrcode.js', 'js/admin.js'],
+            'scripts' => ['vendor/sodium-sumo.js', 'vendor/qrcode.js', 'js/results.js', 'js/admin.js'],
         ]));
     }
 
@@ -55,7 +57,7 @@ final class AdminController
         }
         return Response::html($this->view->render('presenter', [
             'pageTitle' => 'Esitys',
-            'scripts' => ['vendor/qrcode.js', 'js/presenter.js'],
+            'scripts' => ['vendor/qrcode.js', 'js/results.js', 'js/presenter.js'],
         ], 'presenter_layout'));
     }
 
@@ -99,6 +101,12 @@ final class AdminController
         // --- Kirjautuneen ylläpitäjän reitit -------------------------------
         if (preg_match('#^events/(\d{1,10})/(questions|status|delete)$#', $route, $m) === 1) {
             return $this->eventAction($req, (int) $m[1], $m[2], $in, $client);
+        }
+        if (preg_match('#^events/(\d{1,10})/(polls|poll-answers)$#', $route, $m) === 1) {
+            return $this->eventPolls($req, (int) $m[1], $m[2], $in);
+        }
+        if (preg_match('#^polls/(\d{1,10})/(update|status|delete|reset)$#', $route, $m) === 1 && $req->method === 'POST') {
+            return $this->pollAction((int) $m[1], $m[2], $in, $client);
         }
         if (preg_match('#^questions/(\d{1,10})/(status|delete)$#', $route, $m) === 1 && $req->method === 'POST') {
             return $this->questionAction((int) $m[1], $m[2], $in);
@@ -274,6 +282,101 @@ final class AdminController
             return Response::error($e->getMessage(), 422);
         }
         return $ok ? Response::json(['ok' => true]) : Response::error('Ei löytynyt.', 404);
+    }
+
+    /**
+     * Luennon kyselyt (GET), uusi kysely (POST) ja salatut vastaukset (poll-answers).
+     * @param array<string, mixed> $in
+     */
+    private function eventPolls(Request $req, int $eventId, string $action, array $in): Response
+    {
+        $event = $this->events->find($eventId);
+        if ($event === null) {
+            return Response::error('Tapahtumaa ei löytynyt.', 404);
+        }
+        if ($action === 'poll-answers') {
+            if ($req->method !== 'GET') {
+                return Response::error('Metodia ei tueta.', 405);
+            }
+            $after = isset($req->query['after']) && ctype_digit($req->query['after']) ? (int) $req->query['after'] : 0;
+            $generations = [];
+            foreach ($this->polls->forEvent($eventId) as $p) {
+                $generations[(string) $p['id']] = $p['generation'];
+            }
+            return Response::json([
+                'answers' => $this->polls->answersForEvent($eventId, $after),
+                'generations' => (object) $generations,
+            ]);
+        }
+        if ($req->method === 'GET') {
+            return Response::json(['polls' => array_map(fn (array $p): array => $this->pollOut($p, $event), $this->polls->forEvent($eventId))]);
+        }
+        $valid = PollRepository::validate($in['type'] ?? null, $in['prompt'] ?? null, $in['config'] ?? null);
+        if (is_string($valid)) {
+            return Response::error($valid, 422);
+        }
+        $id = $this->polls->create($eventId, (string) $in['type'], $valid[0], $valid[1]);
+        if ($id === null) {
+            return Response::error('Luennolla on jo enimmäismäärä kyselyitä.', 409);
+        }
+        return Response::json(['poll' => $this->pollOut((array) $this->polls->find($id), $event)], 201);
+    }
+
+    /** @param array<string, mixed> $in */
+    private function pollAction(int $id, string $action, array $in, string $client): Response
+    {
+        $poll = $this->polls->find($id);
+        $event = $poll === null ? null : $this->events->find((int) $poll['event_id']);
+        if ($poll === null || $event === null) {
+            return Response::error('Kyselyä ei löytynyt.', 404);
+        }
+        switch ($action) {
+            case 'update':
+                $valid = PollRepository::validate($poll['type'], $in['prompt'] ?? null, $in['config'] ?? null);
+                if (is_string($valid)) {
+                    return Response::error($valid, 422);
+                }
+                $error = $this->polls->update($id, $valid[0], $valid[1]);
+                if ($error !== null) {
+                    return Response::error($error, 409);
+                }
+                break;
+            case 'status':
+                try {
+                    $this->polls->setStatus($id, is_string($in['status'] ?? null) ? $in['status'] : '');
+                } catch (\InvalidArgumentException $e) {
+                    return Response::error($e->getMessage(), 422);
+                }
+                break;
+            case 'reset':
+                $this->polls->reset($id);
+                $this->audit->record('poll_reset', $client, (string) $event['code'] . '#' . $id);
+                break;
+            default: // delete
+                $this->polls->delete($id);
+                $this->audit->record('poll_deleted', $client, (string) $event['code'] . '#' . $id);
+                return Response::json(['ok' => true]);
+        }
+        return Response::json(['poll' => $this->pollOut((array) $this->polls->find($id), $event)]);
+    }
+
+    /**
+     * @param array<string, mixed> $poll
+     * @param array<string, mixed> $event
+     * @return array<string, mixed>
+     */
+    private function pollOut(array $poll, array $event): array
+    {
+        return [
+            'id' => (int) ($poll['id'] ?? 0),
+            'type' => (string) ($poll['type'] ?? ''),
+            'prompt' => (string) ($poll['prompt'] ?? ''),
+            'config' => (object) (is_array($poll['config'] ?? null) ? $poll['config'] : []),
+            'status' => (string) ($poll['status'] ?? ''),
+            'generation' => (int) ($poll['generation'] ?? 1),
+            'answer_count' => $this->polls->countAnswers((int) ($poll['id'] ?? 0)),
+            'url' => $this->config->publicOrigin . $this->config->url('/k/' . (string) ($event['code'] ?? '')) . '?p=' . (int) ($poll['id'] ?? 0),
+        ];
     }
 
     /**

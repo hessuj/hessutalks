@@ -11,6 +11,7 @@ use HessuTalks\Http\Response;
 use HessuTalks\Repository\EventRepository;
 use HessuTalks\Repository\KeyRepository;
 use HessuTalks\Repository\NicknameRepository;
+use HessuTalks\Repository\PollRepository;
 use HessuTalks\Repository\QuestionRepository;
 use HessuTalks\Security\FormToken;
 use HessuTalks\Security\RateLimiter;
@@ -28,6 +29,7 @@ final class ParticipantController
     public const CLAIM_LIMIT_PER_EVENT = 300;     // nimimerkkivarauksia / luento / 10 min
     public const SUBMIT_LIMIT_PER_NICK = 20;      // viestejä / nimimerkki / 10 min
     public const EVENT_MAX_QUESTIONS = 2000;
+    public const VOTE_LIMIT_PER_VOTER = 30;       // vastauksia (myös muutoksia) / vastaaja / kysely / 10 min
 
     public function __construct(
         private readonly Config $config,
@@ -35,6 +37,7 @@ final class ParticipantController
         private readonly EventRepository $events,
         private readonly QuestionRepository $questions,
         private readonly NicknameRepository $nicknames,
+        private readonly PollRepository $polls,
         private readonly KeyRepository $keys,
         private readonly RateLimiter $limiter,
         private readonly FormToken $formToken,
@@ -89,7 +92,9 @@ final class ParticipantController
             'publicKey' => $pk,
             'formToken' => $this->formToken->issue((int) $event['id']),
             'jsStrings' => (string) json_encode(I18n::jsStrings($lang), JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR),
-            'scripts' => ['vendor/sodium.js', 'js/lang.js', 'js/participant.js'],
+            'pollsEndpoint' => $this->config->url('/api/polls'),
+            'answerEndpoint' => $this->config->url('/api/polls/answer'),
+            'scripts' => ['vendor/sodium.js', 'js/lang.js', 'js/participant.js', 'js/polls.js'],
         ]);
     }
 
@@ -141,6 +146,64 @@ final class ParticipantController
             return Response::error(I18n::t($lang, 'err.quota'), 429);
         }
         $this->questions->add($eventId, $nicknameId, (string) $in['ciphertext']);
+        return Response::json(['ok' => true], 201);
+    }
+
+    /**
+     * Luennon avoimet kyselyt. Selain kysyy tätä muutaman sekunnin välein; jos ?v vastaa
+     * nykyistä versiota, palautetaan vain {"unchanged": true} (pieni vastaus).
+     */
+    public function polls(Request $req): Response
+    {
+        $lang = I18n::fromRequest($req);
+        $raw = $req->query['code'] ?? '';
+        $code = is_string($raw) ? EventRepository::normalizeCode($raw) : null;
+        $event = $code === null ? null : $this->events->findByCode($code);
+        if ($event === null) {
+            $this->limiter->hit('lookup_fail', self::FAILED_LOOKUP_LIMIT, self::WINDOW);
+            return Response::error(I18n::t($lang, 'err.event_not_found'), 404);
+        }
+        if (!$this->events->isOpen($event)) {
+            return Response::json(['polls' => [], 'closed' => true, 'error' => I18n::t($lang, 'err.closed')], 410);
+        }
+        $polls = array_map(static fn (array $p): array => [
+            'id' => $p['id'],
+            'type' => $p['type'],
+            'prompt' => $p['prompt'],
+            'config' => (object) $p['config'],
+            'generation' => $p['generation'],
+        ], $this->polls->openForEvent((int) $event['id']));
+        $version = substr(hash('sha256', (string) json_encode($polls)), 0, 16);
+        if (($req->query['v'] ?? null) === $version) {
+            return Response::json(['v' => $version, 'unchanged' => true]);
+        }
+        return Response::json(['v' => $version, 'polls' => $polls]);
+    }
+
+    /** Tallentaa salatun kyselyvastauksen. Saman selaimen uusi vastaus korvaa aiemman. */
+    public function answerPoll(Request $req): Response
+    {
+        $ctx = $this->openEventFromRequest($req);
+        if ($ctx instanceof Response) {
+            return $ctx;
+        }
+        [$eventId, $in, $lang] = $ctx;
+
+        $pollId = $in['poll'] ?? null;
+        $poll = is_int($pollId) ? $this->polls->find($pollId) : null;
+        if ($poll === null || $poll['event_id'] !== $eventId || $poll['status'] !== 'open') {
+            return Response::error(I18n::t($lang, 'err.poll_closed'), 409);
+        }
+        if (!PollRepository::isValidVoter($in['voter'] ?? null) || !PollRepository::isValidCiphertext($in['ciphertext'] ?? null)) {
+            return Response::error(I18n::t($lang, 'err.invalid_answer'), 422);
+        }
+        $bucket = 'vote|' . $poll['id'] . '|' . hash('sha256', (string) $in['voter']);
+        if (!$this->limiter->hit($bucket, self::VOTE_LIMIT_PER_VOTER, self::WINDOW)) {
+            return Response::error(I18n::t($lang, 'err.vote_rate'), 429);
+        }
+        if (!$this->polls->answer((int) $poll['id'], (string) $in['voter'], (string) $in['ciphertext'])) {
+            return Response::error(I18n::t($lang, 'err.poll_quota'), 429);
+        }
         return Response::json(['ok' => true], 201);
     }
 

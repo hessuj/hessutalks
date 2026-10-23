@@ -27,6 +27,8 @@
     return typeof v === 'string' && v.length <= (max || MAX_TEXT) ? v : null;
   }
   function show() {
+    root.classList.remove('poll-stage');
+    pollView = null;
     root.replaceChildren.apply(root, arguments);
   }
   function waiting(msg) {
@@ -42,6 +44,65 @@
     img.alt = 'QR-koodi';
     show(h('p', 'stage-code', code), img, h('p', 'stage-url', url));
   }
+
+  // ---------------------------------------------------------------- kyselyn tulokset
+
+  var POLL_TYPES = ['single', 'multi', 'words', 'likert', 'scale'];
+  var pollView = null;   // { id, prompt, results, count } – sama näkymä päivitetään, jotta kaaviot animoituvat
+  var lastPoll = null;
+
+  function isCount(n) { return typeof n === 'number' && Number.isInteger(n) && n >= 0; }
+  function validPoll(m) {
+    var p = m.poll;
+    var d = m.data;
+    if (!p || typeof p !== 'object' || !isCount(p.id) || POLL_TYPES.indexOf(p.type) === -1 || str(p.prompt, 300) === null) return false;
+    if (!p.config || typeof p.config !== 'object' || str(m.url, 500) === null || !d || typeof d !== 'object' || !isCount(d.voters)) return false;
+    if (p.type === 'single' || p.type === 'multi') {
+      var opts = p.config.options;
+      if (!Array.isArray(opts) || opts.length > 10 || !opts.every(function (o) { return str(o, 120) !== null; })) return false;
+      return Array.isArray(d.counts) && d.counts.length === opts.length && d.counts.every(isCount);
+    }
+    if (p.type === 'likert' || p.type === 'scale') {
+      if ((p.config.min_label !== undefined && str(p.config.min_label, 40) === null) ||
+          (p.config.max_label !== undefined && str(p.config.max_label, 40) === null)) return false;
+      return Array.isArray(d.counts) && d.counts.length <= 11 && d.counts.every(isCount) && isCount(d.from) &&
+        (d.mean === undefined || typeof d.mean === 'number') && (d.median === undefined || typeof d.median === 'number');
+    }
+    return Array.isArray(d.words) && d.words.length <= 500 && d.words.every(function (w) {
+      return Array.isArray(w) && w.length === 2 && str(w[0], 40) !== null && isCount(w[1]);
+    });
+  }
+
+  function renderPoll(m) {
+    var p = m.poll;
+    lastPoll = m;
+    if (!pollView || pollView.id !== p.id) {
+      var prompt = h('p', 'poll-stage-prompt');
+      var results = h('div', 'poll-stage-results');
+      var qr = window.qrcode(0, 'M');
+      qr.addData(m.url);
+      qr.make();
+      var img = h('img');
+      img.src = qr.createDataURL(6, 2);
+      img.alt = 'QR-koodi';
+      var count = h('p', 'poll-stage-count');
+      var info = h('div', 'poll-stage-info');
+      info.appendChild(h('p', 'poll-stage-url', m.url.replace(/^https?:\/\//, '')));
+      info.appendChild(count);
+      var foot = h('div', 'poll-stage-foot');
+      foot.appendChild(img);
+      foot.appendChild(info);
+      show(prompt, results, foot);
+      root.classList.add('poll-stage');
+      pollView = { id: p.id, prompt: prompt, results: results, count: count };
+    }
+    pollView.prompt.textContent = p.prompt;
+    pollView.count.textContent = m.data.voters + ' vastausta' + (m.status === 'closed' ? ' · kysely on suljettu' : '');
+    window.HessuResults.render(pollView.results, p, m.data);
+  }
+
+  // Sanapilvi asetellaan ikkunan koon mukaan: piirretään uudelleen, kun koko muuttuu.
+  window.addEventListener('resize', function () { if (pollView && lastPoll) renderPoll(lastPoll); });
 
   function renderList(title, items) {
     var ol = h('ol', 'stage-list');
@@ -87,6 +148,9 @@
           return it && str(it.nick, 100) !== null && str(it.text) !== null;
         }));
         break;
+      case 'poll':
+        if (validPoll(m)) renderPoll(m);
+        break;
       case 'blank':
         show();
         break;
@@ -119,6 +183,12 @@
     return;
   }
   window.opener.postMessage({ type: 'ready' }, window.location.origin);
+
+  // Tahdistus: hallintanäkymä päivittää tulokset näiden viestien tahdissa, vaikka sen välilehti olisi
+  // taustalla (selain hidastaa taustan ajastimia, mutta ei viestien käsittelyä).
+  setInterval(function () {
+    if (window.opener && !window.opener.closed) window.opener.postMessage({ type: 'tick' }, window.location.origin);
+  }, 2000);
 
   // Jos hallintaikkuna suljetaan, tyhjennä näyttö, ettei sisältö jää näkyviin.
   var watch = setInterval(function () {

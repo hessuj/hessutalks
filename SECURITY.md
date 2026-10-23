@@ -24,6 +24,8 @@ Ilmoita haavoittuvuuksista yksityisesti GitHubin *Security → Report a vulnerab
 | XSS viestien kautta | CSP ilman inline-skriptejä. Purettu sisältö lisätään DOMiin vain `textContent`illa. Templatet escapoidaan. |
 | Toisen nimimerkin käyttö | Varaus sidotaan satunnaiseen 256-bittiseen omistajatunnisteeseen, josta palvelimella on vain tiiviste |
 | Projektorin esitysikkuna | Esitysikkunassa ei ole salausavainta eikä salauskirjastoa. Hallintaikkuna lähettää sille vain näytettävän tekstin `postMessage`lla omaan originiinsa. Esitysikkuna hyväksyy viestit vain avaajaltaan ja samasta originista, ja se vaatii kirjautumisen. Näyttö tyhjennetään, kun hallintaikkuna suljetaan. |
+| Kyselyvastaukset | Vastaus salataan selaimessa (sealed box) ja sidotaan luentoon ja kyselyyn salatun sisällön sisällä. Luennoitsijan selain hylkää väärän muotoiset tai toiselle kyselylle salatut vastaukset. Kysymysteksti ja vaihtoehdot ovat luennoitsijan julkista sisältöä ja tallennetaan selväkielisinä. |
+| Kyselyvastaajan tunnistaminen | Ei nimimerkkiä. Selaimen satunnaisesta tunnisteesta tallennetaan vain kyselykohtainen HMAC, joten saman selaimen vastauksia eri kyselyissä ei voi yhdistää tietokannasta. |
 | Viestin siirto toiselle luennolle | Luennon koodi on salatun viestin sisällä. Ylläpitonäkymä varoittaa ristiriidasta. |
 | Roskapostitus | Nimimerkki- ja luentokohtaiset rajat sekä luentokohtaiset enimmäismäärät |
 | Luentokoodien arvailu | Avaruus 31⁶ ≈ 887 milj. Epäonnistuneita hakuja rajoitetaan palvelun tasolla. |
@@ -42,6 +44,11 @@ Ilmoita haavoittuvuuksista yksityisesti GitHubin *Security → Report a vulnerab
   ne tallentuvat salattuina. Lomake ohjeistaa olemaan tekemättä niin.
 - **Saman verkon käyttäjät.** Rajoitukset eivät perustu IP-osoitteisiin, joten luentosali voi olla NAT:n takana ilman haittaa.
   Tämä tarkoittaa myös, että yksittäistä häiriköijää voi rajoittaa vain nimimerkin perusteella.
+
+- **Kyselyjen äänten monistaminen.** Koska vastaajia ei tunnisteta, muokattu asiakasohjelma voi luoda
+  uusia satunnaisia tunnisteita ja vastata useasti. Rajoja: lomaketoken, vastaajakohtainen nopeusraja ja
+  kyselykohtainen enimmäismäärä (3000). Kyselyt sopivat mielipiteiden ja osaamisen kartoitukseen, eivät äänestyksiin,
+  joiden tuloksella on seurauksia.
 
 ## Ylläpitäjän muistilista
 

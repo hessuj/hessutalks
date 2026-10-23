@@ -19,7 +19,7 @@
   var KDF_OPS = 3;
   var KDF_MEM = 64 * 1024 * 1024;
   var MIN_PASSPHRASE = 12;
-  var POLL_MS = 5000;
+  var POLL_MS = 2500;
 
   var sodium = null;
   var secretKey = null;   // Uint8Array, vain muistissa
@@ -368,20 +368,25 @@
 
   // ================================================================ esitysnäyttö (projektori)
   //
-  // Esitysikkuna (/admin/esitys) avataan jatketulle näytölle, jolloin hallintanäkymä jää
-  // läppärin näytölle. Ikkunassa ei ole salausavainta: tämä ikkuna lähettää sille vain
-  // näytettävän tekstin postMessagella saman originin sisällä.
+  // Esitysikkunat (/admin/esitys) avataan jatketulle näytölle, jolloin hallintanäkymä jää
+  // läppärin näytölle. Ikkunoita voi olla auki useita yhtä aikaa, yksi kutakin näkymää kohden:
+  // "esitys" (QR-koodi, yksittäinen viesti), "kysymykset", "palautteet" ja "kysely-<id>".
+  // Ikkunoissa ei ole salausavainta: tämä ikkuna lähettää niille vain näytettävän sisällön
+  // postMessagella saman originin sisällä.
+  //
+  // Näkyvä esitysikkuna lähettää tahdistusviestin (tick) parin sekunnin välein. Sen avulla tulokset
+  // päivittyvät, vaikka tämä välilehti olisi taustalla (selain hidastaa taustan ajastimia).
 
   var ORIGIN = window.location.origin;
-  var presenterWin = null;
-  var presenterMsg = null;    // viimeisin sisältö; lähetetään uudelleen, kun ikkuna ilmoittaa olevansa valmis
-  var presenterLive = null;   // funktio, joka tuottaa päivittyvän sisällön (kysymyslista)
+  var screens = {};           // avain -> { win, msg, live, fitTo }
   var presenterNote = h('span.hint');
+  var liveRefresh = null;     // nykyisen luentonäkymän päivitysfunktio (tick kutsuu)
+  var lastTick = 0;
 
-  function presenterOpen() { return !!presenterWin && !presenterWin.closed; }
+  function screenOpen(sc) { return !!sc && !!sc.win && !sc.win.closed; }
 
-  function presenterPost(msg) {
-    if (presenterOpen()) presenterWin.postMessage(msg, ORIGIN);
+  function screenPost(sc, msg) {
+    if (screenOpen(sc)) sc.win.postMessage(msg, ORIGIN);
   }
 
   /** Valitsee näytön, joka ei ole tämän ikkunan näyttö (Window Management API, Chrome/Edge). */
@@ -400,9 +405,8 @@
   // varmistettu, että selain todella sijoitti sen sinne: muuten ylisuuri ikkuna jäisi väärälle näytölle.
   var PRESENTER_W = 960;
   var PRESENTER_H = 600;
-  var presenterScreen = null;   // kohdenäyttö, jonka kokoiseksi ikkuna suurennetaan, kun se on valmis
 
-  function openPresenter() {
+  function openScreen(key, sc) {
     return extendedScreen().then(function (scr) {
       var features = 'popup,width=' + PRESENTER_W + ',height=' + PRESENTER_H;
       if (scr) {
@@ -410,9 +414,9 @@
           ',top=' + Math.round(scr.availTop + (scr.availHeight - PRESENTER_H) / 2);
       }
       // Ei noopeneria: esitysikkuna tarvitsee avaajan viestien lähettäjän tunnistamiseen.
-      presenterWin = window.open(BASE + '/admin/esitys', 'hessutalks-esitys', features);
-      presenterScreen = presenterWin ? scr : null;
-      if (!presenterWin) {
+      sc.win = window.open(BASE + '/admin/esitys', 'hessutalks-' + key, features);
+      sc.fitTo = sc.win ? scr : null;
+      if (!sc.win) {
         presenterNote.textContent = 'Selain esti ikkunan. Salli ponnahdusikkunat tai paina nappia uudelleen.';
       } else if (!scr) {
         presenterNote.textContent = 'Siirrä esitysikkuna projektorin näytölle ja kaksoisklikkaa sitä (koko näyttö). Automaattinen sijoitus toimii Chromessa ja Edgessä.';
@@ -428,37 +432,338 @@
   }
 
   /** Suurentaa esitysikkunan kohdenäytön kokoiseksi, jos ikkuna on kohdenäytöllä. */
-  function fitPresenter() {
-    var scr = presenterScreen;
-    presenterScreen = null;
-    if (!scr || !presenterOpen()) return;
-    if (!isOnScreen(presenterWin, scr)) {
+  function fitScreen(sc) {
+    var scr = sc.fitTo;
+    sc.fitTo = null;
+    if (!scr || !screenOpen(sc)) return;
+    if (!isOnScreen(sc.win, scr)) {
       presenterNote.textContent = 'Selain ei sijoittanut ikkunaa toiselle näytölle. Raahaa se projektorille ja kaksoisklikkaa sitä (koko näyttö).';
       return;
     }
-    presenterWin.moveTo(scr.availLeft, scr.availTop);
-    presenterWin.resizeTo(scr.availWidth, scr.availHeight);
+    sc.win.moveTo(scr.availLeft, scr.availTop);
+    sc.win.resizeTo(scr.availWidth, scr.availHeight);
     presenterNote.textContent = 'Esitysnäyttö avattu toiselle näytölle. Kaksoisklikkaa sitä tai paina F: koko näyttö.';
   }
 
-  /** Näyttää sisällön projektorilla. live = funktio, jolla sisältö päivitetään kyselyjen välissä. */
-  function present(msg, live) {
-    presenterMsg = msg;
-    presenterLive = live || null;
-    if (presenterOpen()) { presenterPost(msg); return; }
-    openPresenter();
+  /**
+   * Näyttää sisällön projektorin ikkunassa key. live = funktio, joka tuottaa päivittyvän sisällön;
+   * updateScreens() lähettää sen ikkunaan aina, kun se muuttuu.
+   */
+  function present(key, msg, live) {
+    var sc = screens[key] || (screens[key] = { win: null, msg: null, live: null, fitTo: null });
+    sc.msg = msg;
+    sc.live = live || null;
+    if (screenOpen(sc)) {
+      screenPost(sc, msg);
+      try { sc.win.focus(); } catch (e) { /* selain voi estää */ }
+      return;
+    }
+    openScreen(key, sc);
+  }
+
+  /** Lähettää päivittyvien näkymien uuden sisällön ikkunoihin, jos se on muuttunut. */
+  function updateScreens() {
+    Object.keys(screens).forEach(function (key) {
+      var sc = screens[key];
+      if (!sc.live || !screenOpen(sc)) return;
+      var next = sc.live();
+      if (next && JSON.stringify(next) !== JSON.stringify(sc.msg)) { sc.msg = next; screenPost(sc, next); }
+    });
+  }
+
+  function anyScreenOpen() {
+    return Object.keys(screens).some(function (k) { return screenOpen(screens[k]); });
   }
 
   window.addEventListener('message', function (ev) {
-    if (ev.origin !== ORIGIN || !presenterOpen() || ev.source !== presenterWin) return;
-    if (!ev.data || ev.data.type !== 'ready') return;
-    fitPresenter();
-    if (presenterMsg) presenterPost(presenterMsg);
+    if (ev.origin !== ORIGIN || !ev.data) return;
+    var sc = null;
+    Object.keys(screens).forEach(function (k) { if (screenOpen(screens[k]) && screens[k].win === ev.source) sc = screens[k]; });
+    if (!sc) return;
+    if (ev.data.type === 'ready') {
+      fitScreen(sc);
+      if (sc.msg) screenPost(sc, sc.msg);
+    } else if (ev.data.type === 'tick' && liveRefresh && Date.now() - lastTick > 1500) {
+      lastTick = Date.now();
+      liveRefresh();
+    }
   });
 
+  /** Tyhjentää kaikki projektorin ikkunat. */
+  function blankScreens() {
+    Object.keys(screens).forEach(function (k) {
+      var sc = screens[k];
+      sc.msg = { type: 'blank' }; sc.live = null;
+      screenPost(sc, sc.msg);
+    });
+  }
+
   function presenterEnd() {
-    presenterMsg = null; presenterLive = null;
-    presenterPost({ type: 'end' });
+    Object.keys(screens).forEach(function (k) {
+      var sc = screens[k];
+      sc.msg = null; sc.live = null;
+      screenPost(sc, { type: 'end' });
+    });
+  }
+
+  // ================================================================ kyselyt (luennon näkymässä)
+
+  var TYPE_LABEL = { single: 'Monivalinta, yksi vastaus', multi: 'Monivalinta, useita vastauksia', words: 'Sanapilvi', likert: 'Likert-asteikko', scale: 'Asteikko 0–10' };
+  var POLL_STATUS_LABEL = { draft: 'Luonnos', open: 'Auki', closed: 'Suljettu' };
+  var LABEL_DEFAULTS = {
+    likert: ['Täysin eri mieltä', 'Täysin samaa mieltä'],
+    scale: ['Ei lainkaan', 'Erittäin paljon']
+  };
+
+  /** Lataa QR-koodin PNG-kuvana (esim. luentokalvoon). */
+  function downloadQr(text, filename) {
+    var qr = window.qrcode(0, 'M');
+    qr.addData(text);
+    qr.make();
+    var n = qr.getModuleCount();
+    var cell = 16;
+    var margin = 4;
+    var size = (n + 2 * margin) * cell;
+    var canvas = document.createElement('canvas');
+    canvas.width = size;
+    canvas.height = size;
+    var ctx = canvas.getContext('2d');
+    ctx.fillStyle = '#fff';
+    ctx.fillRect(0, 0, size, size);
+    ctx.fillStyle = '#000';
+    for (var r = 0; r < n; r++) {
+      for (var c = 0; c < n; c++) {
+        if (qr.isDark(r, c)) ctx.fillRect((c + margin) * cell, (r + margin) * cell, cell, cell);
+      }
+    }
+    canvas.toBlob(function (blob) {
+      var a = h('a', { href: URL.createObjectURL(blob), download: filename });
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(function () { URL.revokeObjectURL(a.href); }, 1000);
+    }, 'image/png');
+  }
+
+  /**
+   * Luennon kyselyt: luonti, muokkaus, avaus/sulkeminen ja reaaliaikaiset tulokset.
+   * Vastaukset puretaan tässä selaimessa; palvelin ei näe niitä.
+   */
+  function pollsPanel(eventId, getEvent) {
+    var polls = [];
+    var answers = {};       // kyselyn id -> { vastaaja: vastaus }
+    var invalid = {};       // kyselyn id -> hylättyjen vastausten määrä
+    var generations = {};   // kyselyn id -> sukupolvi (kasvaa, kun vastaukset tyhjennetään)
+    var hidden = {};        // kyselyn id -> { sana: true } (sanapilven moderointi, vain muistissa)
+    var lastAnswerId = 0;
+    var views = {};         // kyselyn id -> tuloselementti (säilyy, jotta kaaviot animoituvat)
+    var listEl = h('div.poll-list');
+    var formEl = h('div');
+    var outEl = h('div');
+    var el = h('section.polls-admin', null,
+      h('div.toolbar', null, h('h2', { text: 'Kyselyt' }), h('span.spacer'),
+        h('button.btn.small', { type: 'button', text: 'Uusi kysely', onclick: function () { showForm(null); } })),
+      outEl, formEl, listEl);
+
+    function findPoll(pid) {
+      for (var i = 0; i < polls.length; i++) if (polls[i].id === pid) return polls[i];
+      return null;
+    }
+    function fail(e) { if (e.message !== '401') outEl.replaceChildren(notice(e.message, 'error')); }
+
+    function load() {
+      return api('GET', 'events/' + eventId + '/polls').then(function (r) { polls = r.polls; renderAll(); });
+    }
+
+    function tallyFor(poll) {
+      var map = answers[poll.id] || {};
+      return HessuResults.tally(poll, Object.keys(map).map(function (k) { return map[k]; }), hidden[poll.id]);
+    }
+
+    function pollMessage(pid) {
+      var poll = findPoll(pid);
+      if (!poll) return { type: 'blank' };
+      return {
+        type: 'poll', code: getEvent().code, url: poll.url, status: poll.status,
+        poll: { id: poll.id, type: poll.type, prompt: poll.prompt, config: poll.config },
+        data: tallyFor(poll)
+      };
+    }
+
+    /** Hakee uudet salatut vastaukset, purkaa ja tarkistaa ne. */
+    function refreshAnswers() {
+      return api('GET', 'events/' + eventId + '/poll-answers?after=' + lastAnswerId).then(function (r) {
+        var changed = false;
+        var gens = r.generations || {};
+        Object.keys(gens).forEach(function (pid) {
+          if (generations[pid] !== undefined && generations[pid] !== gens[pid]) { answers[pid] = {}; invalid[pid] = 0; changed = true; }
+          generations[pid] = gens[pid];
+        });
+        // Vastaus kyselyyn, jota tämä näkymä ei vielä tunne: ladataan kyselyt ensin ja haetaan uudelleen.
+        if (r.answers.some(function (a) { return !findPoll(a.poll_id); })) return load();
+        var code = getEvent().code;
+        r.answers.forEach(function (a) {
+          if (a.id > lastAnswerId) lastAnswerId = a.id;
+          var poll = findPoll(a.poll_id);
+          var m = decrypt(a.ciphertext);
+          // Vastaus hyväksytään vain, jos se on salattu juuri tälle luennolle ja kyselylle.
+          var value = m && m.e === code && m.p === a.poll_id ? HessuResults.validAnswer(poll, m.a) : null;
+          var map = answers[a.poll_id] || (answers[a.poll_id] = {});
+          if (value === null) { invalid[a.poll_id] = (invalid[a.poll_id] || 0) + 1; delete map[a.voter]; }
+          else map[a.voter] = value;
+          changed = true;
+        });
+        if (changed) updateResults();
+      });
+    }
+
+    function updateResults() {
+      polls.forEach(function (poll) {
+        var view = views[poll.id];
+        if (!view || !view.el.isConnected) return;
+        var data = tallyFor(poll);
+        view.count.textContent = data.voters + ' vastausta' +
+          (invalid[poll.id] ? ', ' + invalid[poll.id] + ' hylätty (virheellinen tai toiselle kyselylle salattu)' : '');
+        HessuResults.render(view.el, poll, data, poll.type === 'words' ? { onWord: function (word) { hideWord(poll, word); } } : null);
+        renderHidden(poll);
+      });
+      updateScreens();
+    }
+
+    function hideWord(poll, word) {
+      if (!window.confirm('Piilotetaanko "' + word + '" tuloksista ja projektorilta?')) return;
+      (hidden[poll.id] || (hidden[poll.id] = {}))[word] = true;
+      updateResults();
+    }
+    function renderHidden(poll) {
+      var view = views[poll.id];
+      var words = Object.keys(hidden[poll.id] || {});
+      view.hidden.replaceChildren();
+      if (!words.length) return;
+      view.hidden.appendChild(h('span.hint', { text: 'Piilotetut: ' }));
+      words.forEach(function (word) {
+        view.hidden.appendChild(h('button.btn.ghost.small', { type: 'button', text: word + ' ↺', title: 'Palauta näkyviin', onclick: function () {
+          delete hidden[poll.id][word]; updateResults();
+        } }));
+      });
+    }
+
+    function act(poll, action, body, confirmText) {
+      if (confirmText && !window.confirm(confirmText)) return;
+      api('POST', 'polls/' + poll.id + '/' + action, body || {}).then(function (r) {
+        if (action === 'delete') {
+          polls = polls.filter(function (p) { return p.id !== poll.id; });
+          var sc = screens['kysely-' + poll.id];
+          if (sc) { sc.live = null; sc.msg = { type: 'blank' }; screenPost(sc, sc.msg); }
+        } else {
+          polls = polls.map(function (p) { return p.id === poll.id ? r.poll : p; });
+        }
+        if (action === 'reset') { answers[poll.id] = {}; invalid[poll.id] = 0; }
+        renderAll();
+      }).catch(fail);
+    }
+
+    function renderAll() {
+      outEl.replaceChildren();
+      listEl.replaceChildren();
+      if (!polls.length) {
+        listEl.appendChild(h('p.empty', { text: 'Ei kyselyitä. Luo kysely valmiiksi ennen luentoa ja lataa sen QR-koodi kalvoon.' }));
+      }
+      polls.forEach(function (poll) {
+        var view = views[poll.id] || (views[poll.id] = { el: h('div'), count: h('span.hint'), hidden: h('div.poll-hidden') });
+        var next = { draft: ['Avaa kysely', 'open'], open: ['Sulje kysely', 'closed'], closed: ['Avaa uudelleen', 'open'] }[poll.status];
+        listEl.appendChild(h('article.poll-card', { 'data-status': poll.status },
+          h('div.poll-card-head', null,
+            h('span.badge.' + poll.status, { text: POLL_STATUS_LABEL[poll.status] || poll.status }),
+            h('span.hint', { text: TYPE_LABEL[poll.type] || poll.type })),
+          h('p.poll-card-prompt', { text: poll.prompt }),
+          h('div.q-actions', null,
+            h('button.btn.small', { type: 'button', text: next[0], onclick: function () { act(poll, 'status', { status: next[1] }); } }),
+            h('button.btn.small', { type: 'button', text: 'Tulokset projektorille', onclick: function () {
+              present('kysely-' + poll.id, pollMessage(poll.id), function () { return pollMessage(poll.id); });
+            } }),
+            h('button.btn.ghost.small', { type: 'button', text: 'Lataa QR-koodi', title: poll.url, onclick: function () {
+              downloadQr(poll.url, 'hessutalks-' + getEvent().code + '-kysely-' + poll.id + '.png');
+            } }),
+            h('button.btn.ghost.small', { type: 'button', text: 'Muokkaa', onclick: function () { showForm(poll); } }),
+            h('button.btn.ghost.small', { type: 'button', text: 'Tyhjennä vastaukset', onclick: function () {
+              act(poll, 'reset', {}, 'Tyhjennetäänkö kyselyn "' + poll.prompt + '" kaikki vastaukset pysyvästi?');
+            } }),
+            h('button.btn.danger.small', { type: 'button', text: 'Poista', onclick: function () {
+              act(poll, 'delete', {}, 'Poistetaanko kysely "' + poll.prompt + '" ja sen vastaukset pysyvästi?');
+            } })),
+          h('p.url', null, h('a', { href: poll.url, target: '_blank', rel: 'noopener', text: poll.url })),
+          view.count, view.el, view.hidden));
+      });
+      updateResults();
+    }
+
+    // ---------------------------------------------------------------- lomake
+
+    function showForm(poll) {
+      var editing = !!poll;
+      var cfg = editing ? poll.config : {};
+      var type = h('select', { id: 'poll-type', disabled: editing },
+        Object.keys(TYPE_LABEL).map(function (k) { return h('option', { value: k, text: TYPE_LABEL[k], selected: editing && poll.type === k }); }));
+      var prompt = h('input', { type: 'text', id: 'poll-prompt', maxlength: 300, required: true, value: editing ? poll.prompt : '',
+        placeholder: 'esim. Mikä on tärkein tietoturvaperiaate?' });
+      var fields = h('div');
+      var inputs = {};
+
+      function renderFields() {
+        var t = type.value;
+        fields.replaceChildren();
+        inputs = {};
+        if (t === 'single' || t === 'multi') {
+          inputs.options = h('textarea', { id: 'poll-options', rows: 5, placeholder: 'Yksi vaihtoehto per rivi (2–10)' });
+          inputs.options.value = (cfg.options || []).join('\n');
+          fields.append(h('label', { for: 'poll-options', text: 'Vaihtoehdot' }), inputs.options);
+        } else if (t === 'likert' || t === 'scale') {
+          if (t === 'likert') {
+            inputs.points = h('select', { id: 'poll-points' },
+              h('option', { value: '5', text: '5 kohtaa', selected: cfg.points !== 7 }),
+              h('option', { value: '7', text: '7 kohtaa', selected: cfg.points === 7 }));
+            fields.append(h('label', { for: 'poll-points', text: 'Asteikko' }), inputs.points);
+          }
+          var defs = LABEL_DEFAULTS[t];
+          inputs.min = h('input', { type: 'text', id: 'poll-min', maxlength: 40, value: editing ? (cfg.min_label || '') : defs[0] });
+          inputs.max = h('input', { type: 'text', id: 'poll-max', maxlength: 40, value: editing ? (cfg.max_label || '') : defs[1] });
+          fields.append(
+            h('label', { for: 'poll-min', text: t === 'scale' ? 'Selite arvolle 0' : 'Selite arvolle 1' }), inputs.min,
+            h('label', { for: 'poll-max', text: t === 'scale' ? 'Selite arvolle 10' : 'Selite suurimmalle arvolle' }), inputs.max);
+        } else {
+          fields.append(h('p.hint', { text: 'Kuulijat vastaavat 1–3 sanalla. Samat vastaukset kasvattavat sanaa pilvessä. Voit piilottaa sopimattoman sanan klikkaamalla sitä tuloksissa.' }));
+        }
+      }
+
+      function config() {
+        var t = type.value;
+        if (t === 'single' || t === 'multi') return { options: inputs.options.value.split('\n').map(function (x) { return x.trim(); }).filter(Boolean) };
+        if (t === 'likert') return { points: parseInt(inputs.points.value, 10), min_label: inputs.min.value, max_label: inputs.max.value };
+        if (t === 'scale') return { min_label: inputs.min.value, max_label: inputs.max.value };
+        return {};
+      }
+
+      type.addEventListener('change', renderFields);
+      renderFields();
+      var out = h('div');
+      formEl.replaceChildren(h('form.poll-form', { onsubmit: function (ev) {
+        ev.preventDefault();
+        var req = editing
+          ? api('POST', 'polls/' + poll.id + '/update', { prompt: prompt.value, config: config() })
+          : api('POST', 'events/' + eventId + '/polls', { type: type.value, prompt: prompt.value, config: config() });
+        req.then(function () { formEl.replaceChildren(); return load(); })
+          .catch(function (e) { if (e.message !== '401') out.replaceChildren(notice(e.message, 'error')); });
+      } },
+        h('h3', { text: editing ? 'Muokkaa kyselyä' : 'Uusi kysely' }),
+        h('label', { for: 'poll-type', text: 'Kysymystyyppi' }), type,
+        h('label', { for: 'poll-prompt', text: 'Kysymys' }), prompt,
+        fields,
+        h('p', null, h('button.btn.small', { type: 'submit', text: editing ? 'Tallenna' : 'Luo kysely' }), ' ',
+          h('button.btn.ghost.small', { type: 'button', text: 'Peruuta', onclick: function () { formEl.replaceChildren(); } })),
+        out));
+      prompt.focus();
+    }
+
+    return { el: el, load: load, refresh: refreshAnswers };
   }
 
   function showEvent(id) {
@@ -469,6 +774,7 @@
     var listEl = h('ul.questions');
     var headEl = h('div');
     var countEl = h('span.hint');
+    var panel = pollsPanel(id, function () { return event; });
 
     function renderHead() {
       var url = event.url;
@@ -481,14 +787,15 @@
             h('p.url', null, h('a', { href: url, target: '_blank', rel: 'noopener', text: url })),
             h('p', null,
               h('button.btn.small', { type: 'button', text: 'QR-koodi projektorille', onclick: function () {
-                present({ type: 'qr', code: event.code, url: url });
+                present('esitys', { type: 'qr', code: event.code, url: url });
               } }), ' ',
               h('button.btn.small', { type: 'button', text: 'Kysymykset projektorille', onclick: function () {
-                present(listMessage(), listMessage);
+                present('kysymykset', listMessage('question'), function () { return listMessage('question'); });
               } }), ' ',
-              h('button.btn.ghost.small', { type: 'button', text: 'Tyhjennä projektori', onclick: function () {
-                present({ type: 'blank' });
+              h('button.btn.small', { type: 'button', text: 'Palautteet projektorille', onclick: function () {
+                present('palautteet', listMessage('feedback'), function () { return listMessage('feedback'); });
               } }), ' ',
+              h('button.btn.ghost.small', { type: 'button', text: 'Tyhjennä projektori', onclick: blankScreens }), ' ',
               h('button.btn.ghost.small', { type: 'button', text: event.open ? 'Sulje kysymykset' : 'Avaa kysymykset', onclick: function () {
                 api('POST', 'events/' + id + '/status', { status: event.open ? 'closed' : 'open' }).then(function (r) { event = r.event; renderHead(); });
               } }), ' ',
@@ -501,18 +808,18 @@
       );
     }
 
-    // Projektorin kysymyslista: käsiteltävät kysymykset, uusin ensin (jos kaikki eivät mahdu, vanhimmat jäävät pois).
-    // Palautteita ei näytetä yleisölle.
+    // Projektorin lista (kysymykset tai palautteet omissa ikkunoissaan): käsiteltävät viestit, uusin ensin.
+    // Lista päivittyy projektorille automaattisesti uusien viestien tullessa.
     var LIST_MAX = 10;
-    function listMessage() {
+    function listMessage(kind) {
       var bad = nickConflicts();
       var shown = items.filter(function (it) {
         var m = it.msg;
-        return m && m.k !== 'feedback' && m.e === event.code && typeof m.t === 'string' && typeof m.n === 'string' &&
-          !bad[it.nickname_id] && (it.status === 'new' || it.status === 'answered');
+        return m && (m.k === 'feedback') === (kind === 'feedback') && m.e === event.code && typeof m.t === 'string' &&
+          typeof m.n === 'string' && !bad[it.nickname_id] && (it.status === 'new' || it.status === 'answered');
       }).slice(-LIST_MAX).reverse();
       return {
-        type: 'list', title: event.title,
+        type: 'list', title: event.title + ' · ' + (kind === 'feedback' ? 'Palautteet' : 'Kysymykset'),
         items: shown.map(function (it) { return { nick: it.msg.n, text: it.msg.t }; })
       };
     }
@@ -553,10 +860,7 @@
         return it.status === filter;
       }).slice().reverse();
       countEl.textContent = visible.length + ' / ' + items.length + ' viestiä';
-      if (presenterLive === listMessage) {
-        var next = listMessage();
-        if (JSON.stringify(next) !== JSON.stringify(presenterMsg)) { presenterMsg = next; presenterPost(next); }
-      }
+      updateScreens();
       listEl.replaceChildren();
       if (!visible.length) {
         listEl.appendChild(h('li.empty', { text: items.length ? 'Ei viestejä tällä suodattimella.' : 'Ei vielä viestejä. Uudet viestit tulevat näkyviin automaattisesti.' }));
@@ -577,7 +881,7 @@
           m ? h('p.q-text', { text: String(m.t) }) : null,
           h('div.q-actions', null,
             m ? h('button.btn.small', { type: 'button', text: 'Näytä projektorilla', onclick: function () {
-              present({ type: 'question', nick: typeof m.n === 'string' ? m.n : '?', text: String(m.t) });
+              present('esitys', { type: 'question', nick: typeof m.n === 'string' ? m.n : '?', text: String(m.t) });
               if (it.status === 'new') setStatus(it, 'answered');
             } }) : null,
             it.status !== 'answered' ? h('button.btn.ghost.small', { type: 'button', text: 'Merkitse vastatuksi', onclick: function () { setStatus(it, 'answered'); } }) : null,
@@ -609,17 +913,25 @@
       });
     }
 
-    mount(headEl, filtersEl, listEl);
+    // Päivitys: kysymykset ja kyselyvastaukset. Ajastin toimii, kun välilehti on näkyvissä;
+    // taustalla esitysikkunan tick-viesti kutsuu samaa funktiota (ks. esitysnäyttö).
+    function refreshAll() {
+      return poll().then(function () { return panel.refresh(); });
+    }
+
+    mount(headEl, panel.el, h('h2', { text: 'Kysymykset ja palaute' }), filtersEl, listEl);
     filtersEl.replaceChildren.apply(filtersEl, filterButtons());
-    poll().then(function () {
+    poll().then(function () { return panel.load(); }).then(function () { return panel.refresh(); }).then(function () {
+      liveRefresh = function () { refreshAll().catch(function () {}); };
       pollTimer = setInterval(function () {
         if (document.hidden) return;
-        poll().catch(function () {});
+        refreshAll().catch(function () {});
       }, POLL_MS);
     }).catch(function (e) { if (e.message !== '401') root.appendChild(notice(e.message, 'error')); });
   }
 
   function stopPolling() {
+    liveRefresh = null;
     if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
   }
 
