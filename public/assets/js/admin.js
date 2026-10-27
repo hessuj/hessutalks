@@ -28,6 +28,7 @@
   var state = null;
   var pollTimer = null;
   var pendingPrf = null;  // { id, output, wrap } kirjautumisen jälkeen, kunnes avain on avattu
+  var prfDiag = null;     // miksi PRF-arvoa ei saatu (näytetään avausnäkymässä)
   var PRF_CONTEXT = 'HessuTalks PRF unlock v1';
 
   // ================================================================ DOM-apurit
@@ -124,6 +125,24 @@
     });
   }
 
+  /**
+   * Lukee PRF-tuloksen. Hyväksyy standardin ArrayBufferin, typed arrayn ja (1Passwordin
+   * laajennuksen palauttaman) tavallisen numerotaulukon. diag kertoo muodon, ei arvoa.
+   */
+  function prfResult(ext) {
+    if (!ext || !ext.prf) return { output: null, diag: 'ei PRF-vastausta (selain tai passkey ei tue)' };
+    var first = ext.prf.results && ext.prf.results.first;
+    if (!first) return { output: null, diag: 'PRF-vastaus ilman tulosta' + (ext.prf.enabled === false ? ' (enabled: false)' : '') };
+    var bytes = null;
+    if (first instanceof ArrayBuffer) bytes = new Uint8Array(first.slice(0));
+    else if (ArrayBuffer.isView(first)) bytes = new Uint8Array(first.buffer.slice(first.byteOffset, first.byteOffset + first.byteLength));
+    else if (Array.isArray(first) && first.every(function (b) { return b === (b & 255); })) bytes = Uint8Array.from(first);
+    if (!bytes || bytes.length !== 32) {
+      return { output: null, diag: 'PRF-tulos väärää muotoa (' + Object.prototype.toString.call(first) + (bytes ? ', ' + bytes.length + ' tavua' : '') + ')' };
+    }
+    return { output: bytes, diag: null };
+  }
+
   /** Kirjautuu ja ottaa talteen PRF-arvon (pendingPrf), jos passkey ja selain tukevat sitä. */
   function loginWithPasskey() {
     var output = null;
@@ -131,8 +150,9 @@
       return navigator.credentials.get(prepGet(opts));
     }).then(function (cred) {
       var ext = typeof cred.getClientExtensionResults === 'function' ? cred.getClientExtensionResults() : {};
-      var first = ext && ext.prf && ext.prf.results && ext.prf.results.first;
-      if (first) output = new Uint8Array(first.slice ? first.slice(0) : first);
+      var res = prfResult(ext);
+      output = res.output;
+      prfDiag = res.diag;
       return api('POST', 'login', {
         id: bufToB64url(cred.rawId),
         clientDataJSON: bufToB64url(cred.response.clientDataJSON),
@@ -371,7 +391,8 @@
       } },
         h('p.hint', { text: pendingPrf
           ? 'Tämä passkey tukee avausta, mutta sitä ei ole vielä otettu käyttöön. Avaa kerran tunnuslauseella, niin jatkossa passkey riittää.'
-          : 'Varakeino: passkey ei antanut avausarvoa (PRF). Syy on yleensä salasanamanageri, joka ei tue PRF:ää. Apple Salasanoihin (iCloud) tai Google-salasanoihin tallennettu passkey tukee sitä.' }),
+          : 'Varakeino: passkey ei antanut avausarvoa (PRF). Syy on yleensä salasanamanageri, joka ei tue PRF:ää. Apple Salasanoihin (iCloud) tai Google-salasanoihin tallennettu passkey tukee sitä.'
+            + (prfDiag ? ' Tekninen syy: ' + prfDiag + '.' : '') }),
         h('label', { for: 'pp', text: 'Tunnuslause' }), input,
         h('p', null, h('button.btn' + (pendingPrf ? '' : '.ghost'), { type: 'submit', text: 'Avaa tunnuslauseella' }), ' ', logoutButton())),
       out);
