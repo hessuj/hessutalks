@@ -37,9 +37,15 @@ final class EventRepository
         return preg_match($pattern, $code) === 1 ? $code : null;
     }
 
-    /** @return array<string, mixed> */
-    public function create(string $title, ?int $durationHours): array
+    /**
+     * @param string|null $lang osallistujan sivun oletuskieli (fi/en) tai null = selaimen kieli
+     * @return array<string, mixed>
+     */
+    public function create(string $title, ?int $durationHours, ?string $lang = null): array
     {
+        if ($lang !== null && !in_array($lang, ['fi', 'en'], true)) {
+            throw new \InvalidArgumentException('Tuntematon kieli.');
+        }
         $title = trim($title);
         if ($title === '' || mb_strlen($title) > self::TITLE_MAX) {
             throw new \InvalidArgumentException('Otsikon pituus 1–' . self::TITLE_MAX . ' merkkiä.');
@@ -53,8 +59,8 @@ final class EventRepository
                 continue;
             }
             $this->db->exec(
-                'INSERT INTO events (code, title, status, created_at, closes_at) VALUES (?, ?, ?, ?, ?)',
-                [$code, $title, 'open', $now, $closesAt],
+                'INSERT INTO events (code, title, status, created_at, closes_at, lang) VALUES (?, ?, ?, ?, ?, ?)',
+                [$code, $title, 'open', $now, $closesAt, $lang],
             );
             $event = $this->find($this->db->lastId());
             if ($event === null) {
@@ -107,6 +113,14 @@ final class EventRepository
             ? 'UPDATE events SET status = ?, closes_at = NULL WHERE id = ?'
             : 'UPDATE events SET status = ? WHERE id = ?';
         return $this->db->exec($sql, [$status, $id]) === 1;
+    }
+
+    public function setLang(int $id, ?string $lang): bool
+    {
+        if ($lang !== null && !in_array($lang, ['fi', 'en'], true)) {
+            throw new \InvalidArgumentException('Tuntematon kieli.');
+        }
+        return $this->db->exec('UPDATE events SET lang = ? WHERE id = ?', [$lang, $id]) === 1;
     }
 
     public function delete(int $id): bool

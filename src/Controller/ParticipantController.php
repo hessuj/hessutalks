@@ -10,6 +10,7 @@ use HessuTalks\I18n;
 use HessuTalks\Http\Response;
 use HessuTalks\Repository\EventRepository;
 use HessuTalks\Repository\KeyRepository;
+use HessuTalks\Repository\LiveRepository;
 use HessuTalks\Repository\NicknameRepository;
 use HessuTalks\Repository\PollRepository;
 use HessuTalks\Repository\QuestionRepository;
@@ -38,6 +39,7 @@ final class ParticipantController
         private readonly QuestionRepository $questions,
         private readonly NicknameRepository $nicknames,
         private readonly PollRepository $polls,
+        private readonly LiveRepository $live,
         private readonly KeyRepository $keys,
         private readonly RateLimiter $limiter,
         private readonly FormToken $formToken,
@@ -85,14 +87,15 @@ final class ParticipantController
         if ($pk === null) {
             return $this->message($req, 'page.not_ready', 503);
         }
-        $lang = I18n::fromRequest($req);
+        $lang = self::eventLang($req, $event);
         return $this->page($req, 'event', [
+            'lang' => $lang,
             'pageTitle' => (string) $event['title'],
             'event' => $event,
             'publicKey' => $pk,
             'formToken' => $this->formToken->issue((int) $event['id']),
             'jsStrings' => (string) json_encode(I18n::jsStrings($lang), JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR),
-            'pollsEndpoint' => $this->config->url('/api/polls'),
+            'liveEndpoint' => $this->config->url('/api/live'),
             'answerEndpoint' => $this->config->url('/api/polls/answer'),
             'scripts' => ['vendor/sodium.js', 'js/lang.js', 'js/participant.js', 'js/polls.js'],
         ]);
@@ -150,10 +153,11 @@ final class ParticipantController
     }
 
     /**
-     * Luennon avoimet kyselyt. Selain kysyy tätä muutaman sekunnin välein; jos ?v vastaa
-     * nykyistä versiota, palautetaan vain {"unchanged": true} (pieni vastaus).
+     * Luennon aktiivinen kysymys. Selain kysyy tätä noin sekunnin välein. Jos ?v vastaa luennon
+     * live_versionia, palautetaan vain {"unchanged": true}: yksi tietokantakysely, pieni vastaus.
+     * poll = null tarkoittaa odotusnäkymää.
      */
-    public function polls(Request $req): Response
+    public function live(Request $req): Response
     {
         $lang = I18n::fromRequest($req);
         $raw = $req->query['code'] ?? '';
@@ -164,20 +168,13 @@ final class ParticipantController
             return Response::error(I18n::t($lang, 'err.event_not_found'), 404);
         }
         if (!$this->events->isOpen($event)) {
-            return Response::json(['polls' => [], 'closed' => true, 'error' => I18n::t($lang, 'err.closed')], 410);
+            return Response::json(['poll' => null, 'closed' => true, 'error' => I18n::t($lang, 'err.closed')], 410);
         }
-        $polls = array_map(static fn (array $p): array => [
-            'id' => $p['id'],
-            'type' => $p['type'],
-            'prompt' => $p['prompt'],
-            'config' => (object) $p['config'],
-            'generation' => $p['generation'],
-        ], $this->polls->openForEvent((int) $event['id']));
-        $version = substr(hash('sha256', (string) json_encode($polls)), 0, 16);
-        if (($req->query['v'] ?? null) === $version) {
+        $version = (int) $event['live_version'];
+        if (($req->query['v'] ?? null) === (string) $version) {
             return Response::json(['v' => $version, 'unchanged' => true]);
         }
-        return Response::json(['v' => $version, 'polls' => $polls]);
+        return Response::json(['v' => $version, 'poll' => $this->live->participantPoll($event)]);
     }
 
     /** Tallentaa salatun kyselyvastauksen. Saman selaimen uusi vastaus korvaa aiemman. */
@@ -191,7 +188,8 @@ final class ParticipantController
 
         $pollId = $in['poll'] ?? null;
         $poll = is_int($pollId) ? $this->polls->find($pollId) : null;
-        if ($poll === null || $poll['event_id'] !== $eventId || $poll['status'] !== 'open') {
+        // Vain aktiivinen ja avoin kysymys ottaa vastaan vastauksia.
+        if ($poll === null || $poll['event_id'] !== $eventId || $poll['status'] !== 'open' || $this->live->activeId($eventId) !== $poll['id']) {
             return Response::error(I18n::t($lang, 'err.poll_closed'), 409);
         }
         if (!PollRepository::isValidVoter($in['voter'] ?? null) || !PollRepository::isValidCiphertext($in['ciphertext'] ?? null)) {
@@ -274,6 +272,16 @@ final class ParticipantController
             'langSwitch' => true,
             'scripts' => ['js/lang.js'],
         ]), $status);
+    }
+
+    /**
+     * Luennon sivun kieli: käyttäjän valinta (?lang), muuten luennon oletuskieli, muuten selaimen kieli.
+     * @param array<string, mixed> $event
+     */
+    private static function eventLang(Request $req, array $event): string
+    {
+        $default = $event['lang'] ?? null;
+        return I18n::explicit($req) ?? (is_string($default) && in_array($default, I18n::LANGS, true) ? $default : I18n::fromRequest($req));
     }
 
     /** '?lang=xx', jos käyttäjä on valinnut kielen; sisäiset linkit säilyttävät valinnan. */

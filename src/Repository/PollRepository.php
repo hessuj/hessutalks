@@ -126,18 +126,46 @@ final class PollRepository
         return hash_hmac('sha256', 'voter|' . $pollId . '|' . $voter, $this->appSecret);
     }
 
-    /** @param array<string, mixed> $config */
-    public function create(int $eventId, string $type, string $prompt, array $config): ?int
+    /**
+     * Luo kyselyn sarjan loppuun. null = luennon kiintiö täynnä.
+     * @param array<string, mixed> $config
+     */
+    public function create(int $eventId, int $setId, string $type, string $prompt, array $config): ?int
     {
         if ($this->countForEvent($eventId) >= self::MAX_PER_EVENT) {
             return null;
         }
         $now = $this->clock->now();
+        $max = $this->db->one('SELECT COALESCE(MAX(position), 0) AS p FROM polls WHERE set_id = ?', [$setId]);
         $this->db->exec(
-            'INSERT INTO polls (event_id, type, prompt, config, status, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
-            [$eventId, $type, $prompt, self::encode($config), 'draft', $now, $now],
+            'INSERT INTO polls (event_id, set_id, position, type, prompt, config, status, created_at, updated_at)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+            [$eventId, $setId, (int) ($max['p'] ?? 0) + 1, $type, $prompt, self::encode($config), 'draft', $now, $now],
         );
         return $this->db->lastId();
+    }
+
+    /** Siirtää kyselyä sarjansa sisällä yhden askeleen (-1 ylös, 1 alas). */
+    public function move(int $id, int $dir): bool
+    {
+        $poll = $this->find($id);
+        if ($poll === null || ($dir !== -1 && $dir !== 1)) {
+            return false;
+        }
+        $ids = array_map(
+            static fn (array $r): int => (int) $r['id'],
+            $this->db->all('SELECT id FROM polls WHERE set_id = ? ORDER BY position ASC, id ASC', [(int) $poll['set_id']]),
+        );
+        $i = array_search($id, $ids, true);
+        $j = is_int($i) ? $i + $dir : -1;
+        if (!is_int($i) || $j < 0 || $j >= count($ids)) {
+            return false;
+        }
+        [$ids[$i], $ids[$j]] = [$ids[$j], $ids[$i]];
+        foreach ($ids as $pos => $pid) {
+            $this->db->exec('UPDATE polls SET position = ? WHERE id = ?', [$pos + 1, $pid]);
+        }
+        return true;
     }
 
     /** @return array<string, mixed>|null */
@@ -148,27 +176,16 @@ final class PollRepository
     }
 
     /**
-     * Kaikki luennon kyselyt vastausmäärineen (ylläpitäjälle).
+     * Kaikki luennon kyselyt vastausmäärineen (ylläpitäjälle), sarjojen ja kyselyjen järjestyksessä.
+     * skipped kertoo, onko kyselyn sarja ohitettu.
      * @return list<array<string, mixed>>
      */
     public function forEvent(int $eventId): array
     {
         $rows = $this->db->all(
-            'SELECT p.*, (SELECT COUNT(*) FROM poll_answers a WHERE a.poll_id = p.id) AS answer_count
-             FROM polls p WHERE p.event_id = ? ORDER BY p.id ASC',
-            [$eventId],
-        );
-        return array_map(self::decodeRow(...), $rows);
-    }
-
-    /**
-     * Avoimet kyselyt osallistujalle: vain julkiset kentät.
-     * @return list<array<string, mixed>>
-     */
-    public function openForEvent(int $eventId): array
-    {
-        $rows = $this->db->all(
-            "SELECT id, type, prompt, config, generation FROM polls WHERE event_id = ? AND status = 'open' ORDER BY id ASC",
+            'SELECT p.*, s.skipped AS skipped, (SELECT COUNT(*) FROM poll_answers a WHERE a.poll_id = p.id) AS answer_count
+             FROM polls p JOIN poll_sets s ON s.id = p.set_id
+             WHERE p.event_id = ? ORDER BY s.position ASC, s.id ASC, p.position ASC, p.id ASC',
             [$eventId],
         );
         return array_map(self::decodeRow(...), $rows);
@@ -290,10 +307,13 @@ final class PollRepository
     {
         $config = json_decode((string) ($row['config'] ?? '{}'), true);
         $row['config'] = is_array($config) ? $config : [];
-        foreach (['id', 'event_id', 'generation', 'created_at', 'updated_at', 'answer_count'] as $k) {
+        foreach (['id', 'event_id', 'set_id', 'position', 'generation', 'created_at', 'updated_at', 'answer_count'] as $k) {
             if (isset($row[$k])) {
                 $row[$k] = (int) $row[$k];
             }
+        }
+        if (isset($row['skipped'])) {
+            $row['skipped'] = (bool) $row['skipped'];
         }
         return $row;
     }

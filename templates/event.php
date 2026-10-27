@@ -1,7 +1,7 @@
 <?php
 /** @var \Closure $e @var \Closure $url @var \Closure $t @var string $lang */
 /** @var array<string, mixed> $event @var string $publicKey @var string $formToken @var string $jsStrings */
-/** @var string $pollsEndpoint @var string $answerEndpoint */
+/** @var string $liveEndpoint @var string $answerEndpoint */
 ?>
 <section class="card" id="ask"
          data-code="<?= $e($event['code']) ?>"
@@ -17,7 +17,7 @@
   <noscript><p class="notice error"><?= $e($t('event.noscript')) ?></p></noscript>
 
   <div id="polls" class="polls" hidden
-       data-endpoint="<?= $e($pollsEndpoint) ?>"
+       data-endpoint="<?= $e($liveEndpoint) ?>"
        data-answer-endpoint="<?= $e($answerEndpoint) ?>"></div>
 
   <form id="ask-form" class="ask-form" method="post" action="#" novalidate hidden>

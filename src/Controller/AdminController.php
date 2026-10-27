@@ -10,9 +10,11 @@ use HessuTalks\Http\Request;
 use HessuTalks\Http\Response;
 use HessuTalks\Repository\EventRepository;
 use HessuTalks\Repository\KeyRepository;
+use HessuTalks\Repository\LiveRepository;
 use HessuTalks\Repository\PasskeyRepository;
 use HessuTalks\Repository\PollRepository;
 use HessuTalks\Repository\QuestionRepository;
+use HessuTalks\Repository\SetRepository;
 use HessuTalks\Security\AuditLog;
 use HessuTalks\Security\ClientId;
 use HessuTalks\View;
@@ -26,6 +28,8 @@ final class AdminController
         private readonly EventRepository $events,
         private readonly QuestionRepository $questions,
         private readonly PollRepository $polls,
+        private readonly SetRepository $sets,
+        private readonly LiveRepository $live,
         private readonly KeyRepository $keys,
         private readonly PasskeyRepository $passkeys,
         private readonly AuditLog $audit,
@@ -99,14 +103,17 @@ final class AdminController
         }
 
         // --- Kirjautuneen ylläpitäjän reitit -------------------------------
-        if (preg_match('#^events/(\d{1,10})/(questions|status|delete)$#', $route, $m) === 1) {
+        if (preg_match('#^events/(\d{1,10})/(questions|status|delete|lang)$#', $route, $m) === 1) {
             return $this->eventAction($req, (int) $m[1], $m[2], $in, $client);
         }
-        if (preg_match('#^events/(\d{1,10})/(polls|poll-answers)$#', $route, $m) === 1) {
+        if (preg_match('#^events/(\d{1,10})/(polls|poll-answers|sets|live)$#', $route, $m) === 1) {
             return $this->eventPolls($req, (int) $m[1], $m[2], $in);
         }
-        if (preg_match('#^polls/(\d{1,10})/(update|status|delete|reset)$#', $route, $m) === 1 && $req->method === 'POST') {
+        if (preg_match('#^polls/(\d{1,10})/(update|status|delete|reset|move)$#', $route, $m) === 1 && $req->method === 'POST') {
             return $this->pollAction((int) $m[1], $m[2], $in, $client);
+        }
+        if (preg_match('#^sets/(\d{1,10})/(update|move|skip|delete)$#', $route, $m) === 1 && $req->method === 'POST') {
+            return $this->setAction((int) $m[1], $m[2], $in, $client);
         }
         if (preg_match('#^questions/(\d{1,10})/(status|delete)$#', $route, $m) === 1 && $req->method === 'POST') {
             return $this->questionAction((int) $m[1], $m[2], $in);
@@ -279,8 +286,12 @@ final class AdminController
         if ($hours !== null && (!is_int($hours) || $hours < 1 || $hours > 24 * 30)) {
             return Response::error('Kesto 1–720 tuntia.', 422);
         }
+        $lang = $in['lang'] ?? null;
+        if ($lang !== null && !in_array($lang, ['fi', 'en'], true)) {
+            return Response::error('Tuntematon kieli.', 422);
+        }
         try {
-            $event = $this->events->create($title, $hours);
+            $event = $this->events->create($title, $hours, $lang);
         } catch (\InvalidArgumentException $e) {
             return Response::error($e->getMessage(), 422);
         }
@@ -305,6 +316,14 @@ final class AdminController
         }
         if ($req->method !== 'POST') {
             return Response::error('Metodia ei tueta.', 405);
+        }
+        if ($action === 'lang') {
+            $lang = $in['lang'] ?? null;
+            if ($lang !== null && !in_array($lang, ['fi', 'en'], true)) {
+                return Response::error('Tuntematon kieli.', 422);
+            }
+            $this->events->setLang($id, $lang);
+            return Response::json(['event' => $this->eventOut((array) $this->events->find($id))]);
         }
         if ($action === 'status') {
             $status = is_string($in['status'] ?? null) ? $in['status'] : '';
@@ -361,13 +380,29 @@ final class AdminController
             ]);
         }
         if ($req->method === 'GET') {
-            return Response::json(['polls' => array_map(fn (array $p): array => $this->pollOut($p, $event), $this->polls->forEvent($eventId))]);
+            return $action === 'polls' ? $this->pollsState($event) : Response::error('Metodia ei tueta.', 405);
+        }
+        if ($action === 'sets') {
+            $slug = SetRepository::cleanSlug($in['slug'] ?? null);
+            $title = SetRepository::cleanTitle($in['title'] ?? null);
+            if ($slug === null || $title === null) {
+                return Response::error('Tunniste 1–16 merkkiä (A–Z, 0–9, - tai _) ja nimi 1–' . SetRepository::TITLE_MAX . ' merkkiä.', 422);
+            }
+            $created = $this->sets->create($eventId, $slug, $title);
+            return is_string($created) ? Response::error($created, 409) : $this->pollsState($event, 201);
+        }
+        if ($action === 'live') {
+            return $this->liveAction($event, $in);
+        }
+        $set = is_int($in['set_id'] ?? null) ? $this->sets->find($in['set_id']) : null;
+        if ($set === null || $set['event_id'] !== $eventId) {
+            return Response::error('Valitse kysymyssarja.', 422);
         }
         $valid = PollRepository::validate($in['type'] ?? null, $in['prompt'] ?? null, $in['config'] ?? null);
         if (is_string($valid)) {
             return Response::error($valid, 422);
         }
-        $id = $this->polls->create($eventId, (string) $in['type'], $valid[0], $valid[1]);
+        $id = $this->polls->create($eventId, (int) $set['id'], (string) $in['type'], $valid[0], $valid[1]);
         if ($id === null) {
             return Response::error('Luennolla on jo enimmäismäärä kyselyitä.', 409);
         }
@@ -392,19 +427,35 @@ final class AdminController
                 if ($error !== null) {
                     return Response::error($error, 409);
                 }
+                $this->live->bump((int) $event['id']);
                 break;
             case 'status':
+                // Avaaminen tekee kyselystä aktiivisen (vain aktiivinen voi olla auki).
+                $status = is_string($in['status'] ?? null) ? $in['status'] : '';
+                if ($status === 'open') {
+                    $this->live->open((int) $event['id'], $id);
+                    break;
+                }
                 try {
-                    $this->polls->setStatus($id, is_string($in['status'] ?? null) ? $in['status'] : '');
+                    $this->polls->setStatus($id, $status);
                 } catch (\InvalidArgumentException $e) {
                     return Response::error($e->getMessage(), 422);
                 }
+                $this->live->bump((int) $event['id']);
                 break;
+            case 'move':
+                $dir = $in['dir'] ?? null;
+                if (!is_int($dir) || !$this->polls->move($id, $dir)) {
+                    return Response::error('Kyselyä ei voi siirtää.', 409);
+                }
+                return $this->pollsState($event);
             case 'reset':
                 $this->polls->reset($id);
+                $this->live->bump((int) $event['id']);
                 $this->audit->record('poll_reset', $client, (string) $event['code'] . '#' . $id);
                 break;
             default: // delete
+                $this->live->forgetPoll((int) $event['id'], $id);
                 $this->polls->delete($id);
                 $this->audit->record('poll_deleted', $client, (string) $event['code'] . '#' . $id);
                 return Response::json(['ok' => true]);
@@ -427,8 +478,93 @@ final class AdminController
             'status' => (string) ($poll['status'] ?? ''),
             'generation' => (int) ($poll['generation'] ?? 1),
             'answer_count' => $this->polls->countAnswers((int) ($poll['id'] ?? 0)),
-            'url' => $this->config->publicOrigin . $this->config->url('/k/' . (string) ($event['code'] ?? '')) . '?p=' . (int) ($poll['id'] ?? 0),
+            'set_id' => (int) ($poll['set_id'] ?? 0),
+            'position' => (int) ($poll['position'] ?? 0),
+            'url' => $this->config->publicOrigin . $this->config->url('/k/' . (string) ($event['code'] ?? '')),
         ];
+    }
+
+    /**
+     * Luennon sarjat, kyselyt ja aktiivinen kysymys hallinnan näkymälle.
+     * @param array<string, mixed> $event
+     */
+    private function pollsState(array $event, int $status = 200): Response
+    {
+        $eventId = (int) $event['id'];
+        return Response::json([
+            'sets' => array_map(static fn (array $s): array => [
+                'id' => $s['id'], 'slug' => $s['slug'], 'title' => $s['title'], 'position' => $s['position'], 'skipped' => $s['skipped'],
+            ], $this->sets->forEvent($eventId)),
+            'polls' => array_map(fn (array $p): array => $this->pollOut($p, $event), $this->polls->forEvent($eventId)),
+            'active' => $this->live->activeId($eventId),
+        ], $status);
+    }
+
+    /**
+     * Aktiivisen kysymyksen ohjaus: activate (poll tai null = odotusnäkymä), next, prev.
+     * @param array<string, mixed> $event
+     * @param array<string, mixed> $in
+     */
+    private function liveAction(array $event, array $in): Response
+    {
+        $eventId = (int) $event['id'];
+        switch ($in['action'] ?? null) {
+            case 'activate':
+                $poll = $in['poll'] ?? null;
+                if (($poll !== null && !is_int($poll)) || !$this->live->activate($eventId, $poll)) {
+                    return Response::error('Kyselyä ei löytynyt.', 404);
+                }
+                break;
+            case 'next':
+            case 'prev':
+                if ($this->live->step($eventId, $in['action'] === 'next' ? 1 : -1) === null) {
+                    return Response::error($in['action'] === 'next' ? 'Ei enempää kysymyksiä.' : 'Tämä on ensimmäinen kysymys.', 409);
+                }
+                break;
+            default:
+                return Response::error('Tuntematon toiminto.', 422);
+        }
+        return $this->pollsState($event);
+    }
+
+    /** @param array<string, mixed> $in */
+    private function setAction(int $id, string $action, array $in, string $client): Response
+    {
+        $set = $this->sets->find($id);
+        $event = $set === null ? null : $this->events->find((int) $set['event_id']);
+        if ($set === null || $event === null) {
+            return Response::error('Sarjaa ei löytynyt.', 404);
+        }
+        switch ($action) {
+            case 'update':
+                $slug = SetRepository::cleanSlug($in['slug'] ?? null);
+                $title = SetRepository::cleanTitle($in['title'] ?? null);
+                if ($slug === null || $title === null) {
+                    return Response::error('Tunniste 1–16 merkkiä (A–Z, 0–9, - tai _) ja nimi 1–' . SetRepository::TITLE_MAX . ' merkkiä.', 422);
+                }
+                $error = $this->sets->update($id, $slug, $title);
+                if ($error !== null) {
+                    return Response::error($error, 409);
+                }
+                break;
+            case 'move':
+                $dir = $in['dir'] ?? null;
+                if (!is_int($dir) || !$this->sets->move($id, $dir)) {
+                    return Response::error('Sarjaa ei voi siirtää.', 409);
+                }
+                break;
+            case 'skip':
+                if (!is_bool($in['skipped'] ?? null)) {
+                    return Response::error('Virheellinen arvo.', 422);
+                }
+                $this->sets->setSkipped($id, $in['skipped']);
+                break;
+            default: // delete
+                $this->live->forgetSet((int) $event['id'], $id);
+                $this->sets->delete($id);
+                $this->audit->record('set_deleted', $client, (string) $event['code'] . '/' . (string) $set['slug']);
+        }
+        return $this->pollsState($event);
     }
 
     /**
@@ -448,6 +584,7 @@ final class AdminController
             'question_count' => (int) ($event['question_count'] ?? 0),
             'new_count' => (int) ($event['new_count'] ?? 0),
             'url' => $this->config->publicOrigin . $this->config->url('/k/' . (string) ($event['code'] ?? '')),
+            'lang' => is_string($event['lang'] ?? null) ? $event['lang'] : null,
         ];
     }
 
