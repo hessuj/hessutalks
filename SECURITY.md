@@ -18,6 +18,7 @@ Ilmoita haavoittuvuuksista yksityisesti GitHubin *Security → Report a vulnerab
 |---|---|
 | Tietokanta tai varmuuskopio vuotaa | Viestit ja nimimerkit ovat vain salattuina. Yksityinen avain on salattu Argon2id-tunnuslauseella. Nimimerkeistä on tallessa vain HMAC-tiiviste. |
 | Webhotellin tiedostot luetaan | Kuten edellä. Lisäksi `app_secret` suojaa HMAC-tiivisteitä ja lomaketokeneita. |
+| Yksityisen avaimen avaus passkeylla | WebAuthn PRF: passkey laskee laitteen sisällä salaisen arvon passkeykohtaisesta suolasta. Selain johtaa siitä avaimen ja salaa sillä kopion yksityisestä avaimesta. Palvelimella on vain suola ja salattu kopio. PRF-arvo ei lähde selaimesta, joten tietokannan vuoto ei paljasta avainta. Kopion voi tallentaa vain sille passkeylle, jolla istunto kirjautui, ja se poistuu passkeyn mukana. Tunnuslause ja varmuuskopio jäävät varakeinoksi. |
 | Kirjautumisen arvaus tai kalastelu | Passkey on sidottu originiin, joten salasanaa ei ole kalasteltavissa. Haasteet ovat kertakäyttöisiä ja vanhenevat 3 minuutissa. Kirjautumisyrityksiä rajoitetaan. |
 | Istunnon kaappaus tai fixation | `__Host-`-eväste, `HttpOnly`, `SameSite=Strict`, tunniste vaihdetaan kirjautuessa, aikakatkaisut |
 | CSRF | Tarkka Origin-vertailu, `Sec-Fetch-Site`-tarkistus, CSRF-token, vain JSON-pyynnöt |

@@ -62,7 +62,7 @@ avaimella on molemmat kielet.
 | Kerros | Ratkaisu |
 |---|---|
 | Viestien luottamuksellisuus | libsodium `crypto_box_seal` (X25519 + XSalsa20-Poly1305) selaimessa |
-| Yksityinen avain | Salattu selaimessa tunnuslauseella (Argon2id, 64 MiB), palvelin ei näe tunnuslausetta |
+| Yksityinen avain | Avataan selaimessa passkeylla (WebAuthn PRF) tai varakeinona tunnuslauseella (Argon2id, 64 MiB). Palvelin ei näe kumpaakaan |
 | Ylläpitäjän kirjautuminen | Passkey (WebAuthn), käyttäjän varmennus pakollinen, ei salasanoja |
 | Istunto | `__Host-`-eväste, `HttpOnly`, `Secure`, `SameSite=Strict`, 30 min toimettomuus / 8 h enintään |
 | CSRF | Origin- ja `Sec-Fetch-Site`-tarkistus + CSRF-token (ylläpito) / tilaton HMAC-lomaketoken (osallistuja) |
@@ -144,6 +144,9 @@ käsiksi tietokantaan eikä muihin sivuston osiin.
    Luo sen jälkeen salausavaimet tunnuslauseella. Tallenna tunnuslause salasanojen hallintaan
    ja talleta ladattu varmuuskopiotiedosto turvaan.
 6. **Varapasskey:** lisää *Asetukset*-sivulta toinen passkey esimerkiksi puhelimeen.
+7. **Avaus passkeylla:** kirjaudu kullakin passkeylla kerran ja avaa avain tunnuslauseella. Sovellus
+   tallentaa passkeykohtaisen salatun kopion, ja sen jälkeen pelkkä Touch ID / Face ID avaa myös kysymykset.
+   Vaatii PRF-tuen (Safari 18 / macOS 15 / iOS 18, Chrome, Edge). Muuten tunnuslause kysytään kuten ennenkin.
 
 ## Kehitys omalla koneella
 

@@ -41,6 +41,8 @@ final class AdminSecurityTest extends AppTestCase
         yield ['POST', '/admin/api/keys'];
         yield ['POST', '/admin/api/keys/rewrap'];
         yield ['POST', '/admin/api/passkeys/1/delete'];
+        yield ['POST', '/admin/api/passkeys/1/prf'];
+        yield ['POST', '/admin/api/passkeys/1/prf-delete'];
     }
 
     #[\PHPUnit\Framework\Attributes\DataProvider('protectedRoutes')]
@@ -228,6 +230,132 @@ final class AdminSecurityTest extends AppTestCase
     {
         $csrf = $this->loginAdmin();
         self::assertSame(409, $this->request('POST', '/admin/api/passkeys/1/delete', [], ['X-CSRF-Token' => $csrf])->status);
+    }
+
+    // ------------------------------------------------------------ avaus passkeylla (PRF)
+
+    /** Kirjautuu oikean kirjautumisvirran läpi passkeylla cred-1 ja palauttaa vastauksen. */
+    private function passkeyLogin(): array
+    {
+        $h = ['X-CSRF-Token' => $this->pageCsrf()];
+        $opts = $this->json($this->request('POST', '/admin/api/login/options', [], $h));
+        $r = $this->request('POST', '/admin/api/login', $this->assertion(), $h);
+        self::assertSame(200, $r->status, $r->body);
+        return ['options' => $opts] + $this->json($r);
+    }
+
+    /** @return array{public_key: string, enc_secret_key: string, nonce: string} */
+    private function prfWrap(): array
+    {
+        return [
+            'public_key' => base64_encode(sodium_crypto_box_publickey($this->keypair)),
+            'enc_secret_key' => base64_encode(random_bytes(48)),
+            'nonce' => base64_encode(random_bytes(24)),
+        ];
+    }
+
+    public function testLoginOptionsContainStablePrfSaltPerPasskey(): void
+    {
+        $repo = new PasskeyRepository($this->db, $this->clock);
+        $repo->add('cred-1', 'PEM', 0, 'MacBook');
+        $repo->add('cred-2', 'PEM', 0, 'iPhone');
+        $h = ['X-CSRF-Token' => $this->pageCsrf()];
+        $first = $this->json($this->request('POST', '/admin/api/login/options', [], $h))['prfSalts'] ?? null;
+        $second = $this->json($this->request('POST', '/admin/api/login/options', [], $h))['prfSalts'] ?? null;
+
+        self::assertIsArray($first);
+        self::assertSame([self::b64u('cred-1'), self::b64u('cred-2')], array_keys($first));
+        foreach ($first as $salt) {
+            self::assertSame(32, strlen((string) PasskeyRepository::b64urlDecode((string) $salt)), 'Suola on 32 satunnaista tavua');
+        }
+        self::assertNotSame($first[self::b64u('cred-1')], $first[self::b64u('cred-2')], 'Jokaisella passkeylla oma suola');
+        self::assertSame($first, $second, 'Suola pysyy samana, muuten PRF-arvo muuttuisi');
+    }
+
+    public function testPrfWrapRoundTripThroughLogin(): void
+    {
+        $this->createKeys();
+        (new PasskeyRepository($this->db, $this->clock))->add('cred-1', 'PEM', 0, 'MacBook');
+        $login = $this->passkeyLogin();
+        self::assertSame(1, $login['passkey']);
+        self::assertNull($login['prf'], 'Ei kopiota ennen käyttöönottoa');
+
+        $wrap = $this->prfWrap();
+        $r = $this->request('POST', '/admin/api/passkeys/1/prf', $wrap, ['X-CSRF-Token' => (string) $login['csrf']]);
+        self::assertSame(200, $r->status, $r->body);
+        $state = $this->json($this->request('GET', '/admin/api/state'));
+        self::assertTrue($state['passkeys'][0]['prf']);
+        self::assertSame(1, $state['passkey']);
+
+        $this->session->destroy();
+        $again = $this->passkeyLogin();
+        self::assertSame(['enc_secret_key' => $wrap['enc_secret_key'], 'nonce' => $wrap['nonce']], $again['prf']);
+        $audit = $this->db->one("SELECT COUNT(*) AS n FROM audit_log WHERE action = 'prf_unlock_enabled'");
+        self::assertSame(1, (int) ($audit['n'] ?? 0));
+    }
+
+    public function testPrfWrapIsNotRevealedWithoutSuccessfulLogin(): void
+    {
+        $repo = new PasskeyRepository($this->db, $this->clock);
+        $repo->add('cred-1', 'PEM', 0, 'MacBook');
+        $repo->prfSalts();
+        $repo->setPrfWrap(1, base64_encode(random_bytes(48)), base64_encode(random_bytes(24)));
+        $h = ['X-CSRF-Token' => $this->pageCsrf()];
+        $opts = $this->request('POST', '/admin/api/login/options', [], $h);
+        self::assertStringNotContainsString('enc_secret_key', $opts->body);
+        $r = $this->request('POST', '/admin/api/login', $this->assertion('bad'), $h);
+        self::assertSame(401, $r->status);
+        self::assertStringNotContainsString('enc_secret_key', $r->body);
+    }
+
+    public function testPrfWrapOnlyForTheSessionsOwnPasskey(): void
+    {
+        $this->createKeys();
+        $repo = new PasskeyRepository($this->db, $this->clock);
+        $repo->add('cred-1', 'PEM', 0, 'MacBook');
+        $repo->add('cred-2', 'PEM', 0, 'iPhone');
+        $login = $this->passkeyLogin();
+        $h = ['X-CSRF-Token' => (string) $login['csrf']];
+        self::assertSame(403, $this->request('POST', '/admin/api/passkeys/2/prf', $this->prfWrap(), $h)->status, 'Toisen passkeyn kopio');
+
+        // Istunto ilman passkeyta (esim. käyttöönotto) ei voi tallentaa kopiota millekään passkeylle.
+        $this->session->destroy();
+        $csrf = $this->loginAdmin();
+        self::assertSame(403, $this->request('POST', '/admin/api/passkeys/1/prf', $this->prfWrap(), ['X-CSRF-Token' => $csrf])->status);
+    }
+
+    public function testPrfWrapIsValidated(): void
+    {
+        $this->createKeys();
+        (new PasskeyRepository($this->db, $this->clock))->add('cred-1', 'PEM', 0, 'MacBook');
+        $h = ['X-CSRF-Token' => (string) $this->passkeyLogin()['csrf']];
+        $cases = [
+            'liian lyhyt' => ['enc_secret_key' => base64_encode(random_bytes(32))] + $this->prfWrap(),
+            'väärä nonce' => ['nonce' => base64_encode(random_bytes(12))] + $this->prfWrap(),
+            'ei base64' => ['enc_secret_key' => '<script>'] + $this->prfWrap(),
+        ];
+        foreach ($cases as $name => $body) {
+            self::assertSame(422, $this->request('POST', '/admin/api/passkeys/1/prf', $body, $h)->status, $name);
+        }
+        $other = ['public_key' => base64_encode(random_bytes(32))] + $this->prfWrap();
+        self::assertSame(409, $this->request('POST', '/admin/api/passkeys/1/prf', $other, $h)->status, 'Väärän avainparin kopio');
+        self::assertNull((new PasskeyRepository($this->db, $this->clock))->prfWrap(1));
+    }
+
+    public function testPrfWrapCanBeRemovedAndIsDeletedWithPasskey(): void
+    {
+        $this->createKeys();
+        $repo = new PasskeyRepository($this->db, $this->clock);
+        $repo->add('cred-1', 'PEM', 0, 'MacBook');
+        $repo->add('cred-2', 'PEM', 0, 'iPhone');
+        $h = ['X-CSRF-Token' => (string) $this->passkeyLogin()['csrf']];
+        $this->request('POST', '/admin/api/passkeys/1/prf', $this->prfWrap(), $h);
+        self::assertSame(200, $this->request('POST', '/admin/api/passkeys/1/prf-delete', [], $h)->status);
+        self::assertNull($repo->prfWrap(1));
+
+        $this->request('POST', '/admin/api/passkeys/1/prf', $this->prfWrap(), $h);
+        self::assertSame(200, $this->request('POST', '/admin/api/passkeys/1/delete', [], $h)->status);
+        self::assertNull($this->db->one('SELECT id FROM passkeys WHERE prf_enc_secret_key IS NOT NULL'), 'Kopio poistuu passkeyn mukana');
     }
 
     public function testKeysCannotBeReplaced(): void

@@ -116,6 +116,9 @@ final class AdminController
                 ? Response::json(['ok' => true])
                 : Response::error('Viimeistä passkeyta ei voi poistaa.', 409);
         }
+        if (preg_match('#^passkeys/(\d{1,10})/(prf|prf-delete)$#', $route, $m) === 1 && $req->method === 'POST') {
+            return $m[2] === 'prf' ? $this->savePrfWrap((int) $m[1], $in, $client) : $this->deletePrfWrap((int) $m[1], $client);
+        }
 
         return match ([$req->method, $route]) {
             ['GET', 'state'] => $this->state(),
@@ -163,9 +166,57 @@ final class AdminController
     /** @param array<string, mixed> $in */
     private function login(array $in, string $client): Response
     {
-        return $this->auth->completeLogin($in, $client)
-            ? Response::json(['ok' => true, 'csrf' => $this->auth->csrfToken()])
-            : Response::error('Kirjautuminen epäonnistui.', 401);
+        if (!$this->auth->completeLogin($in, $client)) {
+            return Response::error('Kirjautuminen epäonnistui.', 401);
+        }
+        $passkeyId = $this->auth->sessionPasskeyId();
+        return Response::json([
+            'ok' => true,
+            'csrf' => $this->auth->csrfToken(),
+            'passkey' => $passkeyId,
+            // Salattu kopio yksityisestä avaimesta. Sen voi avata vain passkeyn PRF-arvolla selaimessa.
+            'prf' => $passkeyId === null ? null : $this->passkeys->prfWrap($passkeyId),
+        ]);
+    }
+
+    /**
+     * Tallentaa passkey-kohtaisen salatun kopion yksityisestä avaimesta. Sallittu vain sille passkeylle,
+     * jolla istunto kirjautui, koska vain se tuotti PRF-arvon tässä selaimessa.
+     *
+     * @param array<string, mixed> $in
+     */
+    private function savePrfWrap(int $id, array $in, string $client): Response
+    {
+        if ($this->auth->sessionPasskeyId() !== $id) {
+            return Response::error('Avauksen voi ottaa käyttöön vain passkeylle, jolla kirjauduit.', 403);
+        }
+        $current = $this->keys->publicKey();
+        $b64 = static function (mixed $v, int $len): ?string {
+            $raw = is_string($v) ? base64_decode($v, true) : false;
+            return $raw !== false && strlen($raw) === $len ? (string) $v : null;
+        };
+        $enc = $b64($in['enc_secret_key'] ?? null, SODIUM_CRYPTO_BOX_SECRETKEYBYTES + SODIUM_CRYPTO_SECRETBOX_MACBYTES);
+        $nonce = $b64($in['nonce'] ?? null, SODIUM_CRYPTO_SECRETBOX_NONCEBYTES);
+        if ($enc === null || $nonce === null) {
+            return Response::error('Virheellinen salattu avain.', 422);
+        }
+        if ($current === null || !is_string($in['public_key'] ?? null) || !hash_equals($current, $in['public_key'])) {
+            return Response::error('Julkinen avain ei täsmää.', 409);
+        }
+        if (!$this->passkeys->setPrfWrap($id, $enc, $nonce)) {
+            return Response::error('Ei löytynyt.', 404);
+        }
+        $this->audit->record('prf_unlock_enabled', $client, 'passkey #' . $id);
+        return Response::json(['ok' => true]);
+    }
+
+    private function deletePrfWrap(int $id, string $client): Response
+    {
+        if (!$this->passkeys->clearPrfWrap($id)) {
+            return Response::error('Ei löytynyt.', 404);
+        }
+        $this->audit->record('prf_unlock_disabled', $client, 'passkey #' . $id);
+        return Response::json(['ok' => true]);
     }
 
     private function logout(string $client): Response
@@ -183,6 +234,7 @@ final class AdminController
         return Response::json([
             'keys' => $keys === null ? null : $keys + ['fingerprint' => KeyRepository::fingerprint((string) $keys['public_key'])],
             'passkeys' => $this->passkeys->list(),
+            'passkey' => $this->auth->sessionPasskeyId(),
             'events' => array_map($this->eventOut(...), $this->events->all()),
             'origin' => $this->config->publicOrigin,
             'basePath' => $this->config->basePath,
