@@ -89,6 +89,20 @@ Jokainen push ja pull request ajaa:
 
 Kun kaikki menevät läpi `main`-haarassa, sovellus julkaistaan FTPS:llä webhotelliin ja tuotanto savutestataan.
 
+ZAP-säännöt ovat tiedostossa `.zap/rules.tsv`: FAIL kaataa CI:n, WARN raportoidaan ja IGNORE ohitetaan perustellusti.
+
+### Riippuvuuspäivitykset (Dependabot)
+
+Dependabot tarkistaa GitHub Actionsien ja Composer-pakettien päivitykset viikoittain ja avaa niistä
+pull requestin (`.github/dependabot.yml`). Uutta versiota ehdotetaan vasta, kun se on ollut julkaistuna
+7 päivää. Kaikki Actions-päivitykset kootaan yhteen PR:ään, ja ne pysyvät lukittuina commit-SHA:han.
+
+- Lue PR:n muutokset ja julkaisutiedot ja mergeä, kun CI on vihreä.
+- Jos PR on jäänyt jälkeen `main`ista, kommentoi `@dependabot rebase`. Jos ryhmään on sillä välin tullut
+  uusia päivityksiä, Dependabot sulkee vanhan PR:n ja avaa uuden.
+- Satunnaisesti kaatunut job (esim. ZAP:n exit code 3) ajetaan uudelleen PR:n *Checks*-välilehdeltä
+  (*Re-run failed jobs*).
+
 ## Käyttöönotto (cPanel)
 
 Hakemistorakenne webhotellissa:
@@ -141,11 +155,14 @@ HESSUTALKS_CONFIG=var/config.php php -S localhost:8080 -t public bin/dev-router.
 
 Hallinta: <http://localhost:8080/admin>. Passkeyt toimivat `localhost`-osoitteessa ilman HTTPS:ää.
 
+`HESSUTALKS_CONFIG=var/config.php php bin/seed-demo.php` luo testiavaimet ja avoimen luennon ja tulostaa
+sen koodin. CI käyttää sitä ZAP-skannaukseen. Skripti kieltäytyy toimimasta tuotantoasetuksilla.
+
 Testit:
 
 ```sh
 vendor/bin/phpunit --testdox
-vendor/bin/phpstan analyse
+vendor/bin/phpstan analyse --memory-limit=1G
 node --test tests/js/*.test.mjs
 scripts/verify-vendor.sh
 ```
@@ -159,7 +176,9 @@ Kirjastoja ei ladata CDN:stä.
 
 ## Tulossa
 
-Sanapilvi, kysymyksiin vastaaminen osallistujille näkyvästi, äänestys kysymyksistä.
+- Kysymyksiin vastaaminen osallistujille näkyvästi ja äänestys kysymyksistä
+- Kyselyt, vaihe 2: visa, jossa oikea vastaus paljastetaan
+- Kyselyt, vaihe 3: järjestyskysely, avoin vastaus moderoinnilla, kyselyiden kopiointi luennolta toiselle
 
 ## Lisenssi
 
