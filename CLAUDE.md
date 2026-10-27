@@ -15,6 +15,8 @@ Katso README.md (käyttö, käyttöönotto) ja SECURITY.md (uhkamalli). Älä he
   julkaisema sisältö (kyselyn kysymys ja vaihtoehdot) on selväkielisenä. Uudet ominaisuudet on suunniteltava tämän rajoitteen mukaan.
 - Purettu sisältö DOMiin vain `textContent`illa. Ei inline-skriptejä (tiukka CSP). Ei CDN-kirjastoja.
 - Kaikki SQL parametrisoituna `Database`-luokan kautta.
+- Oikeat vastaukset ja selitykset (`config.correct`, `config.explanations`) eivät saa päätyä osallistujalle
+  ennen paljastusta: käytä `PollRepository::publicConfig()`.
 
 ## Rakenne
 ```
@@ -59,6 +61,6 @@ Lisää jokaiselle uudelle ominaisuudelle testit, myös tietoturvatestit (`tests
 
 ## Tulossa
 MMoIT 2026 -kurssin vaatimukset (tapahtuma 13.–14.11.2026, ei julkaisuja tapahtuman aikana).
-Tila ja hyväksymistestit: docs/hyvaksymistestit.md. Valmiina: passkey-avaus (PRF), sarjat ja aktiivinen kysymys.
-Seuraavaksi: JSON-tuonti, avoin teksti + moderointi, oikea vastaus/paljastus, esitysnäkymä + pikanäppäimet,
+Tila ja hyväksymistestit: docs/hyvaksymistestit.md. Valmiina: passkey-avaus (PRF), sarjat ja aktiivinen kysymys, JSON-tuonti/vienti (src/Import/SetFormat.php).
+Seuraavaksi: avoin teksti + moderointi (lisää myös SetFormatiin type open), oikea vastaus/paljastus, esitysnäkymä + pikanäppäimet,
 nopeusrajat + julkaisujäädytys.

@@ -8,6 +8,7 @@ use HessuTalks\Auth\AdminAuth;
 use HessuTalks\Config;
 use HessuTalks\Http\Request;
 use HessuTalks\Http\Response;
+use HessuTalks\Import\SetFormat;
 use HessuTalks\Repository\EventRepository;
 use HessuTalks\Repository\KeyRepository;
 use HessuTalks\Repository\LiveRepository;
@@ -106,8 +107,8 @@ final class AdminController
         if (preg_match('#^events/(\d{1,10})/(questions|status|delete|lang)$#', $route, $m) === 1) {
             return $this->eventAction($req, (int) $m[1], $m[2], $in, $client);
         }
-        if (preg_match('#^events/(\d{1,10})/(polls|poll-answers|sets|live)$#', $route, $m) === 1) {
-            return $this->eventPolls($req, (int) $m[1], $m[2], $in);
+        if (preg_match('#^events/(\d{1,10})/(polls|poll-answers|sets|live|import|export)$#', $route, $m) === 1) {
+            return $this->eventPolls($req, (int) $m[1], $m[2], $in, $client);
         }
         if (preg_match('#^polls/(\d{1,10})/(update|status|delete|reset|move)$#', $route, $m) === 1 && $req->method === 'POST') {
             return $this->pollAction((int) $m[1], $m[2], $in, $client);
@@ -359,7 +360,7 @@ final class AdminController
      * Luennon kyselyt (GET), uusi kysely (POST) ja salatut vastaukset (poll-answers).
      * @param array<string, mixed> $in
      */
-    private function eventPolls(Request $req, int $eventId, string $action, array $in): Response
+    private function eventPolls(Request $req, int $eventId, string $action, array $in, string $client): Response
     {
         $event = $this->events->find($eventId);
         if ($event === null) {
@@ -380,7 +381,14 @@ final class AdminController
             ]);
         }
         if ($req->method === 'GET') {
-            return $action === 'polls' ? $this->pollsState($event) : Response::error('Metodia ei tueta.', 405);
+            return match ($action) {
+                'polls' => $this->pollsState($event),
+                'export' => $this->export($event, $req->query['set'] ?? null),
+                default => Response::error('Metodia ei tueta.', 405),
+            };
+        }
+        if ($action === 'import') {
+            return $this->import($event, $in, $client);
         }
         if ($action === 'sets') {
             $slug = SetRepository::cleanSlug($in['slug'] ?? null);
@@ -525,6 +533,73 @@ final class AdminController
                 return Response::error('Tuntematon toiminto.', 422);
         }
         return $this->pollsState($event);
+    }
+
+    /**
+     * Tuo sarjat JSON-tiedostosta. dry_run = vain tarkistus ja yhteenveto. Kaikki tai ei mitään:
+     * virheet (myös luennolla jo oleva sarjan tunniste) estävät tuonnin, ohitetut kysymykset ovat varoituksia.
+     * @param array<string, mixed> $event
+     * @param array<string, mixed> $in
+     */
+    private function import(array $event, array $in, string $client): Response
+    {
+        $eventId = (int) $event['id'];
+        $raw = $in['json'] ?? null;
+        if (!is_string($raw)) {
+            return Response::error('Tiedosto puuttuu.', 422);
+        }
+        $parsed = SetFormat::parse($raw);
+        $errors = $parsed['errors'];
+        $existing = array_column($this->sets->forEvent($eventId), 'slug');
+        foreach ($parsed['sets'] as $set) {
+            if (in_array($set['slug'], $existing, true)) {
+                $errors[] = 'Sarja ' . $set['slug'] . ' on jo luennolla. Poista tai nimeä se uudelleen ennen tuontia.';
+            }
+        }
+        $pollCount = array_sum(array_map(static fn (array $s): int => count($s['polls']), $parsed['sets']));
+        if (count($existing) + count($parsed['sets']) > SetRepository::MAX_PER_EVENT) {
+            $errors[] = 'Luennolla voi olla enintään ' . SetRepository::MAX_PER_EVENT . ' sarjaa.';
+        }
+        if ($this->polls->countForEvent($eventId) + $pollCount > PollRepository::MAX_PER_EVENT) {
+            $errors[] = 'Luennolla voi olla enintään ' . PollRepository::MAX_PER_EVENT . ' kysymystä.';
+        }
+        $summary = [
+            'sets' => array_map(static fn (array $s): array => ['slug' => $s['slug'], 'title' => $s['title'], 'questions' => count($s['polls'])], $parsed['sets']),
+            'questions' => $pollCount,
+            'warnings' => $parsed['warnings'],
+            'errors' => $errors,
+        ];
+        if ($errors !== []) {
+            return Response::json(['error' => 'Tiedostoa ei voi tuoda.'] + $summary, 422);
+        }
+        if (($in['dry_run'] ?? false) === true) {
+            return Response::json($summary);
+        }
+        try {
+            $this->sets->import($eventId, $parsed['sets'], $this->polls);
+        } catch (\RuntimeException $e) {
+            return Response::error('Tuonti epäonnistui: ' . $e->getMessage(), 409);
+        }
+        $this->audit->record('sets_imported', $client, (string) $event['code'] . ': ' . count($parsed['sets']) . ' sarjaa, ' . $pollCount . ' kysymystä');
+        $state = json_decode($this->pollsState($event)->body, true);
+        return Response::json(['import' => $summary] + (is_array($state) ? $state : []), 201);
+    }
+
+    /**
+     * Vie luennon sarjat (tai yhden sarjan, ?set=id) JSONina tuontimuodossa.
+     * @param array<string, mixed> $event
+     */
+    private function export(array $event, mixed $setParam): Response
+    {
+        $eventId = (int) $event['id'];
+        $sets = $this->sets->forEvent($eventId);
+        if (is_string($setParam) && $setParam !== '') {
+            $sets = array_values(array_filter($sets, static fn (array $s): bool => (string) $s['id'] === $setParam));
+            if ($sets === []) {
+                return Response::error('Sarjaa ei löytynyt.', 404);
+            }
+        }
+        return Response::json(SetFormat::export((string) $event['title'], $sets, $this->polls->forEvent($eventId)));
     }
 
     /** @param array<string, mixed> $in */

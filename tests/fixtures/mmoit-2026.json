@@ -1,0 +1,98 @@
+{
+  "event": {
+    "title": "Cybersecurity Fundamentals – MMoIT 2026",
+    "dates": ["2026-11-13", "2026-11-14"]
+  },
+  "sets": [
+    {
+      "id": "OPEN",
+      "title": "Opening",
+      "questions": [
+        { "type": "wordcloud", "text": "Cybersecurity in one word?", "maxWords": 3 }
+      ]
+    },
+    {
+      "id": "M1",
+      "title": "M1 Cyber and society",
+      "questions": [
+        { "type": "scale", "text": "I have personally been targeted by phishing or a scam.", "min": 1, "max": 5, "minLabel": "Strongly disagree", "maxLabel": "Strongly agree" },
+        { "type": "scale", "text": "My workplace would survive a two-week IT outage.", "min": 1, "max": 5, "minLabel": "Strongly disagree", "maxLabel": "Strongly agree" },
+        { "type": "scale", "text": "Security slows down software development.", "min": 1, "max": 5, "minLabel": "Strongly disagree", "maxLabel": "Strongly agree" },
+        { "type": "scale", "text": "I know whom to report a security incident to at my workplace.", "min": 1, "max": 5, "minLabel": "Strongly disagree", "maxLabel": "Strongly agree" },
+        { "type": "scale", "text": "Cybersecurity is primarily a technical issue.", "min": 1, "max": 5, "minLabel": "Strongly disagree", "maxLabel": "Strongly agree" },
+        { "type": "open", "text": "Which service in your daily life would stop first if electricity, payments or telecom were down for 72 hours?", "multipleAnswers": false }
+      ]
+    },
+    {
+      "id": "M2",
+      "title": "M2 The attacker's world",
+      "questions": [
+        { "type": "single", "text": "Which threat actor would most likely target Lumion Robotics?", "options": ["Cybercriminal group", "Hacktivist", "State-sponsored actor", "Insider", "Competitor (industrial espionage)", "Curious researcher / script kiddie"] },
+        { "type": "single", "text": "Which threat actor could cause Lumion the most harm?", "options": ["Cybercriminal group", "Hacktivist", "State-sponsored actor", "Insider", "Competitor (industrial espionage)", "Curious researcher / script kiddie"] }
+      ]
+    },
+    {
+      "id": "M3",
+      "title": "M3 Rules of the game",
+      "questions": [
+        {
+          "type": "multi",
+          "text": "Which of these EU regulations apply to a manufacturer of connected robotic lawnmowers?",
+          "options": ["Cyber Resilience Act (CRA)", "Radio Equipment Directive – cybersecurity delegated act", "Machinery Regulation 2023/1230", "GDPR", "NIS2 / Finnish Cybersecurity Act", "AI Act", "DORA"],
+          "correct": [0, 1, 2, 3],
+          "explanations": [
+            "Yes – product with digital elements; vulnerability reporting since 11 Sep 2026.",
+            "Yes – the mower uses Wi-Fi/Bluetooth/cellular; applies since 1 Aug 2025.",
+            "Yes – the mower is machinery; applies from 20 Jan 2027, includes protection against corruption.",
+            "Yes – location data and garden maps are personal data.",
+            "It depends – manufacture of machinery (NACE C28) is in Annex II; applies if Lumion is medium-sized or larger.",
+            "It depends – only if AI is a safety component, e.g. vision-based obstacle detection.",
+            "No – DORA covers the financial sector."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "M4",
+      "title": "M4 Case: Lumion under pressure",
+      "questions": [
+        { "type": "single", "text": "Stage 1: 40 customers report mowers starting at 3 a.m. and leaving the garden boundary. What is your FIRST action?", "options": ["Send a notice to all customers", "Remotely stop the affected mowers", "Collect and preserve logs", "Contact the researcher who reported the flaw"], "correct": [1], "explanations": ["Important, but not first.", "Safety first – blades and people.", "Do this right after – logs are evidence.", "Useful later in coordinated disclosure."] },
+        { "type": "single", "text": "Stage 2: The vulnerability is actively exploited and customers' GPS data may be exposed. Whom must Lumion notify, and how fast?", "options": ["Only the police, when convenient", "National CSIRT and ENISA: early warning within 24 h (CRA); data protection authority within 72 h (GDPR)", "Customers within one week", "No one until a fix exists"], "correct": [1] },
+        { "type": "single", "text": "Stage 3: The media asks for a comment and a hacktivist group claims responsibility. Who should speak?", "options": ["The CEO", "The CISO", "The communications lead, with an agreed message", "Nobody – 'no comment'"] },
+        { "type": "single", "text": "Stage 4: A partly tested fix is ready, and the OTA signing key was stored in plain text in the CI pipeline. What do you do?", "options": ["Release the fix now", "Wait for full testing", "Keep mowers stopped and test first", "Rotate the signing key first, then release"] }
+      ]
+    },
+    {
+      "id": "M5",
+      "title": "M5 Governance and risk",
+      "questions": [
+        { "type": "single", "text": "Is this a risk? 'An attacker phishes an employee's credentials.'", "options": ["Yes", "No", "Not yet – the business impact is missing"], "correct": [2] },
+        { "type": "single", "text": "Is this a risk? 'An attacker inserts malware via unchecked attachments.'", "options": ["Yes", "No", "Not yet – the business impact is missing"], "correct": [2] },
+        { "type": "single", "text": "Is this a risk? 'A DDoS attack causes 2 hours of downtime and a small reputational impact.'", "options": ["Yes", "No", "Not yet – the business impact is missing"], "correct": [0] }
+      ]
+    },
+    {
+      "id": "M6",
+      "title": "M6 Secure development and cyber for every role",
+      "questions": [
+        { "type": "qa", "text": "Questions about secure development or your group work?", "fallbackType": "open" }
+      ]
+    },
+    {
+      "id": "WRAP-FRI",
+      "title": "Friday wrap-up",
+      "questions": [
+        { "type": "open", "text": "What surprised you today?" },
+        { "type": "open", "text": "One question you would like answered tomorrow:" }
+      ]
+    },
+    {
+      "id": "CLOSE-SAT",
+      "title": "Closing",
+      "questions": [
+        { "type": "open", "text": "Your most important takeaway from these two days?" },
+        { "type": "scale", "text": "How useful were these lectures for your group work?", "min": 1, "max": 5, "minLabel": "Not useful", "maxLabel": "Very useful" }
+      ]
+    }
+  ]
+}

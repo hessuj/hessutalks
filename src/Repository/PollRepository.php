@@ -26,6 +26,9 @@ final class PollRepository
     public const OPTIONS_MIN = 2;
     public const OPTIONS_MAX = 10;
     public const LABEL_MAX = 40;
+    public const EXPLANATION_MAX = 300;
+    /** Asetukset, joita ei näytetä osallistujalle ennen paljastusta (oikeat vastaukset ja selitykset). */
+    public const PRIVATE_CONFIG = ['correct', 'explanations'];
     /** Vastaukset ovat lyhyitä; salattu JSON mahtuu tähän reilusti. */
     public const CIPHERTEXT_MAX_BYTES = 2048;
 
@@ -66,7 +69,8 @@ final class PollRepository
                 if (count($options) < self::OPTIONS_MIN || count($options) > self::OPTIONS_MAX) {
                     return 'Vaihtoehtoja pitää olla ' . self::OPTIONS_MIN . '–' . self::OPTIONS_MAX . '.';
                 }
-                return [$p, ['options' => $options]];
+                $answer = self::answerKey($type, count($options), $c);
+                return is_string($answer) ? $answer : [$p, ['options' => $options] + $answer];
             case 'likert':
                 $points = $c['points'] ?? 5;
                 if (!in_array($points, [5, 7], true)) {
@@ -80,6 +84,60 @@ final class PollRepository
             default: // words
                 return [$p, []];
         }
+    }
+
+    /**
+     * Oikeat vastaukset (vaihtoehtojen indeksit) ja vaihtoehtokohtaiset selitykset, molemmat valinnaisia.
+     * Yhden vastauksen kysymyksessä oikeita on enintään yksi.
+     * @param array<mixed> $c
+     * @return array{correct?: list<int>, explanations?: list<string>}|string
+     */
+    private static function answerKey(string $type, int $count, array $c): array|string
+    {
+        $out = [];
+        $correct = $c['correct'] ?? [];
+        if (!is_array($correct) || !array_is_list($correct)) {
+            return 'Oikeat vastaukset pitää antaa vaihtoehtojen numeroina.';
+        }
+        foreach ($correct as $i) {
+            if (!is_int($i) || $i < 0 || $i >= $count) {
+                return 'Oikea vastaus viittaa vaihtoehtoon, jota ei ole.';
+            }
+        }
+        $correct = array_values(array_unique($correct));
+        sort($correct);
+        if ($type === 'single' && count($correct) > 1) {
+            return 'Yhden vastauksen kysymyksessä voi olla vain yksi oikea vastaus.';
+        }
+        if ($correct !== []) {
+            $out['correct'] = $correct;
+        }
+        $explanations = $c['explanations'] ?? [];
+        if (!is_array($explanations) || !array_is_list($explanations) || ($explanations !== [] && count($explanations) !== $count)) {
+            return 'Selityksiä pitää olla yksi jokaista vaihtoehtoa kohden.';
+        }
+        $clean = [];
+        foreach ($explanations as $e) {
+            $text = self::cleanText($e ?? '', self::EXPLANATION_MAX);
+            if ($text === null) {
+                return 'Selityksessä saa olla enintään ' . self::EXPLANATION_MAX . ' merkkiä.';
+            }
+            $clean[] = $text;
+        }
+        if (array_filter($clean, static fn (string $t): bool => $t !== '') !== []) {
+            $out['explanations'] = $clean;
+        }
+        return $out;
+    }
+
+    /**
+     * Osallistujalle näytettävät asetukset: ilman oikeita vastauksia ja selityksiä.
+     * @param array<string, mixed> $config
+     * @return array<string, mixed>
+     */
+    public static function publicConfig(array $config): array
+    {
+        return array_diff_key($config, array_flip(self::PRIVATE_CONFIG));
     }
 
     /**

@@ -7,7 +7,7 @@ Merkinnät: ✅ todennettu · 🟡 osittain · ⏳ ei vielä toteutettu · 🧪 
 Todennustavat:
 - **PHPUnit**: `vendor/bin/phpunit` (CI ajaa jokaiselle PR:lle)
 - **Node**: `node --test tests/js/*.test.mjs` (CI)
-- **Selain**: `scripts/e2e.sh`, oikea Chrome (headless) ja virtuaalinen passkey, hallinta ja osallistuja omissa ikkunoissaan. Ajetaan paikallisesti, ei vielä CI:ssä.
+- **Selain**: `scripts/e2e.sh` (`tests/e2e/`), oikea Chrome (headless) ja virtuaalinen passkey, hallinta ja osallistuja omissa ikkunoissaan. Ajetaan paikallisesti, ei vielä CI:ssä.
 
 | # | Testi | Tila | Miten todennettu |
 |---|---|---|---|
@@ -24,7 +24,7 @@ Todennustavat:
 | H11 | Suljetaan perjantaina, avataan lauantaina | ✅ | PHPUnit `testEventCanBeClosedAndReopenedWithAnswersKept`: suljettu → 410, avattu → sama koodi toimii, vastaukset tallessa. Ylläpidon istunto vanhenee yön yli (8 h), joten lauantaina kirjaudutaan uudelleen passkeylla. |
 | H12 | Sarjojen järjestyksen muutos ja ohitus kesken tapahtuman | ✅ | Selain: ohitus, palautus ja sarjan siirto muuttavat Seuraava/Edellinen-järjestystä. PHPUnit `LiveRepositoryTest`, `testAdminControlsSetsAndActiveQuestion`. Vastaukset säilyvät (ohitus ei poista mitään). |
 | H13 | Kuorma: 150 osallistujaa | ⏳ | Siirretty myöhemmäksi (Hessun päätös 27.10.). Osallistujan tilakysely tekee yhden tietokantahaun, kun mikään ei muutu. |
-| H14 | JSON-tuonti luvun 10 tiedostolla | ⏳ | Vaihe 3. |
+| H14 | JSON-tuonti luvun 10 tiedostolla | 🟡 | PHPUnit `SetFormatTest::testCourseFileIsImportedWithOpenQuestionsSkipped`, `testImportCourseFileWithDryRunFirst` ja selain `import-json.mjs`: kurssin tiedosto sellaisenaan tuottaa 9 sarjaa ja 17 kysymystä oikeassa järjestyksessä, oikeat vastaukset ja selitykset tallessa. Viisi avointa tekstiä (M1/6, M6 Q&A → open, WRAP-FRI ×2, CLOSE-SAT/1) ohitetaan varoituksella vaiheeseen 4 asti. Vienti ja uudelleentuonti tuottavat samat kysymykset (`testExportRoundTrips`). |
 | H15 | Esitysnäkymä Teams-jaossa luettavissa | 🧪 | Vaihe 6 (esitysnäkymä), sitten koeajo Teamsissa. |
 
 ## Vaiheiden tila
@@ -32,8 +32,8 @@ Todennustavat:
 | Vaihe | Sisältö | Tila |
 |---|---|---|
 | 1 | Admin-kirjautuminen: avaus passkeylla (PRF) | ✅ PR #8–#10. Safari + 1Password: odottaa Hessun testiä. |
-| 2 | Sarjat, aktiivinen kysymys, odotusnäkymä, osallistujan kieli | ✅ tämä PR |
-| 3 | JSON-tuonti ja -vienti | ⏳ |
+| 2 | Sarjat, aktiivinen kysymys, odotusnäkymä, osallistujan kieli | ✅ PR #11 |
+| 3 | JSON-tuonti ja -vienti | ✅ tämä PR |
 | 4 | T3 avoin teksti, pysyvä moderointi, T4 30 merkkiä | ⏳ |
 | 5 | Oikea vastaus, selitykset, paljastus, tulosten näyttö/piilotus | ⏳ |
 | 6 | Esitysnäkymä ja pikanäppäimet | ⏳ |

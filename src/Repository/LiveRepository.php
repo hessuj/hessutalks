@@ -130,7 +130,8 @@ final class LiveRepository
             'id' => (int) $row['id'],
             'type' => (string) $row['type'],
             'prompt' => (string) $row['prompt'],
-            'config' => (object) (is_array($config) ? $config : []),
+            // Oikeat vastaukset ja selitykset eivät lähde osallistujalle.
+            'config' => (object) PollRepository::publicConfig(is_array($config) ? $config : []),
             'generation' => (int) $row['generation'],
             'status' => (string) $row['status'],
         ];

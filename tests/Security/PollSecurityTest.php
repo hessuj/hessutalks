@@ -186,6 +186,8 @@ final class PollSecurityTest extends AppTestCase
         yield ['POST', '/admin/api/sets/1/move'];
         yield ['POST', '/admin/api/sets/1/skip'];
         yield ['POST', '/admin/api/sets/1/delete'];
+        yield ['POST', '/admin/api/events/1/import'];
+        yield ['GET', '/admin/api/events/1/export'];
     }
 
     #[\PHPUnit\Framework\Attributes\DataProvider('adminRoutes')]
@@ -318,6 +320,102 @@ final class PollSecurityTest extends AppTestCase
         self::assertSame(200, $this->request('POST', '/admin/api/events/' . $this->eventId . '/lang', ['lang' => 'en'], $h)->status);
         self::assertStringContainsString('<html lang="en"', $this->request('GET', '/k/' . $this->code, null, $fi)->body, 'Luennon kieli voittaa selaimen kielen');
         self::assertStringContainsString('<html lang="fi"', $this->request('GET', '/k/' . $this->code . '?lang=fi', null, $fi)->body, 'Osallistujan oma valinta voittaa');
+    }
+
+    // ------------------------------------------------------------ JSON-tuonti ja -vienti (H14)
+
+    private function courseFile(): string
+    {
+        return (string) file_get_contents(dirname(__DIR__) . '/fixtures/mmoit-2026.json');
+    }
+
+    /** Kurssitiedostossa on oma M1: poistetaan setUpin sarja, jotta luento on tyhjä. */
+    private function emptyEvent(): void
+    {
+        $this->db->exec('DELETE FROM poll_sets WHERE event_id = ?', [$this->eventId]);
+    }
+
+    private function countRows(string $table): int
+    {
+        return (int) ($this->db->one('SELECT COUNT(*) AS n FROM ' . $table)['n'] ?? -1);
+    }
+
+    public function testImportCourseFileWithDryRunFirst(): void
+    {
+        $this->emptyEvent();
+        $h = ['X-CSRF-Token' => $this->loginAdmin()];
+        $url = '/admin/api/events/' . $this->eventId . '/import';
+        $before = [$this->countRows('poll_sets'), $this->countRows('polls')];
+
+        $dry = $this->request('POST', $url, ['json' => $this->courseFile(), 'dry_run' => true], $h);
+        self::assertSame(200, $dry->status, $dry->body);
+        $summary = $this->json($dry);
+        self::assertSame(17, $summary['questions']);
+        self::assertCount(9, $summary['sets']);
+        self::assertCount(5, $summary['warnings'], 'Avoimet tekstit ohitetaan (vaihe 4)');
+        self::assertSame($before, [$this->countRows('poll_sets'), $this->countRows('polls')], 'Esikatselu ei kirjoita mitään');
+
+        $r = $this->request('POST', $url, ['json' => $this->courseFile()], $h);
+        self::assertSame(201, $r->status, $r->body);
+        $state = $this->json($r);
+        self::assertSame(['OPEN', 'M1', 'M2', 'M3', 'M4', 'M5', 'M6', 'WRAP-FRI', 'CLOSE-SAT'], array_column($state['sets'], 'slug'));
+        self::assertSame(17, count($state['polls']));
+        self::assertSame(1, (int) ($this->db->one("SELECT COUNT(*) AS n FROM audit_log WHERE action = 'sets_imported'")['n'] ?? 0));
+
+        // Sama tiedosto uudelleen: sarjat ovat jo luennolla, eikä mitään tuoda.
+        $again = $this->request('POST', $url, ['json' => $this->courseFile()], $h);
+        self::assertSame(422, $again->status);
+        self::assertStringContainsString('on jo luennolla', $again->body);
+        self::assertSame(17, $this->countRows('polls'));
+    }
+
+    public function testImportIsAllOrNothing(): void
+    {
+        $h = ['X-CSRF-Token' => $this->loginAdmin()];
+        $file = (string) json_encode(['sets' => [
+            ['id' => 'OK', 'title' => 'Kelpaa', 'questions' => [['type' => 'wordcloud', 'text' => 'Sana?']]],
+            ['id' => 'BAD', 'title' => 'Ei kelpaa', 'questions' => [['type' => 'scale', 'text' => 'X', 'min' => 3, 'max' => 4]]],
+        ]]);
+        $r = $this->request('POST', '/admin/api/events/' . $this->eventId . '/import', ['json' => $file], $h);
+        self::assertSame(422, $r->status);
+        self::assertStringContainsString('Sarja BAD, kysymys 1', $r->body);
+        self::assertSame(1, $this->countRows('poll_sets'), 'Vain setUpin sarja: kelvollistakaan sarjaa ei tuotu');
+        self::assertSame(422, $this->request('POST', '/admin/api/events/' . $this->eventId . '/import', ['json' => ['sets' => []]], $h)->status, 'Tiedosto merkkijonona');
+    }
+
+    public function testImportedAnswerKeyIsNotSentToParticipants(): void
+    {
+        $this->emptyEvent();
+        $h = ['X-CSRF-Token' => $this->loginAdmin()];
+        $this->request('POST', '/admin/api/events/' . $this->eventId . '/import', ['json' => $this->courseFile()], $h);
+        $m3 = $this->db->one("SELECT p.id FROM polls p JOIN poll_sets s ON s.id = p.set_id WHERE s.slug = 'M3'");
+        self::assertSame(200, $this->request('POST', '/admin/api/polls/' . (int) ($m3['id'] ?? 0) . '/status', ['status' => 'open'], $h)->status);
+
+        $live = $this->request('GET', '/api/live?code=' . $this->code);
+        $poll = $this->json($live)['poll'];
+        self::assertStringStartsWith('Which of these EU regulations', $poll['prompt']);
+        self::assertSame(['options'], array_keys($poll['config']));
+        self::assertStringNotContainsString('correct', $live->body);
+        self::assertStringNotContainsString('DORA covers the financial sector', $live->body, 'Selitykset eivät näy ennen paljastusta');
+        self::assertStringNotContainsString('DORA covers', $this->request('GET', '/k/' . $this->code)->body);
+    }
+
+    public function testExportMatchesImportFormat(): void
+    {
+        $this->emptyEvent();
+        $h = ['X-CSRF-Token' => $this->loginAdmin()];
+        $this->request('POST', '/admin/api/events/' . $this->eventId . '/import', ['json' => $this->courseFile()], $h);
+        $all = $this->json($this->request('GET', '/admin/api/events/' . $this->eventId . '/export'));
+        self::assertSame('hessutalks-sets', $all['format']);
+        self::assertCount(9, $all['sets']);
+        $m4 = array_values(array_filter($all['sets'], static fn (array $s): bool => $s['id'] === 'M4'))[0];
+        self::assertSame([1], $m4['questions'][0]['correct']);
+        self::assertSame('Safety first – blades and people.', $m4['questions'][0]['explanations'][1]);
+
+        $setId = (int) ($this->db->one("SELECT id FROM poll_sets WHERE slug = 'M5'")['id'] ?? 0);
+        $one = $this->json($this->request('GET', '/admin/api/events/' . $this->eventId . '/export?set=' . $setId));
+        self::assertSame(['M5'], array_column($one['sets'], 'id'));
+        self::assertSame(404, $this->request('GET', '/admin/api/events/' . $this->eventId . '/export?set=999999')->status);
     }
 
     public function testBrowserScriptsNeverUseHtmlInjectionSinks(): void
