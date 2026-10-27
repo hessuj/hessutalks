@@ -41,7 +41,7 @@ export async function tab(port) {
         if (await js(expr).catch(() => false)) return;
         await new Promise((r) => setTimeout(r, 100));
       }
-      throw new Error('Aikakatkaisu: ' + what + '\n--- sivu ---\n' + (await js('document.body.innerText').catch(() => '?')).slice(0, 3000) + '\n' + logs.join('\n'));
+      throw new Error('Aikakatkaisu: ' + what + ' (visibilityState=' + (await js('document.visibilityState').catch(() => '?')) + ')\n--- sivu ---\n' + (await js('document.body.innerText').catch(() => '?')).slice(0, 3000) + '\n' + logs.join('\n'));
     },
     hasText: (s) => `document.body.innerText.includes(${JSON.stringify(s)})`,
     has: (sel) => `!!document.querySelector(${JSON.stringify(sel)})`,

@@ -23,6 +23,7 @@
   var POLL_MS = 1200;        // vaatimus: näkymä vaihtuu alle 2 s:ssa
   var HIDDEN_MS = 4000;      // taustalla (esim. puhelimen näyttö lukittu) harvemmin
   var MAX_BACKOFF_MS = 8000;
+  var REQUEST_TIMEOUT_MS = 5000; // roikkuva pyyntö (esim. heikko mobiiliverkko) katkaistaan ja yritetään uudelleen
   var VOTER_KEY = 'hessutalks.voter';
   var ANSWERS_KEY = 'hessutalks.answers';
   var WORDS_MAX_CHARS = 40;
@@ -254,7 +255,10 @@
     if (document.hidden) { schedule(HIDDEN_MS); return; }
     var url = box.dataset.endpoint + '?code=' + encodeURIComponent(code) + '&lang=' + encodeURIComponent(lang) +
       (version !== null ? '&v=' + encodeURIComponent(version) : '');
-    fetch(url, { credentials: 'omit', cache: 'no-store' }).then(function (res) {
+    var ctrl = typeof AbortController === 'function' ? new AbortController() : null;
+    var abort = ctrl ? setTimeout(function () { ctrl.abort(); }, REQUEST_TIMEOUT_MS) : null;
+    fetch(url, { credentials: 'omit', cache: 'no-store', signal: ctrl ? ctrl.signal : undefined }).then(function (res) {
+      clearTimeout(abort);
       return res.json().catch(function () { return {}; }).then(function (data) {
         if (res.status === 410) {
           stopped = true;
@@ -272,7 +276,8 @@
         schedule(POLL_MS);
       });
     }).catch(function () {
-      // Verkkokatko tai palvelinvirhe: yritetään uudelleen kasvavalla viiveellä.
+      clearTimeout(abort);
+      // Verkkokatko, aikakatkaisu tai palvelinvirhe: yritetään uudelleen kasvavalla viiveellä.
       failures++;
       if (failures >= 2) { reconnect.textContent = t('reconnecting'); reconnect.hidden = false; }
       schedule(Math.min(POLL_MS * Math.pow(2, failures - 1), MAX_BACKOFF_MS));

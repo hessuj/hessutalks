@@ -23,13 +23,18 @@ TMP=$(mktemp -d)
 SERVER=""
 BROWSER=""
 cleanup() {
-  [ -n "$SERVER" ] && kill "$SERVER" 2>/dev/null || true
+  # Ensin php -S:n työprosessit (lapset), sitten pääprosessi.
+  [ -n "$SERVER" ] && { pkill -P "$SERVER" 2>/dev/null; kill "$SERVER" 2>/dev/null; } || true
   [ -n "$BROWSER" ] && kill "$BROWSER" 2>/dev/null || true
   wait 2>/dev/null || true
   rm -rf "$TMP"
 }
 trap cleanup EXIT
 
+if curl -s -o /dev/null "http://localhost:$PORT/"; then
+  echo "Portti $PORT on jo käytössä (jäikö edellinen ajo päälle?). Vapauta se tai aseta E2E_PORT." >&2
+  exit 2
+fi
 mkdir -p "$TMP/data"
 php -r '
   [$dir, $port] = [$argv[1], $argv[2]];
@@ -42,9 +47,12 @@ php -r '
   file_put_contents("$dir/config.php", "<?php\nreturn " . var_export($c, true) . ";\n");
 ' "$TMP" "$PORT"
 
-(cd "$ROOT" && HESSUTALKS_CONFIG="$TMP/config.php" exec php -S "localhost:$PORT" -t public bin/dev-router.php >"$TMP/server.log" 2>&1) &
+# Useampi työprosessi: yksisäikeinen php -S jumittuu Chromen ennakoiviin yhteyksiin (tuotannossa Apache).
+(cd "$ROOT" && PHP_CLI_SERVER_WORKERS=4 HESSUTALKS_CONFIG="$TMP/config.php" exec php -S "localhost:$PORT" -t public bin/dev-router.php >"$TMP/server.log" 2>&1) &
 SERVER=$!
-"$CHROME" --headless=new --remote-debugging-port="$CDP" --user-data-dir="$TMP/chrome" --no-first-run --no-default-browser-check about:blank >"$TMP/chrome.log" 2>&1 &
+# Automaatiossa ikkunat eivät saa jäädä "taustalle": muuten Chrome hidastaa ajastimia ja sivu luulee olevansa piilossa.
+"$CHROME" --headless=new --remote-debugging-port="$CDP" --user-data-dir="$TMP/chrome" --no-first-run --no-default-browser-check \
+  --disable-background-timer-throttling --disable-backgrounding-occluded-windows --disable-renderer-backgrounding about:blank >"$TMP/chrome.log" 2>&1 &
 BROWSER=$!
 for _ in $(seq 1 50); do
   curl -sf "http://127.0.0.1:$CDP/json/version" >/dev/null && curl -sf -o /dev/null "http://localhost:$PORT/healthz" && break
