@@ -44,7 +44,6 @@ Ilmoita haavoittuvuuksista yksityisesti GitHubin *Security → Report a vulnerab
   ne tallentuvat salattuina. Lomake ohjeistaa olemaan tekemättä niin.
 - **Saman verkon käyttäjät.** Rajoitukset eivät perustu IP-osoitteisiin, joten luentosali voi olla NAT:n takana ilman haittaa.
   Tämä tarkoittaa myös, että yksittäistä häiriköijää voi rajoittaa vain nimimerkin perusteella.
-
 - **Kyselyjen äänten monistaminen.** Koska vastaajia ei tunnisteta, muokattu asiakasohjelma voi luoda
   uusia satunnaisia tunnisteita ja vastata useasti. Rajoja: lomaketoken, vastaajakohtainen nopeusraja ja
   kyselykohtainen enimmäismäärä (3000). Kyselyt sopivat mielipiteiden ja osaamisen kartoitukseen, eivät äänestyksiin,
