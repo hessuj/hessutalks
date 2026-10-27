@@ -71,12 +71,23 @@ final class AdminAuth
         $this->session->destroy();
     }
 
-    private function loginSession(string $client, string $how): void
+    /** Passkey, jolla nykyinen istunto kirjautui (null käyttöönotossa). */
+    public function sessionPasskeyId(): ?int
+    {
+        $id = $this->session->get('admin_passkey_id');
+        return is_int($id) ? $id : null;
+    }
+
+    private function loginSession(string $client, string $how, ?int $passkeyId = null): void
     {
         $this->session->regenerate();
         $now = $this->clock->now();
         $this->session->remove('setup_verified');
         $this->session->remove('wa_challenge');
+        $this->session->remove('admin_passkey_id');
+        if ($passkeyId !== null) {
+            $this->session->set('admin_passkey_id', $passkeyId);
+        }
         $this->session->set('admin_auth_at', $now);
         $this->session->set('admin_last_seen', $now);
         $this->session->set('csrf', bin2hex(random_bytes(32)));
@@ -168,7 +179,8 @@ final class AdminAuth
         }
         $args = $this->webauthn->getArgs($this->passkeys->allCredentialIds());
         $this->storeChallenge('login', $args['challenge']);
-        return $args['options'];
+        // Selain pyytää samalla kirjautumisella PRF-arvon, jolla yksityinen avain avataan.
+        return $args['options'] + ['prfSalts' => $this->passkeys->prfSalts()];
     }
 
     /** @param array<string, mixed> $in */
@@ -208,7 +220,7 @@ final class AdminAuth
             return false;
         }
         $this->passkeys->touch((int) $pk['id'], $count);
-        $this->loginSession($client, 'passkey #' . (int) $pk['id']);
+        $this->loginSession($client, 'passkey #' . (int) $pk['id'], (int) $pk['id']);
         return true;
     }
 

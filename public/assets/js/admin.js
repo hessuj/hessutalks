@@ -3,8 +3,9 @@
  *
  * Turvallisuusperiaatteet:
  *  - Kirjautuminen passkeylla (WebAuthn). Ei salasanoja palvelimelle.
- *  - Yksityinen salausavain avataan VAIN tässä selaimessa tunnuslauseella
- *    (Argon2id -> XSalsa20-Poly1305) ja pidetään vain muistissa. Sivun uudelleenlataus lukitsee.
+ *  - Yksityinen salausavain avataan VAIN tässä selaimessa: passkeyn PRF-arvolla (sama
+ *    biometria kuin kirjautumisessa) tai varakeinona tunnuslauseella (Argon2id -> XSalsa20-Poly1305).
+ *    PRF-arvo ei lähde selaimesta. Avain pidetään vain muistissa. Sivun uudelleenlataus lukitsee.
  *  - Purettu sisältö lisätään DOMiin vain textContentilla (ei innerHTML:ää) -> ei XSS:ää.
  */
 (function () {
@@ -26,6 +27,8 @@
   var publicKey = null;
   var state = null;
   var pollTimer = null;
+  var pendingPrf = null;  // { id, output, wrap } kirjautumisen jälkeen, kunnes avain on avattu
+  var PRF_CONTEXT = 'HessuTalks PRF unlock v1';
 
   // ================================================================ DOM-apurit
 
@@ -96,13 +99,20 @@
     pk.challenge = b64urlToBuf(pk.challenge);
     pk.user.id = b64urlToBuf(pk.user.id);
     (pk.excludeCredentials || []).forEach(function (c) { c.id = b64urlToBuf(c.id); });
+    // PRF päälle jo luonnissa: turva-avaimet (hmac-secret) vaativat sen. Muut selaimet ohittavat.
+    pk.extensions = Object.assign({}, pk.extensions, { prf: {} });
     return o;
   }
   function prepGet(o) {
     var pk = o.publicKey;
     pk.challenge = b64urlToBuf(pk.challenge);
     (pk.allowCredentials || []).forEach(function (c) { c.id = b64urlToBuf(c.id); });
-    return o;
+    // Passkey-kohtainen PRF-suola. Selaimet, jotka eivät tue PRF:ää, ohittavat laajennuksen.
+    var salts = o.prfSalts || {};
+    var evalBy = {};
+    Object.keys(salts).forEach(function (id) { evalBy[id] = { first: b64urlToBuf(salts[id]) }; });
+    if (Object.keys(evalBy).length) pk.extensions = { prf: { evalByCredential: evalBy } };
+    return { publicKey: pk };
   }
 
   function registerPasskey(name) {
@@ -117,10 +127,15 @@
     });
   }
 
+  /** Kirjautuu ja ottaa talteen PRF-arvon (pendingPrf), jos passkey ja selain tukevat sitä. */
   function loginWithPasskey() {
+    var output = null;
     return api('POST', 'login/options', {}).then(function (opts) {
       return navigator.credentials.get(prepGet(opts));
     }).then(function (cred) {
+      var ext = typeof cred.getClientExtensionResults === 'function' ? cred.getClientExtensionResults() : {};
+      var first = ext && ext.prf && ext.prf.results && ext.prf.results.first;
+      if (first) output = new Uint8Array(first.slice ? first.slice(0) : first);
       return api('POST', 'login', {
         id: bufToB64url(cred.rawId),
         clientDataJSON: bufToB64url(cred.response.clientDataJSON),
@@ -128,6 +143,10 @@
         signature: bufToB64url(cred.response.signature),
         userHandle: cred.response.userHandle ? bufToB64url(cred.response.userHandle) : null
       });
+    }).then(function (r) {
+      forgetPrf();
+      if (output && r.passkey) pendingPrf = { id: r.passkey, output: output, wrap: r.prf || null };
+      return r;
     });
   }
 
@@ -168,6 +187,51 @@
     } finally {
       sodium.memzero(key);
     }
+  }
+
+  // ---------------------------------------------------------------- avaus passkeylla (PRF)
+
+  /** PRF-arvosta johdettu salausavain. Konteksti erottaa sen muista mahdollisista käytöistä. */
+  function prfKey(output) {
+    return sodium.crypto_generichash(sodium.crypto_secretbox_KEYBYTES, output, sodium.from_string(PRF_CONTEXT));
+  }
+
+  function forgetPrf() {
+    if (pendingPrf) sodium.memzero(pendingPrf.output);
+    pendingPrf = null;
+  }
+
+  /** Avaa yksityisen avaimen passkeyn kopiosta. Palauttaa true, jos onnistui. */
+  function unlockWithPrf(keys) {
+    if (!pendingPrf || !pendingPrf.wrap) return false;
+    var key = prfKey(pendingPrf.output);
+    try {
+      var sk = sodium.crypto_secretbox_open_easy(unb64(pendingPrf.wrap.enc_secret_key), unb64(pendingPrf.wrap.nonce), key);
+      var pk = unb64(keys.public_key);
+      if (sodium.compare(sodium.crypto_scalarmult_base(sk), pk) !== 0) throw new Error('Avainpari ei täsmää.');
+      secretKey = sk; publicKey = pk;
+      forgetPrf();
+      return true;
+    } catch (e) {
+      // Kopio on vanhentunut tai vioittunut: tunnuslauseella avattaessa tallennetaan uusi.
+      pendingPrf.wrap = null;
+      return false;
+    } finally {
+      sodium.memzero(key);
+    }
+  }
+
+  /** Tallentaa avatusta avaimesta passkey-kohtaisen kopion, jos kirjautuminen tuotti PRF-arvon. */
+  function enablePrfUnlock() {
+    if (!pendingPrf || !secretKey) return Promise.resolve(false);
+    var id = pendingPrf.id;
+    var key = prfKey(pendingPrf.output);
+    var nonce = sodium.randombytes_buf(sodium.crypto_secretbox_NONCEBYTES);
+    var enc = sodium.crypto_secretbox_easy(secretKey, nonce, key);
+    sodium.memzero(key);
+    forgetPrf();
+    return api('POST', 'passkeys/' + id + '/prf', { public_key: b64(publicKey), enc_secret_key: b64(enc), nonce: b64(nonce) })
+      .then(function () { return true; });
   }
 
   function downloadBackup(keys) {
@@ -271,27 +335,48 @@
       out);
   }
 
-  function showUnlock() {
+  /**
+   * Tunnuslause on varakeino. Jos kirjautuminen tuotti PRF-arvon, avatusta avaimesta tallennetaan
+   * passkey-kohtainen kopio, ja seuraavalla kerralla pelkkä passkey riittää.
+   */
+  function showUnlock(msg) {
     var input = h('input', { type: 'password', id: 'pp', autocomplete: 'current-password', required: true });
-    var out = h('div');
+    var out = h('div', null, msg ? notice(msg, 'error') : null);
+    var prfBtn = webauthnSupported() ? h('button.btn', { type: 'button', text: 'Avaa passkeylla', onclick: function () {
+      prfBtn.disabled = true;
+      out.replaceChildren(notice('Odotetaan passkeyta…'));
+      loginWithPasskey().then(function () { start(); }).catch(function (e) {
+        prfBtn.disabled = false;
+        if (e.message !== '401') out.replaceChildren(notice(e.name === 'NotAllowedError' ? 'Peruttiin.' : e.message, 'error'));
+      });
+    } }) : null;
     mount(h('h1', { text: 'Avaa kysymykset' }),
       h('p', null, 'Avaimen sormenjälki ', h('span.fingerprint', { text: state.keys.fingerprint })),
+      pendingPrf ? null : h('p', null, prfBtn),
       h('form', { onsubmit: function (ev) {
         ev.preventDefault();
         out.replaceChildren(notice('Avataan…'));
         setTimeout(function () {
           try {
             unlock(state.keys, input.value);
-            input.value = '';
-            showEvents();
           } catch (e) {
             out.replaceChildren(notice('Väärä tunnuslause.', 'error'));
             input.select();
+            return;
           }
+          input.value = '';
+          enablePrfUnlock().then(function (enabled) {
+            return loadState().then(function () {
+              showEvents(enabled ? 'Avaus passkeylla otettu käyttöön. Seuraavalla kerralla tunnuslausetta ei kysytä.' : null);
+            });
+          }).catch(function (e) { if (e.message !== '401') showEvents('Avausta passkeylla ei voitu ottaa käyttöön: ' + e.message); });
         }, 30);
       } },
+        h('p.hint', { text: pendingPrf
+          ? 'Tämä passkey tukee avausta, mutta sitä ei ole vielä otettu käyttöön. Avaa kerran tunnuslauseella, niin jatkossa passkey riittää.'
+          : 'Varakeino, jos passkey ei tue avausta (vaatii esim. Safari 18 / macOS 15 / iOS 18 tai uuden Chromen).' }),
         h('label', { for: 'pp', text: 'Tunnuslause' }), input,
-        h('p', null, h('button.btn', { type: 'submit', text: 'Avaa' }), ' ', logoutButton())),
+        h('p', null, h('button.btn' + (pendingPrf ? '' : '.ghost'), { type: 'submit', text: 'Avaa tunnuslauseella' }), ' ', logoutButton())),
       out);
   }
 
@@ -949,7 +1034,14 @@
           api('POST', 'passkeys/' + p.id + '/delete', {}).then(loadState).then(showSettings)
             .catch(function (e) { out.replaceChildren(notice(e.message, 'error')); });
         } }),
-        h('span.meta', { text: 'Luotu ' + fmtTime(p.created_at) + (p.last_used_at ? ', käytetty ' + fmtTime(p.last_used_at) : '') })));
+        p.prf ? h('button.btn.ghost.small', { type: 'button', text: 'Poista avaus', title: 'Tunnuslause kysytään taas tällä passkeylla', onclick: function () {
+          if (!window.confirm('Poistetaanko avaus passkeylla "' + p.name + '"? Kirjautuminen toimii edelleen, mutta avaimen avaus vaatii tunnuslauseen.')) return;
+          api('POST', 'passkeys/' + p.id + '/prf-delete', {}).then(loadState).then(showSettings)
+            .catch(function (e) { out.replaceChildren(notice(e.message, 'error')); });
+        } }) : null,
+        h('span.meta', { text: 'Luotu ' + fmtTime(p.created_at) + (p.last_used_at ? ', käytetty ' + fmtTime(p.last_used_at) : '')
+          + (p.prf ? ' · avaus passkeylla käytössä' : ' · avaus tunnuslauseella')
+          + (p.id === state.passkey ? ' · tämä istunto' : '') })));
     });
     var pkName = h('input', { type: 'text', id: 'new-pk', maxlength: 60, placeholder: 'esim. iPhone' });
     var pp = passphraseFields('Uusi tunnuslause');
@@ -959,6 +1051,7 @@
       out,
       h('h2', { text: 'Passkeyt' }),
       h('p', { text: 'Lisää varapasskey esimerkiksi puhelimeen, jotta et lukitse itseäsi ulos.' }),
+      h('p.hint', { text: 'Avaus passkeylla: passkey tuottaa laitteessa salaisen arvon, jolla yksityinen avain avataan tässä selaimessa. Arvo ei lähde palvelimelle. Avaus otetaan käyttöön passkeykohtaisesti, kun avaat kerran tunnuslauseella sillä kirjauduttuasi. Tunnuslause ja varmuuskopio jäävät varakeinoksi.' }),
       pkList,
       h('form.row-form', { onsubmit: function (ev) {
         ev.preventDefault();
@@ -996,7 +1089,10 @@
   function start() {
     if (!secretKey) {
       return loadState().then(function () {
-        if (!state.keys) showKeySetup(); else showUnlock();
+        if (!state.keys) { forgetPrf(); showKeySetup(); return; }
+        var hadWrap = !!(pendingPrf && pendingPrf.wrap);
+        if (unlockWithPrf(state.keys)) { showEvents(); return; }
+        showUnlock(hadWrap ? 'Avaus passkeylla epäonnistui. Avaa tunnuslauseella.' : null);
       }).catch(function (e) { if (e.message !== '401') mount(notice(e.message, 'error')); });
     }
     return loadState().then(function () { showEvents(); });
