@@ -254,22 +254,19 @@ final class AdminSecurityTest extends AppTestCase
         ];
     }
 
-    public function testLoginOptionsContainStablePrfSaltPerPasskey(): void
+    public function testLoginOptionsContainStablePrfSalt(): void
     {
         $repo = new PasskeyRepository($this->db, $this->clock);
         $repo->add('cred-1', 'PEM', 0, 'MacBook');
-        $repo->add('cred-2', 'PEM', 0, 'iPhone');
         $h = ['X-CSRF-Token' => $this->pageCsrf()];
-        $first = $this->json($this->request('POST', '/admin/api/login/options', [], $h))['prfSalts'] ?? null;
-        $second = $this->json($this->request('POST', '/admin/api/login/options', [], $h))['prfSalts'] ?? null;
+        $first = $this->json($this->request('POST', '/admin/api/login/options', [], $h))['prfSalt'] ?? null;
+        $repo->add('cred-2', 'PEM', 0, 'iPhone');
+        $second = $this->json($this->request('POST', '/admin/api/login/options', [], $h))['prfSalt'] ?? null;
 
-        self::assertIsArray($first);
-        self::assertSame([self::b64u('cred-1'), self::b64u('cred-2')], array_keys($first));
-        foreach ($first as $salt) {
-            self::assertSame(32, strlen((string) PasskeyRepository::b64urlDecode((string) $salt)), 'Suola on 32 satunnaista tavua');
-        }
-        self::assertNotSame($first[self::b64u('cred-1')], $first[self::b64u('cred-2')], 'Jokaisella passkeylla oma suola');
-        self::assertSame($first, $second, 'Suola pysyy samana, muuten PRF-arvo muuttuisi');
+        self::assertIsString($first);
+        self::assertSame(32, strlen((string) PasskeyRepository::b64urlDecode($first)), 'Suola on 32 tavua');
+        self::assertSame($first, $second, 'Suola pysyy samana (myös uuden passkeyn jälkeen), muuten PRF-arvo muuttuisi');
+        self::assertStringNotContainsString(bin2hex((string) PasskeyRepository::b64urlDecode($first)), $this->config->appSecret);
     }
 
     public function testPrfWrapRoundTripThroughLogin(): void
@@ -298,7 +295,6 @@ final class AdminSecurityTest extends AppTestCase
     {
         $repo = new PasskeyRepository($this->db, $this->clock);
         $repo->add('cred-1', 'PEM', 0, 'MacBook');
-        $repo->prfSalts();
         $repo->setPrfWrap(1, base64_encode(random_bytes(48)), base64_encode(random_bytes(24)));
         $h = ['X-CSRF-Token' => $this->pageCsrf()];
         $opts = $this->request('POST', '/admin/api/login/options', [], $h);

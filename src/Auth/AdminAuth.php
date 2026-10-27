@@ -180,7 +180,7 @@ final class AdminAuth
         $args = $this->webauthn->getArgs($this->passkeys->allCredentialIds());
         $this->storeChallenge('login', $args['challenge']);
         // Selain pyytää samalla kirjautumisella PRF-arvon, jolla yksityinen avain avataan.
-        return $args['options'] + ['prfSalts' => $this->passkeys->prfSalts()];
+        return $args['options'] + ['prfSalt' => $this->prfSalt()];
     }
 
     /** @param array<string, mixed> $in */
@@ -225,6 +225,16 @@ final class AdminAuth
     }
 
     // ---------------------------------------------------------------- apurit
+
+    /**
+     * PRF-suola (base64url), sama kaikille passkeyille. Suola ei ole salainen: PRF-arvo on silti
+     * passkeykohtainen, koska jokaisella passkeylla on oma sisäinen salaisuutensa. Yksi suola
+     * (PRF:n eval-muoto) toimii myös salasanamanagereissa, jotka eivät tue evalByCredential-muotoa.
+     */
+    private function prfSalt(): string
+    {
+        return PasskeyRepository::b64urlEncode(hash_hmac('sha256', 'webauthn-prf-salt|v1', $this->config->appSecret, true));
+    }
 
     private function storeChallenge(string $purpose, string $challenge): void
     {

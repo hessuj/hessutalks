@@ -49,25 +49,8 @@ final class PasskeyRepository
         );
     }
 
-    /**
-     * PRF-suolat kirjautumisen haasteeseen: credential id (base64url) => suola (base64url).
-     * Suola luodaan passkeylle ensimmäisellä kerralla. Se ei ole salainen.
-     *
-     * @return array<string, string>
-     */
-    public function prfSalts(): array
-    {
-        $out = [];
-        foreach ($this->db->all('SELECT id, credential_id, prf_salt FROM passkeys ORDER BY id') as $row) {
-            $salt = $row['prf_salt'];
-            if (!is_string($salt)) {
-                $salt = self::b64urlEncode(random_bytes(32));
-                $this->db->exec('UPDATE passkeys SET prf_salt = ? WHERE id = ? AND prf_salt IS NULL', [$salt, (int) $row['id']]);
-            }
-            $out[(string) $row['credential_id']] = $salt;
-        }
-        return $out;
-    }
+    // Sarake prf_salt (migraatio 003) ei ole enää käytössä: PRF-suola on yhteinen kaikille
+    // passkeyille (AdminAuth::prfSalt), koska salasanamanagerit tukevat vain PRF:n eval-muotoa.
 
     /** @return array{enc_secret_key: string, nonce: string}|null */
     public function prfWrap(int $id): ?array
@@ -82,7 +65,7 @@ final class PasskeyRepository
     public function setPrfWrap(int $id, string $encSecretKey, string $nonce): bool
     {
         return $this->db->exec(
-            'UPDATE passkeys SET prf_enc_secret_key = ?, prf_nonce = ? WHERE id = ? AND prf_salt IS NOT NULL',
+            'UPDATE passkeys SET prf_enc_secret_key = ?, prf_nonce = ? WHERE id = ?',
             [$encSecretKey, $nonce, $id],
         ) === 1;
     }
