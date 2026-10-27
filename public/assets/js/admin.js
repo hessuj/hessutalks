@@ -107,11 +107,8 @@
     var pk = o.publicKey;
     pk.challenge = b64urlToBuf(pk.challenge);
     (pk.allowCredentials || []).forEach(function (c) { c.id = b64urlToBuf(c.id); });
-    // Passkey-kohtainen PRF-suola. Selaimet, jotka eivät tue PRF:ää, ohittavat laajennuksen.
-    var salts = o.prfSalts || {};
-    var evalBy = {};
-    Object.keys(salts).forEach(function (id) { evalBy[id] = { first: b64urlToBuf(salts[id]) }; });
-    if (Object.keys(evalBy).length) pk.extensions = { prf: { evalByCredential: evalBy } };
+    // PRF-suola (eval-muoto: toimii myös salasanamanagereissa). Selaimet ilman PRF:ää ohittavat laajennuksen.
+    if (o.prfSalt) pk.extensions = { prf: { eval: { first: b64urlToBuf(o.prfSalt) } } };
     return { publicKey: pk };
   }
 
@@ -374,7 +371,7 @@
       } },
         h('p.hint', { text: pendingPrf
           ? 'Tämä passkey tukee avausta, mutta sitä ei ole vielä otettu käyttöön. Avaa kerran tunnuslauseella, niin jatkossa passkey riittää.'
-          : 'Varakeino, jos passkey ei tue avausta (vaatii esim. Safari 18 / macOS 15 / iOS 18 tai uuden Chromen).' }),
+          : 'Varakeino: passkey ei antanut avausarvoa (PRF). Syy on yleensä salasanamanageri, joka ei tue PRF:ää. Apple Salasanoihin (iCloud) tai Google-salasanoihin tallennettu passkey tukee sitä.' }),
         h('label', { for: 'pp', text: 'Tunnuslause' }), input,
         h('p', null, h('button.btn' + (pendingPrf ? '' : '.ghost'), { type: 'submit', text: 'Avaa tunnuslauseella' }), ' ', logoutButton())),
       out);
