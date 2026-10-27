@@ -14,21 +14,31 @@ Osoite: <https://hessujarvinen.com/hessutalks/>
 4. Luennoitsija avaa viestit omassa selaimessaan tunnuslauseella. Ne päivittyvät reaaliaikaisesti,
    ja QR-koodin, yksittäisen kysymyksen tai kysymyslistan voi näyttää projektorilla.
 
-### Kyselyt
+### Kyselyt ja kysymyssarjat
 
-Luentoon voi liittää kyselyitä: monivalinta (yksi tai useita vastauksia), sanapilvi, Likert-asteikko
-(5 tai 7 kohtaa) ja asteikko 0–10.
+Luento koostuu **kysymyssarjoista** (esim. moduulit `M1`, `M4`), joissa on kysymykset järjestyksessä.
+Kysymystyypit: monivalinta (yksi tai useita vastauksia), sanapilvi, Likert-asteikko (5 tai 7 kohtaa) ja asteikko 0–10.
 
-1. Luo kyselyt hallinnassa luennon sivulla valmiiksi ja lataa kunkin **QR-koodi** (PNG) luentokalvoon.
-2. Avaa kysely luennolla napista *Avaa kysely*. Kuulijat vastaavat kalvon QR-koodilla tai luennon
-   tavallisella sivulla, jolle avoimet kyselyt ilmestyvät automaattisesti.
-3. *Tulokset projektorille* avaa kyselyn tulokset omaan ikkunaansa. Kaaviot ja sanapilvi päivittyvät
-   reaaliajassa (muutaman sekunnin viiveellä), ja ikkunan alareunassa on QR-koodi myöhässä tuleville.
-4. Sanapilvessä sopimattoman sanan voi piilottaa klikkaamalla sitä hallinnan tuloksissa.
+1. Luo luennon sivulla sarjat (*Uusi sarja*) ja niihin kysymykset (*Uusi kysymys*) valmiiksi ennen luentoa.
+   Sarjoja ja kysymyksiä voi siirtää nuolilla, ja sarjan voi **ohittaa** kesken luennon. Ohitetun sarjan
+   kysymykset jäävät pois Seuraava/Edellinen-järjestyksestä, mutta niiden vastaukset säilyvät.
+2. Luennolla on kerrallaan yksi **aktiivinen kysymys**, jonka kaikki osallistujat näkevät. Ohjauspalkissa:
+   *Seuraava →* ja *← Edellinen* vaihtavat aktiivista kysymystä, *Avaa vastauksille* ja *Sulje vastaukset*
+   ohjaavat vastaamista, ja *Odotusnäkymä* poistaa aktiivisen kysymyksen.
+   Luonnos-tilainen aktiivinen kysymys näkyy projektorilla, mutta osallistujat näkevät odotusnäkymän
+   (*Waiting for the next question…*), kunnes avaat sen. Vain aktiivinen kysymys voi olla auki.
+3. Osallistujat käyttävät koko ajan samaa luennon QR-koodia tai linkkiä. Näkymä vaihtuu itsestään noin
+   sekunnin viiveellä ilman sivun päivitystä. Yhteyskatkon jälkeen sivu yhdistää uudelleen, ja oma vastaus säilyy myös uudelleenlatauksessa.
+4. *Aktiivinen projektorille* avaa ikkunan, joka seuraa aktiivista kysymystä ja sen tuloksia (ilman aktiivista kysymystä
+   siinä näkyy luennon QR-koodi). *Tulokset projektorille* näyttää yksittäisen kysymyksen tulokset omassa ikkunassaan.
+5. Sanapilvessä sopimattoman sanan voi piilottaa klikkaamalla sitä hallinnan tuloksissa.
 
 Kyselyyn vastataan ilman nimimerkkiä. Vastaukset salataan selaimessa kuten kysymyksetkin, ja tulokset
-lasketaan luennoitsijan selaimessa, joten hallinnan pitää olla auki ja avattuna tunnuslauseella.
-Saman selaimen uusi vastaus korvaa aiemman.
+lasketaan luennoitsijan selaimessa, joten hallinnan pitää olla auki ja avattuna. Saman selaimen uusi vastaus
+korvaa aiemman, kunnes kysely suljetaan.
+
+**Osallistujien kieli** valitaan luennolle (luontilomake tai luennon sivu): *English*, *Suomi* tai selaimen kielen mukaan.
+Osallistuja voi silti vaihtaa kieltä FI/EN-kytkimestä.
 
 ### Esitys projektorilla
 
@@ -168,7 +178,12 @@ vendor/bin/phpunit --testdox
 vendor/bin/phpstan analyse --memory-limit=1G
 node --test tests/js/*.test.mjs
 scripts/verify-vendor.sh
+scripts/e2e.sh          # selaintestit: oikea Chrome (headless) ja virtuaalinen passkey
 ```
+
+Selaintestit (`tests/e2e/`) käynnistävät oman palvelimen väliaikaisella tietokannalla. Ne ajavat
+hallinnan ja osallistujan rinnakkain omissa ikkunoissaan ja todentavat hyväksymistestejä, ks.
+[docs/hyvaksymistestit.md](docs/hyvaksymistestit.md). Ne vaativat Chromen (macOS:llä valmiina, muuten `CHROME=...`).
 
 ## Selainkirjastot
 
@@ -179,9 +194,13 @@ Kirjastoja ei ladata CDN:stä.
 
 ## Tulossa
 
-- Kysymyksiin vastaaminen osallistujille näkyvästi ja äänestys kysymyksistä
-- Kyselyt, vaihe 2: visa, jossa oikea vastaus paljastetaan
-- Kyselyt, vaihe 3: järjestyskysely, avoin vastaus moderoinnilla, kyselyiden kopiointi luennolta toiselle
+MMoIT 2026 -kurssin vaatimukset (13.–14.11.2026), tilanne: [docs/hyvaksymistestit.md](docs/hyvaksymistestit.md).
+
+- JSON-tuonti ja -vienti kysymyssarjoille
+- Avoin teksti (280 merkkiä) ja pysyvä moderointi, myös sanapilvelle
+- Oikea vastaus, selitykset ja paljastus; tulosten näyttö ja piilotus
+- Yksi esitysnäkymä pikanäppäimineen (QR kulmassa, vastausmäärä, Teams-luettavuus)
+- Nopeusrajat osoitteen mukaan (vain tiiviste, 10 min) ja julkaisujäädytys tapahtuman ajaksi
 
 ## Lisenssi
 

@@ -1,6 +1,10 @@
 /*
  * HessuTalks – osallistujan kyselyt (monivalinta, sanapilvi, Likert, asteikko).
  *
+ * Näkyvissä on aina luennon aktiivinen kysymys tai odotusnäkymä. Selain kysyy tilaa noin sekunnin
+ * välein (lyhyt pollaus HTTPS:n yli, ei WebSocketia: toimii kaikissa verkoissa). Yhteyskatkon jälkeen
+ * yritetään uudelleen kasvavalla viiveellä, ja oma vastaus palautetaan selaimen muistista.
+ *
  * Ei henkilötietoja: vastataan ilman nimimerkkiä. Selain luo satunnaisen vastaajatunnisteen
  * (localStorage), jolla saman selaimen uusi vastaus korvaa aiemman. Palvelin tallentaa siitä
  * vain kyselykohtaisen tiivisteen.
@@ -16,7 +20,9 @@
   var box = document.getElementById('polls');
   if (!ask || !box) return;
 
-  var POLL_MS = 4000;
+  var POLL_MS = 1200;        // vaatimus: näkymä vaihtuu alle 2 s:ssa
+  var HIDDEN_MS = 4000;      // taustalla (esim. puhelimen näyttö lukittu) harvemmin
+  var MAX_BACKOFF_MS = 8000;
   var VOTER_KEY = 'hessutalks.voter';
   var ANSWERS_KEY = 'hessutalks.answers';
   var WORDS_MAX_CHARS = 40;
@@ -32,13 +38,17 @@
     return text;
   }
 
-  var focusId = parseInt(new URLSearchParams(window.location.search).get('p') || '', 10) || null;
   var version = null;
-  var cards = {};          // pollId -> { sig, el }
+  var current = null;      // { sig, el } näkyvissä oleva kysymys tai odotusnäkymä
   var sodium = null;
   var publicKey = null;
   var timer = null;
+  var failures = 0;
+  var stopped = false;
   var memory = {};         // jos localStorage ei ole käytettävissä
+  var reconnect = h('p', 'notice poll-reconnect', null);
+  reconnect.setAttribute('role', 'status');
+  reconnect.hidden = true;
 
   // ---------------------------------------------------------------- tallennus
 
@@ -165,6 +175,16 @@
     form.appendChild(btn);
     form.appendChild(status);
 
+    // Suljettu kysely: vastaus näkyy, mutta sitä ei voi enää muuttaa.
+    if (poll.status === 'closed') {
+      form.classList.add('closed');
+      Array.prototype.forEach.call(form.querySelectorAll('input'), function (i) { i.disabled = true; });
+      btn.hidden = true;
+      status.className = 'notice';
+      status.textContent = t('poll_closed_state') + (own !== null ? ' ' + t('poll_your_answer') : '');
+      return form;
+    }
+
     form.addEventListener('submit', function (ev) {
       ev.preventDefault();
       var answer;
@@ -205,54 +225,58 @@
 
   // ---------------------------------------------------------------- päivitys
 
-  function render(polls) {
-    var seen = {};
-    polls.forEach(function (poll) {
-      var sig = JSON.stringify([poll.type, poll.prompt, poll.config, poll.generation]);
-      seen[poll.id] = true;
-      var card = cards[poll.id];
-      if (card && card.sig === sig) return;   // ei muutosta: säilytetään keskeneräinen vastaus
-      var el = buildCard(poll);
-      if (card) card.el.replaceWith(el); else box.appendChild(el);
-      cards[poll.id] = { sig: sig, el: el };
-    });
-    Object.keys(cards).forEach(function (id) {
-      if (!seen[id]) { cards[id].el.remove(); delete cards[id]; }
-    });
-    // Järjestys: kalvon QR-koodilla avattu kysely ensin, muuten luontijärjestys.
-    polls.slice().sort(function (a, b) { return (b.id === focusId) - (a.id === focusId) || a.id - b.id; })
-      .forEach(function (poll) { box.appendChild(cards[poll.id].el); });
+  function waitingView() {
+    var el = h('div', 'poll-waiting');
+    el.appendChild(h('span', 'poll-waiting-dot', ''));
+    el.appendChild(h('p', null, t('poll_waiting')));
+    return el;
+  }
 
-    var notOpen = focusId && !seen[focusId];
-    var note = box.querySelector('.poll-wait');
-    if (notOpen && !note) {
-      note = h('p', 'notice poll-wait', t('poll_not_open'));
-      box.insertBefore(note, box.firstChild);
-    } else if (!notOpen && note) {
-      note.remove();
-    }
-    box.hidden = !polls.length && !notOpen;
+  /** Näyttää aktiivisen kysymyksen tai odotusnäkymän. Keskeneräinen vastaus säilyy, jos mikään ei muuttunut. */
+  function render(poll) {
+    var sig = poll ? JSON.stringify([poll.id, poll.type, poll.prompt, poll.config, poll.generation, poll.status]) : 'waiting';
+    if (current && current.sig === sig) return;
+    var el = poll ? buildCard(poll) : waitingView();
+    if (current) current.el.replaceWith(el); else box.appendChild(el);
+    current = { sig: sig, el: el };
+    box.hidden = false;
+  }
+
+  function schedule(ms) {
+    if (stopped) return;
+    clearTimeout(timer);
+    timer = setTimeout(refresh, ms);
   }
 
   function refresh() {
+    clearTimeout(timer);
+    if (stopped) return;
+    if (document.hidden) { schedule(HIDDEN_MS); return; }
     var url = box.dataset.endpoint + '?code=' + encodeURIComponent(code) + '&lang=' + encodeURIComponent(lang) +
-      (version ? '&v=' + encodeURIComponent(version) : '');
-    return fetch(url, { credentials: 'omit' }).then(function (res) {
+      (version !== null ? '&v=' + encodeURIComponent(version) : '');
+    fetch(url, { credentials: 'omit', cache: 'no-store' }).then(function (res) {
       return res.json().catch(function () { return {}; }).then(function (data) {
-        if (res.status === 410) { render([]); stop(); return; }
-        if (!res.ok || data.unchanged) return;
-        version = typeof data.v === 'string' ? data.v : null;
-        render(Array.isArray(data.polls) ? data.polls : []);
+        if (res.status === 410) {
+          stopped = true;
+          render(null);
+          current.el.replaceChildren(h('p', 'notice', data.error || ''));
+          return;
+        }
+        if (!res.ok) throw new Error(String(res.status));
+        failures = 0;
+        reconnect.hidden = true;
+        if (!data.unchanged) {
+          version = typeof data.v === 'number' ? data.v : null;
+          render(data.poll && typeof data.poll === 'object' ? data.poll : null);
+        }
+        schedule(POLL_MS);
       });
-    }).catch(function () { /* verkkokatko: yritetään seuraavalla kierroksella */ });
-  }
-
-  function start() {
-    if (timer) return;
-    timer = setInterval(function () { if (!document.hidden) refresh(); }, POLL_MS);
-  }
-  function stop() {
-    if (timer) { clearInterval(timer); timer = null; }
+    }).catch(function () {
+      // Verkkokatko tai palvelinvirhe: yritetään uudelleen kasvavalla viiveellä.
+      failures++;
+      if (failures >= 2) { reconnect.textContent = t('reconnecting'); reconnect.hidden = false; }
+      schedule(Math.min(POLL_MS * Math.pow(2, failures - 1), MAX_BACKOFF_MS));
+    });
   }
 
   var s = window.sodium;
@@ -261,12 +285,12 @@
       sodium = lib;
       publicKey = sodium.from_base64(ask.dataset.pk, sodium.base64_variants.ORIGINAL);
       if (publicKey.length !== sodium.crypto_box_PUBLICKEYBYTES) throw new Error('key');
-      return refresh();
-    })
-    .then(function () {
-      start();
-      if (focusId && cards[focusId]) cards[focusId].el.scrollIntoView({ block: 'start' });
-      document.addEventListener('visibilitychange', function () { if (!document.hidden) refresh(); });
+      box.parentNode.insertBefore(reconnect, box);
+      render(null);
+      refresh();
+      document.addEventListener('visibilitychange', function () { if (!document.hidden) { failures = 0; refresh(); } });
+      window.addEventListener('online', function () { failures = 0; refresh(); });
+      window.addEventListener('pageshow', function (ev) { if (ev.persisted) { failures = 0; refresh(); } });
     })
     .catch(function () { /* participant.js näyttää salausvirheen */ });
 })();

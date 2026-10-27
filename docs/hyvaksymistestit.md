@@ -1,0 +1,41 @@
+# Hyväksymistestit – MMoIT 2026 (13.–14.11.2026)
+
+Vaatimusdokumentin luvun 9 testit ja niiden todennus. Päivitetään jokaisen vaiheen PR:ssä.
+
+Merkinnät: ✅ todennettu · 🟡 osittain · ⏳ ei vielä toteutettu · 🧪 todennetaan koeajossa Hessun kanssa (oikeat laitteet / Teams)
+
+Todennustavat:
+- **PHPUnit**: `vendor/bin/phpunit` (CI ajaa jokaiselle PR:lle)
+- **Node**: `node --test tests/js/*.test.mjs` (CI)
+- **Selain**: `scripts/e2e.sh`, oikea Chrome (headless) ja virtuaalinen passkey, hallinta ja osallistuja omissa ikkunoissaan. Ajetaan paikallisesti, ei vielä CI:ssä.
+
+| # | Testi | Tila | Miten todennettu |
+|---|---|---|---|
+| H1 | Liittyminen QR-koodilla iPhonella, Androidilla ja läppärillä | 🧪 | Selain: luennon linkki avaa odotusnäkymän ilman kirjautumista (`live-polls.mjs`). Oikeat laitteet koeajossa. |
+| H2 | Esittäjä avaa T1-kysymyksen, näkymä vaihtuu alle 2 s:ssa | ✅ | Selain: *Avaa vastauksille* → osallistujan näkymä vaihtui 1,0–1,6 s:ssa ilman päivitystä (paikallinen palvelin, pollaus 1,2 s). Tuotannon verkkoviive tarkistetaan koeajossa. |
+| H3 | Vastauksen vaihto T1:ssä: vain viimeisin lasketaan | ✅ | Selain: vastaus ja muutos → hallinnassa 1 vastaus. PHPUnit `testSameBrowserReplacesItsAnswer`. |
+| H4 | Sulkeminen estää vastaamisen ja osallistuja näkee tilan | ✅ | Selain: *Sulje vastaukset* → "This poll is closed", kentät pois käytöstä. PHPUnit `testAnswerRequiresOpenPollOfThisEvent` (myös: auki mutta ei aktiivinen → 409). |
+| H5 | T2-asteikko: jakauma ja keskiarvo oikein | ✅ | Node `results.test.mjs` (jakaumat ja tunnusluvut). T2 = Likert 5 selitteineen. |
+| H6 | T3: `<script>alert(1)</script>` näkyy tekstinä | ⏳ | Vaihe 4 (avoin teksti). Nykyiset sisällöt: PHPUnit `testBrowserScriptsNeverUseHtmlInjectionSinks`, `testPollPromptIsNotRenderedAsHtmlOnServer`. |
+| H7 | Moderointi T3:ssa: piilotettu katoaa heti | ⏳ | Vaihe 4. |
+| H8 | Osallistuja kutsuu esittäjän rajapintaa → 401/403 | ✅ | PHPUnit `testAdminPollRoutesRequireLogin` (kaikki kysely-, sarja- ja ohjausreitit → 401), `testProtectedRoutesRequireLogin`, CSRF → 403. |
+| H9 | Sama laite vastaa 50 kertaa skriptillä | 🟡 | Yksi vastaus per laite: PHPUnit `testSameBrowserReplacesItsAnswer`. Nopeusraja 30 / 10 min / laite / kysely: `testAnswerRateLimitPerVoter`. Kiristys ja osoitekohtainen raja vaiheessa 7. |
+| H10 | Yhteyskatko ja palautus | ✅ | Selain: verkko pois → "Connection lost. Reconnecting…", verkko takaisin → tila päivittyy. Uudelleenlataus näyttää aktiivisen kysymyksen ja oman vastauksen. |
+| H11 | Suljetaan perjantaina, avataan lauantaina | ✅ | PHPUnit `testEventCanBeClosedAndReopenedWithAnswersKept`: suljettu → 410, avattu → sama koodi toimii, vastaukset tallessa. Ylläpidon istunto vanhenee yön yli (8 h), joten lauantaina kirjaudutaan uudelleen passkeylla. |
+| H12 | Sarjojen järjestyksen muutos ja ohitus kesken tapahtuman | ✅ | Selain: ohitus, palautus ja sarjan siirto muuttavat Seuraava/Edellinen-järjestystä. PHPUnit `LiveRepositoryTest`, `testAdminControlsSetsAndActiveQuestion`. Vastaukset säilyvät (ohitus ei poista mitään). |
+| H13 | Kuorma: 150 osallistujaa | ⏳ | Siirretty myöhemmäksi (Hessun päätös 27.10.). Osallistujan tilakysely tekee yhden tietokantahaun, kun mikään ei muutu. |
+| H14 | JSON-tuonti luvun 10 tiedostolla | ⏳ | Vaihe 3. |
+| H15 | Esitysnäkymä Teams-jaossa luettavissa | 🧪 | Vaihe 6 (esitysnäkymä), sitten koeajo Teamsissa. |
+
+## Vaiheiden tila
+
+| Vaihe | Sisältö | Tila |
+|---|---|---|
+| 1 | Admin-kirjautuminen: avaus passkeylla (PRF) | ✅ PR #8–#10. Safari + 1Password: odottaa Hessun testiä. |
+| 2 | Sarjat, aktiivinen kysymys, odotusnäkymä, osallistujan kieli | ✅ tämä PR |
+| 3 | JSON-tuonti ja -vienti | ⏳ |
+| 4 | T3 avoin teksti, pysyvä moderointi, T4 30 merkkiä | ⏳ |
+| 5 | Oikea vastaus, selitykset, paljastus, tulosten näyttö/piilotus | ⏳ |
+| 6 | Esitysnäkymä ja pikanäppäimet | ⏳ |
+| 7 | Nopeusrajat (myös osoitekohtainen tiiviste), julkaisujäädytys | ⏳ |
+| 8 | SHOULD: tulokset osallistujille, CSV, monistus/siirto, teemat, kirosanasuodatin, puhelinohjain, esikatselu | ⏳ |

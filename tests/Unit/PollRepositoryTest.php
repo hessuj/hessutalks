@@ -7,6 +7,7 @@ namespace HessuTalks\Tests\Unit;
 use HessuTalks\Database;
 use HessuTalks\Repository\EventRepository;
 use HessuTalks\Repository\PollRepository;
+use HessuTalks\Repository\SetRepository;
 use HessuTalks\Security\Clock;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
@@ -16,6 +17,7 @@ final class PollRepositoryTest extends TestCase
     private Database $db;
     private PollRepository $polls;
     private int $eventId;
+    private int $setId;
 
     protected function setUp(): void
     {
@@ -24,6 +26,7 @@ final class PollRepositoryTest extends TestCase
         $clock->freeze(1_800_000_000);
         $this->polls = new PollRepository($this->db, $clock, str_repeat('ab', 32));
         $this->eventId = (int) (new EventRepository($this->db, $clock))->create('Luento', null)['id'];
+        $this->setId = (int) (new SetRepository($this->db, $clock))->create($this->eventId, 'M1', 'Moduuli 1');
     }
 
     private static function voter(string $seed = 'a'): string
@@ -41,7 +44,7 @@ final class PollRepositoryTest extends TestCase
     {
         $valid = PollRepository::validate($type, 'Kysymys?', $config);
         self::assertIsArray($valid);
-        return (int) $this->polls->create($this->eventId, $type, $valid[0], $valid[1]);
+        return (int) $this->polls->create($this->eventId, $this->setId, $type, $valid[0], $valid[1]);
     }
 
     /** @return iterable<string, array{mixed, mixed, mixed, bool}> */
@@ -120,16 +123,22 @@ final class PollRepositoryTest extends TestCase
         self::assertIsString($this->polls->update($poll, 'X?', ['options' => ['A', 'B']]));
     }
 
-    public function testOnlyOpenPollsAreListedForParticipantsWithoutAnswers(): void
+    public function testPollsAreOrderedBySetAndPositionAndCanBeMoved(): void
     {
-        $draft = $this->create();
-        $open = $this->create('words', []);
-        $this->polls->setStatus($open, 'open');
-        $this->polls->answer($open, self::voter(), self::ct());
-        $list = $this->polls->openForEvent($this->eventId);
-        self::assertSame([$open], array_column($list, 'id'));
-        self::assertSame(['id', 'type', 'prompt', 'config', 'generation'], array_keys($list[0]));
-        self::assertNotSame($draft, $open);
+        $sets = new SetRepository($this->db, new Clock());
+        $a = $this->create();
+        $b = $this->create();
+        $second = (int) $sets->create($this->eventId, 'M2', 'Moduuli 2');
+        $c = (int) $this->polls->create($this->eventId, $second, 'words', 'Sana?', []);
+        self::assertSame([$a, $b, $c], array_column($this->polls->forEvent($this->eventId), 'id'));
+
+        self::assertTrue($this->polls->move($b, -1));
+        self::assertFalse($this->polls->move($b, -1), 'Ensimmäistä ei voi siirtää ylemmäs');
+        self::assertFalse($this->polls->move($c, 1), 'Viimeistä ei voi siirtää alemmas');
+        self::assertSame([$b, $a, $c], array_column($this->polls->forEvent($this->eventId), 'id'));
+
+        self::assertTrue($sets->move($second, -1));
+        self::assertSame([$c, $b, $a], array_column($this->polls->forEvent($this->eventId), 'id'), 'Sarjan siirto siirtää sen kysymykset');
     }
 
     public function testDeletingEventDeletesPollsAndAnswers(): void

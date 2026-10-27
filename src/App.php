@@ -12,10 +12,12 @@ use HessuTalks\Http\Request;
 use HessuTalks\Http\Response;
 use HessuTalks\Repository\EventRepository;
 use HessuTalks\Repository\KeyRepository;
+use HessuTalks\Repository\LiveRepository;
 use HessuTalks\Repository\NicknameRepository;
 use HessuTalks\Repository\PasskeyRepository;
 use HessuTalks\Repository\PollRepository;
 use HessuTalks\Repository\QuestionRepository;
+use HessuTalks\Repository\SetRepository;
 use HessuTalks\Security\AuditLog;
 use HessuTalks\Security\ClientId;
 use HessuTalks\Security\Clock;
@@ -50,10 +52,12 @@ final class App
 
         $nicknames = new NicknameRepository($db, $clock, $config->appSecret);
         $polls = new PollRepository($db, $clock, $config->appSecret);
+        $sets = new SetRepository($db, $clock);
+        $live = new LiveRepository($db);
         $this->participant = new ParticipantController(
-            $config, $view, $events, $questions, $nicknames, $polls, $keys, $limiter, new FormToken($config->appSecret, $clock),
+            $config, $view, $events, $questions, $nicknames, $polls, $live, $keys, $limiter, new FormToken($config->appSecret, $clock),
         );
-        $this->admin = new AdminController($config, $view, $auth, $events, $questions, $polls, $keys, $passkeys, $audit, $clientId);
+        $this->admin = new AdminController($config, $view, $auth, $events, $questions, $polls, $sets, $live, $keys, $passkeys, $audit, $clientId);
     }
 
     public function onError(\Closure $logger): void
@@ -114,8 +118,8 @@ final class App
         if ($path === '/api/questions') {
             return $req->method === 'POST' ? $this->participant->submit($req) : Response::error('Metodia ei tueta.', 405);
         }
-        if ($path === '/api/polls') {
-            return $req->method === 'GET' ? $this->participant->polls($req) : Response::error('Metodia ei tueta.', 405);
+        if ($path === '/api/live') {
+            return $req->method === 'GET' ? $this->participant->live($req) : Response::error('Metodia ei tueta.', 405);
         }
         if ($path === '/api/polls/answer') {
             return $req->method === 'POST' ? $this->participant->answerPoll($req) : Response::error('Metodia ei tueta.', 405);

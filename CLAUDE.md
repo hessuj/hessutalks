@@ -22,7 +22,8 @@ public/            index.php (front controller), .htaccess, assets/ (css, js, ve
 src/               PHP 8.4, PSR-4 HessuTalks\ – App (reititys), I18n (fi/en), Controller/, Repository/, Auth/, Security/, Http/
 templates/         PHP-templatet, escapoi aina $e():llä
 migrations/        SQL-migraatiot (ajetaan automaattisesti), numeroidaan juoksevasti (001_, 002_ …)
-tests/Unit, tests/Security   PHPUnit; tests/js  Node-testit (krypto, kyselytulokset)
+tests/Unit, tests/Security   PHPUnit; tests/js  Node-testit (krypto, kyselytulokset, PRF)
+tests/e2e          selaintestit (headless Chrome, virtuaalinen passkey), ajo scripts/e2e.sh
 bin/init.php       asetustiedoston luonti; bin/dev-router.php kehityspalvelin; bin/seed-demo.php testiluento (dev/CI)
 .zap/rules.tsv     ZAP baseline -säännöt (FAIL/WARN/IGNORE)
 ```
@@ -37,6 +38,7 @@ vendor/bin/phpunit --testdox           # aja aina ennen committia
 vendor/bin/phpstan analyse --memory-limit=1G
 node --test tests/js/*.test.mjs
 scripts/verify-vendor.sh
+scripts/e2e.sh                         # selaintestit; aja käyttöliittymämuutosten jälkeen
 ```
 Lisää jokaiselle uudelle ominaisuudelle testit, myös tietoturvatestit (`tests/Security`).
 
@@ -56,6 +58,7 @@ Lisää jokaiselle uudelle ominaisuudelle testit, myös tietoturvatestit (`tests
 - Selainkirjastot päivitetään vain `scripts/update-vendor.sh`-skriptillä (SHA-256-lukitus).
 
 ## Tulossa
-Valmiina: kysymykset ja palaute, esitysikkunat, kielivalinta fi/en, kyselyt vaihe 1 (monivalinta, sanapilvi,
-Likert, asteikko 0–10). Seuraavaksi: vastaukset osallistujille näkyviksi, kysymysten äänestys, kyselyt vaihe 2
-(visa) ja vaihe 3 (järjestys, moderoitu avoin vastaus, kyselyiden kopiointi).
+MMoIT 2026 -kurssin vaatimukset (tapahtuma 13.–14.11.2026, ei julkaisuja tapahtuman aikana).
+Tila ja hyväksymistestit: docs/hyvaksymistestit.md. Valmiina: passkey-avaus (PRF), sarjat ja aktiivinen kysymys.
+Seuraavaksi: JSON-tuonti, avoin teksti + moderointi, oikea vastaus/paljastus, esitysnäkymä + pikanäppäimet,
+nopeusrajat + julkaisujäädytys.
