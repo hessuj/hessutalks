@@ -20,7 +20,7 @@
   var KDF_OPS = 3;
   var KDF_MEM = 64 * 1024 * 1024;
   var MIN_PASSPHRASE = 12;
-  var POLL_MS = 2500;
+  var POLL_MS = 1000;   // vaatimus 8: tulokset esitysnäkymään alle 2 s:ssa (haut ovat inkrementaalisia, ?after=)
 
   var sodium = null;
   var secretKey = null;   // Uint8Array, vain muistissa
@@ -620,7 +620,7 @@
       if (sc.msg) screenPost(sc, sc.msg);
     } else if (ev.data.type === 'command' && liveCommand && COMMANDS[ev.data.cmd] === 1) {
       liveCommand(ev.data.cmd);
-    } else if (ev.data.type === 'tick' && liveRefresh && Date.now() - lastTick > 1500) {
+    } else if (ev.data.type === 'tick' && liveRefresh && Date.now() - lastTick > 800) {
       lastTick = Date.now();
       liveRefresh();
     }
@@ -1466,6 +1466,8 @@
         var first = event === null;
         event = r.event;
         r.questions.forEach(function (q) {
+          // Päällekkäiset haut (ajastin ja esitysikkunan tahdistus) voivat palauttaa saman viestin.
+          if (q.id <= lastId) return;
           items.push({ id: q.id, status: q.status, created_at: q.created_at, nickname_id: q.nickname_id, msg: decrypt(q.ciphertext) });
           if (q.id > lastId) lastId = q.id;
         });
@@ -1486,11 +1488,17 @@
     mount(headEl, panel.el, h('h2', { text: 'Kysymykset ja palaute' }), filtersEl, listEl);
     filtersEl.replaceChildren.apply(filtersEl, filterButtons());
     poll().then(function () { return panel.load(); }).then(function () { return panel.refresh(); }).then(function () {
-      liveRefresh = function () { refreshAll().catch(function () {}); };
+      // Yksi päivitys kerrallaan: hidas vastaus ei kasaa pyyntöjä jonoon.
+      var busy = false;
+      liveRefresh = function () {
+        if (busy) return;
+        busy = true;
+        refreshAll().catch(function () {}).then(function () { busy = false; });
+      };
       liveCommand = panel.command;
       pollTimer = setInterval(function () {
         if (document.hidden) return;
-        refreshAll().catch(function () {});
+        liveRefresh();
       }, POLL_MS);
     }).catch(function (e) { if (e.message !== '401') root.appendChild(notice(e.message, 'error')); });
   }

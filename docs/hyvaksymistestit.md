@@ -7,6 +7,7 @@ Merkinnät: ✅ todennettu · 🟡 osittain · ⏳ ei vielä toteutettu · 🧪 
 Todennustavat:
 - **PHPUnit**: `vendor/bin/phpunit` (CI ajaa jokaiselle PR:lle)
 - **Node**: `node --test tests/js/*.test.mjs` (CI)
+- **Kuorma**: `scripts/e2e.sh load.mjs` (paikallisesti, hallinta ja esitysikkuna oikeassa Chromessa) ja `node scripts/load-test.mjs <osallistujalinkki>` (mikä tahansa ympäristö; tuotantoon vain testiluennolle, `--production`).
 - **Selain**: `scripts/e2e.sh` (`tests/e2e/`), oikea Chrome (headless) ja virtuaalinen passkey, hallinta ja osallistuja omissa ikkunoissaan. Ajetaan paikallisesti, ei vielä CI:ssä.
 
 | # | Testi | Tila | Miten todennettu |
@@ -23,7 +24,7 @@ Todennustavat:
 | H10 | Yhteyskatko ja palautus | ✅ | Selain: verkko pois → "Connection lost. Reconnecting…", verkko takaisin → tila päivittyy. Uudelleenlataus näyttää aktiivisen kysymyksen ja oman vastauksen. |
 | H11 | Suljetaan perjantaina, avataan lauantaina | ✅ | PHPUnit `testEventCanBeClosedAndReopenedWithAnswersKept`: suljettu → 410, avattu → sama koodi toimii, vastaukset tallessa. Ylläpidon istunto vanhenee yön yli (8 h), joten lauantaina kirjaudutaan uudelleen passkeylla. |
 | H12 | Sarjojen järjestyksen muutos ja ohitus kesken tapahtuman | ✅ | Selain: ohitus, palautus ja sarjan siirto muuttavat Seuraava/Edellinen-järjestystä. PHPUnit `LiveRepositoryTest`, `testAdminControlsSetsAndActiveQuestion`. Vastaukset säilyvät (ohitus ei poista mitään). |
-| H13 | Kuorma: 150 osallistujaa | ⏳ | Siirretty myöhemmäksi (Hessun päätös 27.10.). Osallistujan tilakysely tekee yhden tietokantahaun, kun mikään ei muutu. |
+| H13 | Kuorma: 150 osallistujaa | 🟡 | Selain `load.mjs` + `scripts/load-test.mjs` (paikallisesti 28.10.): 150 osallistujaa, noin 108 pyyntöä/s, 0 virhettä, tilakysely p95 16 ms. Avattu kysymys näkyi kaikille 1,2 s:ssa. Viive vastauksesta esitysnäkymän vastausmäärään oli enintään 1 978 ms, kun hallinta päivitti 2,5 s välein; päivitysväli lyhennettiin 1 sekuntiin, minkä jälkeen viive oli enintään 677 ms (mediaani 260 ms). **Tuotanto (cPanel) mitataan erillisellä testiluennolla.** 200 osallistujan SHOULD-testi siirretty (Hessun päätös 27.10.). |
 | H14 | JSON-tuonti luvun 10 tiedostolla | ✅ | PHPUnit `SetFormatTest::testCourseFileIsImportedCompletely`, `testImportCourseFileWithDryRunFirst` ja selain `import-json.mjs`: kurssin tiedosto sellaisenaan tuottaa 9 sarjaa ja kaikki 22 kysymystä oikeassa järjestyksessä. Oikeat vastaukset ja selitykset ovat tallessa, ja M6:n Q&A tuodaan avoimena tekstinä (`fallbackType`). Vienti ja uudelleentuonti tuottavat samat kysymykset (`testExportRoundTrips`). |
 | H15 | Esitysnäkymä Teams-jaossa luettavissa | 🧪 | Selain `presenter.mjs`: 1920×1080-näkymässä kysymyksen fontti on noin 67 px (vaatimus noin 40 px), koodi, QR ja vastausmäärä aina kulmassa, iso QR (Q), vaalea teema (T). Varsinainen luettavuus Teamsin vastaanottajan näkymässä koeajossa. |
 
@@ -31,7 +32,7 @@ Todennustavat:
 
 | Vaihe | Sisältö | Tila |
 |---|---|---|
-| 1 | Admin-kirjautuminen: avaus passkeylla (PRF) | ✅ PR #8–#10. Safari + 1Password: odottaa Hessun testiä. |
+| 1 | Admin-kirjautuminen: avaus passkeylla (PRF) | ✅ PR #8–#10. Todennettu Hessun laitteella: Safari + Applen Salasanat. 1Password rajattu pois (Hessun päätös 28.10.), tunnuslause varakeinona. |
 | 2 | Sarjat, aktiivinen kysymys, odotusnäkymä, osallistujan kieli | ✅ PR #11 |
 | 3 | JSON-tuonti ja -vienti | ✅ PR #12 |
 | 4 | T3 avoin teksti, pysyvä moderointi, kirosanasuodatin, T4 30 merkkiä | ✅ PR #13 |
@@ -49,5 +50,5 @@ Todennustavat:
 | 5 Esittäjä | 5.1, 5.2, 5.4 ✅ | 5.1 teemat ✅, 5.3 puhelinohjain ✅, 5.4 CSV ✅ | |
 | 6 Sisältö | luonti ja muokkaus etukäteen ✅ | JSON ✅, monistus ja siirto ✅ | esikatselu ✅ |
 | 7 Tietoturva | 1–5, 7–9 ✅ | 6 kirosanasuodatin ✅ | |
-| 8 Suorituskyky | 443 + varayhteys ✅ (lyhyt pollaus), julkaisujäädytys ✅ | kuormitustesti ⏳ (siirretty) | |
-| 9 Hyväksymistestit | H2–H12, H14 ✅; H1, H15 koeajossa 🧪; H13 kuormitustesti ⏳ | | |
+| 8 Suorituskyky | 443 + varayhteys ✅ (lyhyt pollaus), julkaisujäädytys ✅, 150 osallistujaa ja tulokset alle 2 s 🟡 (paikallisesti ✅, tuotanto mitataan) | kuormitustesti 200 ⏳ (siirretty) | |
+| 9 Hyväksymistestit | H2–H12, H14 ✅; H1, H15 koeajossa 🧪; H13 paikallisesti ✅, tuotanto 🟡 | | |
