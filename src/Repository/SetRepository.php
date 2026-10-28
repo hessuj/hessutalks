@@ -97,6 +97,34 @@ final class SetRepository
         return null;
     }
 
+    /**
+     * Luo sarjat kysymyksineen yhdessä transaktiossa: joko kaikki tai ei mitään.
+     * @param list<array{slug: string, title: string, polls: list<array{type: string, prompt: string, config: array<string, mixed>}>}> $sets
+     * @throws \RuntimeException jos jokin luonti epäonnistuu (mitään ei tallennu)
+     */
+    public function import(int $eventId, array $sets, PollRepository $polls): void
+    {
+        $pdo = $this->db->pdo();
+        $pdo->beginTransaction();
+        try {
+            foreach ($sets as $set) {
+                $setId = $this->create($eventId, $set['slug'], $set['title']);
+                if (is_string($setId)) {
+                    throw new \RuntimeException($setId);
+                }
+                foreach ($set['polls'] as $p) {
+                    if ($polls->create($eventId, $setId, $p['type'], $p['prompt'], $p['config']) === null) {
+                        throw new \RuntimeException('Kysymysten enimmäismäärä täynnä.');
+                    }
+                }
+            }
+            $pdo->commit();
+        } catch (\Throwable $e) {
+            $pdo->rollBack();
+            throw $e instanceof \RuntimeException ? $e : new \RuntimeException('Tuonti epäonnistui.', 0, $e);
+        }
+    }
+
     /** Siirtää sarjaa yhden askeleen (-1 ylös, 1 alas). false = ei voi siirtää. */
     public function move(int $id, int $dir): bool
     {

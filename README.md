@@ -37,6 +37,29 @@ Kyselyyn vastataan ilman nimimerkkiä. Vastaukset salataan selaimessa kuten kysy
 lasketaan luennoitsijan selaimessa, joten hallinnan pitää olla auki ja avattuna. Saman selaimen uusi vastaus
 korvaa aiemman, kunnes kysely suljetaan.
 
+#### Tuonti ja vienti JSON-tiedostona
+
+*Tuo JSON* lukee sarjat tiedostosta, ja kysymykset voi pitää versionhallinnassa ja kopioida tulevia
+kursseja varten. Ennen tallennusta sovellus näyttää yhteenvedon: tuotavat sarjat, ohitettavat kysymykset ja virheet.
+Tuonti on kaikki tai ei mitään. Virhe (myös luennolla jo oleva sarjan tunniste) estää koko tuonnin.
+*Vie JSON* (koko luento) ja sarjan *Vie* lataavat saman muodon takaisin. Esimerkki: [tests/fixtures/mmoit-2026.json](tests/fixtures/mmoit-2026.json).
+
+```json
+{ "event": { "title": "…" },
+  "sets": [ { "id": "M4", "title": "M4 Case", "questions": [
+    { "type": "single", "text": "What is your FIRST action?", "options": ["A", "B"], "correct": [1], "explanations": ["…", "…"] },
+    { "type": "scale", "text": "…", "min": 1, "max": 5, "minLabel": "Strongly disagree", "maxLabel": "Strongly agree" },
+    { "type": "wordcloud", "text": "Cybersecurity in one word?", "maxWords": 3 } ] } ] }
+```
+
+| `type` | Sovelluksessa |
+|---|---|
+| `single`, `multi` | Monivalinta. `correct` = oikeiden vaihtoehtojen indeksit (0-pohjainen), `explanations` = selitys per vaihtoehto. Molemmat valinnaisia, eikä niitä näytetä osallistujille. |
+| `scale` | `min`–`max` 1–5 tai 1–7 = Likert, 0–10 = asteikko |
+| `wordcloud` | Sanapilvi, `maxWords` 1–3 |
+| `open` | Avoin teksti (tulossa, ohitetaan toistaiseksi varoituksella) |
+| `qa` | Ei käytössä; tuodaan `fallbackType`-kentän tyyppinä, jos se on annettu |
+
 **Osallistujien kieli** valitaan luennolle (luontilomake tai luennon sivu): *English*, *Suomi* tai selaimen kielen mukaan.
 Osallistuja voi silti vaihtaa kieltä FI/EN-kytkimestä.
 
@@ -196,7 +219,6 @@ Kirjastoja ei ladata CDN:stä.
 
 MMoIT 2026 -kurssin vaatimukset (13.–14.11.2026), tilanne: [docs/hyvaksymistestit.md](docs/hyvaksymistestit.md).
 
-- JSON-tuonti ja -vienti kysymyssarjoille
 - Avoin teksti (280 merkkiä) ja pysyvä moderointi, myös sanapilvelle
 - Oikea vastaus, selitykset ja paljastus; tulosten näyttö ja piilotus
 - Yksi esitysnäkymä pikanäppäimineen (QR kulmassa, vastausmäärä, Teams-luettavuus)

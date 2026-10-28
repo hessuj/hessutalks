@@ -675,8 +675,17 @@
     var setsEl = h('div.set-list');
     var formEl = h('div');
     var outEl = h('div');
-    var el = h('section.polls-admin', null,
+    var fileInput = h('input', { type: 'file', accept: 'application/json,.json', hidden: true, onchange: function () {
+      var file = fileInput.files && fileInput.files[0];
+      fileInput.value = '';
+      if (!file) return;
+      if (file.size > 60000) { outEl.replaceChildren(notice('Tiedosto on liian suuri (enintään 60 kt).', 'error')); return; }
+      file.text().then(previewImport).catch(fail);
+    } });
+    var el = h('section.polls-admin', null, fileInput,
       h('div.toolbar', null, h('h2', { text: 'Kysymyssarjat' }), h('span.spacer'),
+        h('button.btn.ghost.small', { type: 'button', text: 'Tuo JSON', title: 'Tuo sarjat JSON-tiedostosta', onclick: function () { fileInput.click(); } }),
+        h('button.btn.ghost.small', { type: 'button', text: 'Vie JSON', title: 'Lataa kaikki sarjat JSON-tiedostona', onclick: function () { exportJson(null); } }),
         h('button.btn.small', { type: 'button', text: 'Uusi sarja', onclick: function () { showSetForm(null); } })),
       controlEl, outEl, formEl, setsEl);
 
@@ -839,6 +848,15 @@
 
     // ---------------------------------------------------------------- sarjat ja kyselyt
 
+    /** Oikeat vastaukset hallinnalle (osallistujat eivät saa niitä ennen paljastusta). */
+    function correctHint(poll) {
+      var c = poll.config.correct;
+      if (!Array.isArray(c) || !c.length) return null;
+      var opts = poll.config.options || [];
+      return h('span.hint.correct', { title: c.map(function (i) { return opts[i]; }).join(' · '),
+        text: 'Oikea: ' + c.map(function (i) { return String(i + 1); }).join(', ') + (poll.config.explanations ? ' · selitykset' : '') });
+    }
+
     function pollCard(poll, i, count) {
       var view = views[poll.id] || (views[poll.id] = { el: h('div'), count: h('span'), hidden: h('div.poll-hidden'), details: null });
       var isActive = poll.id === active;
@@ -851,7 +869,8 @@
           h('span.code', { text: String(i + 1) }),
           h('span.badge.' + poll.status, { text: POLL_STATUS_LABEL[poll.status] || poll.status }),
           isActive ? h('span.badge.live', { text: 'Aktiivinen' }) : null,
-          h('span.hint', { text: TYPE_LABEL[poll.type] || poll.type })),
+          h('span.hint', { text: TYPE_LABEL[poll.type] || poll.type }),
+          correctHint(poll)),
         h('p.poll-card-prompt', { text: poll.prompt }),
         h('div.q-actions', null,
           !isActive ? h('button.btn.small', { type: 'button', text: 'Näytä', title: 'Tee aktiiviseksi', onclick: function () { liveAct({ action: 'activate', poll: poll.id }); } }) : null,
@@ -894,6 +913,7 @@
               title: set.skipped ? 'Palauta sarja Seuraava/Edellinen-järjestykseen' : 'Jätä sarja pois Seuraava/Edellinen-järjestyksestä (vastaukset säilyvät)',
               onclick: function () { setAct(set, 'skip', { skipped: !set.skipped }); } }),
             h('button.btn.ghost.small', { type: 'button', text: 'Muokkaa', onclick: function () { showSetForm(set); } }),
+            h('button.btn.ghost.small', { type: 'button', text: 'Vie', title: 'Lataa sarja JSON-tiedostona', onclick: function () { exportJson(set); } }),
             h('button.btn.small', { type: 'button', text: 'Uusi kysymys', onclick: function () { showForm(null, set); } }),
             h('button.btn.danger.small', { type: 'button', text: 'Poista', onclick: function () {
               setAct(set, 'delete', {}, 'Poistetaanko sarja ' + set.slug + ' "' + set.title + '", sen ' + inSet.length + ' kysymystä ja kaikki vastaukset pysyvästi?');
@@ -903,6 +923,64 @@
         setsEl.appendChild(section);
       });
       updateResults();
+    }
+
+    // ---------------------------------------------------------------- JSON-tuonti ja -vienti
+
+    function exportJson(set) {
+      api('GET', 'events/' + eventId + '/export' + (set ? '?set=' + set.id : '')).then(function (data) {
+        var blob = new Blob([JSON.stringify(data, null, 2) + '\n'], { type: 'application/json' });
+        var a = h('a', { href: URL.createObjectURL(blob), download: 'hessutalks-' + getEvent().code + (set ? '-' + set.slug : '') + '.json' });
+        document.body.appendChild(a); a.click(); a.remove();
+        setTimeout(function () { URL.revokeObjectURL(a.href); }, 1000);
+      }).catch(fail);
+    }
+
+    /** Näyttää tuonnin yhteenvedon (palvelin tarkistaa, ei kirjoita) ja tuo vasta vahvistuksesta. */
+    function previewImport(text) {
+      var report = function (r) {
+        return [
+          h('ul', null, (r.sets || []).map(function (s) {
+            return h('li', null, h('span.code', { text: s.slug }), ' ', s.title + ' · ' + s.questions + ' kysymystä');
+          })),
+          (r.warnings || []).length ? h('div', null, h('p', { text: 'Ohitetaan:' }),
+            h('ul.hint', null, r.warnings.map(function (w) { return h('li', { text: w }); }))) : null,
+          (r.errors || []).length ? h('div', null, h('p', null, h('strong', { text: 'Virheet (mitään ei tuoda):' })),
+            h('ul', null, r.errors.map(function (e) { return h('li', { text: e }); }))) : null
+        ];
+      };
+      var send = function (dry) {
+        return fetch(API + 'events/' + eventId + '/import', {
+          method: 'POST', credentials: 'same-origin',
+          headers: { 'X-CSRF-Token': csrf, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ json: text, dry_run: dry })
+        }).then(function (res) {
+          return res.json().catch(function () { return {}; }).then(function (data) {
+            if (res.status === 401) throw new Error('Istunto on päättynyt. Kirjaudu uudelleen.');
+            return { ok: res.ok, data: data };
+          });
+        });
+      };
+      outEl.replaceChildren(notice('Tarkistetaan tiedostoa…'));
+      send(true).then(function (r) {
+        var d = r.data;
+        if (!r.ok && !d.errors) { outEl.replaceChildren(notice(d.error || 'Tarkistus epäonnistui.', 'error')); return; }
+        var box = h('div.poll-form.import-preview', null,
+          h('h3', { text: r.ok ? 'Tuodaan ' + d.sets.length + ' sarjaa ja ' + d.questions + ' kysymystä' : 'Tiedostoa ei voi tuoda' }),
+          report(d),
+          h('p', null,
+            r.ok ? h('button.btn.small', { type: 'button', text: 'Tuo', onclick: function () {
+              send(false).then(function (res) {
+                if (!res.ok) { outEl.replaceChildren(notice(res.data.error || 'Tuonti epäonnistui.', 'error')); return; }
+                applyState(res.data);
+                outEl.replaceChildren(notice('Tuotu ' + res.data.import.sets.length + ' sarjaa ja ' + res.data.import.questions + ' kysymystä.'
+                  + (res.data.import.warnings.length ? ' Ohitettiin ' + res.data.import.warnings.length + ' kysymystä.' : ''), 'ok'));
+              }).catch(fail);
+            } }) : null, ' ',
+            h('button.btn.ghost.small', { type: 'button', text: r.ok ? 'Peruuta' : 'Sulje', onclick: function () { outEl.replaceChildren(); } })));
+        outEl.replaceChildren(box);
+        box.scrollIntoView({ block: 'nearest' });
+      }).catch(fail);
     }
 
     // ---------------------------------------------------------------- lomakkeet
@@ -967,7 +1045,16 @@
 
       function config() {
         var t = type.value;
-        if (t === 'single' || t === 'multi') return { options: inputs.options.value.split('\n').map(function (x) { return x.trim(); }).filter(Boolean) };
+        if (t === 'single' || t === 'multi') {
+          var options = inputs.options.value.split('\n').map(function (x) { return x.trim(); }).filter(Boolean);
+          var out = { options: options };
+          // Oikea vastaus ja selitykset säilyvät, kun vaihtoehtojen määrä ei muutu (muokkaus vaiheessa 5).
+          if (editing && (cfg.options || []).length === options.length) {
+            if (cfg.correct) out.correct = cfg.correct;
+            if (cfg.explanations) out.explanations = cfg.explanations;
+          }
+          return out;
+        }
         if (t === 'likert') return { points: parseInt(inputs.points.value, 10), min_label: inputs.min.value, max_label: inputs.max.value };
         if (t === 'scale') return { min_label: inputs.min.value, max_label: inputs.max.value };
         return {};
