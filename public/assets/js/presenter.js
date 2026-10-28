@@ -252,7 +252,7 @@
   // taustalla (selain hidastaa taustan ajastimia, mutta ei viestien käsittelyä).
   setInterval(function () {
     if (window.opener && !window.opener.closed) window.opener.postMessage({ type: 'tick' }, window.location.origin);
-  }, 2000);
+  }, 1000);
 
   // Jos hallintaikkuna suljetaan, tyhjennä näyttö, ettei sisältö jää näkyviin.
   var watch = setInterval(function () {

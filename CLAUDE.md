@@ -42,6 +42,8 @@ vendor/bin/phpstan analyse --memory-limit=1G
 node --test tests/js/*.test.mjs
 scripts/verify-vendor.sh
 scripts/e2e.sh                         # selaintestit; aja käyttöliittymämuutosten jälkeen
+scripts/e2e.sh load.mjs                # kuormitus: 150 osallistujaa, viive esitysnäkymään (ei oletusajossa)
+node scripts/load-test.mjs <linkki>    # osallistujasimulaatio mihin tahansa ympäristöön (tuotanto: --production, vain testiluento)
 ```
 Lisää jokaiselle uudelle ominaisuudelle testit, myös tietoturvatestit (`tests/Security`).
 
@@ -64,6 +66,6 @@ Lisää jokaiselle uudelle ominaisuudelle testit, myös tietoturvatestit (`tests
 ## Tila
 MMoIT 2026 -kurssin vaatimukset (tapahtuma 13.–14.11.2026, ei julkaisuja tapahtuman aikana, .github/deploy-freeze.txt)
 on toteutettu vaiheittain PR:inä #8–#17. Tila ja hyväksymistestit: docs/hyvaksymistestit.md.
-Jäljellä: kuormitustesti (Hessu siirsi myöhemmäksi) ja koeajo oikeilla laitteilla ja Teamsilla (H1, H13, H15).
+Jäljellä: kuormitustesti tuotannossa (paikallisesti läpi 28.10.; 200 osallistujan SHOULD siirretty) ja koeajo oikeilla laitteilla ja Teamsilla (H1, H13, H15).
 Selaintestit (scripts/e2e.sh) ajetaan aina käyttöliittymämuutosten jälkeen. Sarjojen haku testeissä otsikon mukaan
 (valikot sisältävät muiden sarjojen nimiä).
