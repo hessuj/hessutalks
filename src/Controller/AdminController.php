@@ -104,7 +104,7 @@ final class AdminController
         }
 
         // --- Kirjautuneen ylläpitäjän reitit -------------------------------
-        if (preg_match('#^events/(\d{1,10})/(questions|status|delete|lang)$#', $route, $m) === 1) {
+        if (preg_match('#^events/(\d{1,10})/(questions|status|delete|lang|qr)$#', $route, $m) === 1) {
             return $this->eventAction($req, (int) $m[1], $m[2], $in, $client);
         }
         if (preg_match('#^events/(\d{1,10})/(polls|poll-answers|sets|live|import|export)$#', $route, $m) === 1) {
@@ -318,6 +318,15 @@ final class AdminController
         if ($req->method !== 'POST') {
             return Response::error('Metodia ei tueta.', 405);
         }
+        if ($action === 'qr') {
+            if (!is_bool($in['show'] ?? null)) {
+                return Response::error('Virheellinen arvo.', 422);
+            }
+            $this->events->setShowQr($id, $in['show']);
+            // Versio kertoo muille hallintaikkunoille (esim. läppärin projektori), että tila muuttui.
+            $this->live->bump($id);
+            return Response::json(['event' => $this->eventOut((array) $this->events->find($id))]);
+        }
         if ($action === 'lang') {
             $lang = $in['lang'] ?? null;
             if ($lang !== null && !in_array($lang, ['fi', 'en'], true)) {
@@ -378,6 +387,7 @@ final class AdminController
             return Response::json([
                 'answers' => $this->polls->answersForEvent($eventId, $after),
                 'generations' => (object) $generations,
+                'version' => (int) ($event['live_version'] ?? 0),
             ]);
         }
         if ($req->method === 'GET') {
@@ -539,12 +549,16 @@ final class AdminController
     private function pollsState(array $event, int $status = 200): Response
     {
         $eventId = (int) $event['id'];
+        $fresh = $this->events->find($eventId) ?? $event;
         return Response::json([
             'sets' => array_map(static fn (array $s): array => [
                 'id' => $s['id'], 'slug' => $s['slug'], 'title' => $s['title'], 'position' => $s['position'], 'skipped' => $s['skipped'],
             ], $this->sets->forEvent($eventId)),
             'polls' => array_map(fn (array $p): array => $this->pollOut($p, $event), $this->polls->forEvent($eventId)),
             'active' => $this->live->activeId($eventId),
+            // Ohjaustila: versio muuttuu, kun toinen hallintaikkuna (esim. puhelimen ohjain) muuttaa jotain.
+            'version' => (int) ($fresh['live_version'] ?? 0),
+            'show_qr' => (int) ($fresh['show_qr'] ?? 0) === 1,
         ], $status);
     }
 

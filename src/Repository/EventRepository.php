@@ -115,6 +115,12 @@ final class EventRepository
         return $this->db->exec($sql, [$status, $id]) === 1;
     }
 
+    /** Projektorin iso QR-koodi (ohjattavissa myös puhelimen ohjaimesta). */
+    public function setShowQr(int $id, bool $show): bool
+    {
+        return $this->db->exec('UPDATE events SET show_qr = ? WHERE id = ?', [$show ? 1 : 0, $id]) === 1;
+    }
+
     public function setLang(int $id, ?string $lang): bool
     {
         if ($lang !== null && !in_array($lang, ['fi', 'en'], true)) {

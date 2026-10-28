@@ -25,7 +25,7 @@ Todennustavat:
 | H12 | Sarjojen järjestyksen muutos ja ohitus kesken tapahtuman | ✅ | Selain: ohitus, palautus ja sarjan siirto muuttavat Seuraava/Edellinen-järjestystä. PHPUnit `LiveRepositoryTest`, `testAdminControlsSetsAndActiveQuestion`. Vastaukset säilyvät (ohitus ei poista mitään). |
 | H13 | Kuorma: 150 osallistujaa | ⏳ | Siirretty myöhemmäksi (Hessun päätös 27.10.). Osallistujan tilakysely tekee yhden tietokantahaun, kun mikään ei muutu. |
 | H14 | JSON-tuonti luvun 10 tiedostolla | ✅ | PHPUnit `SetFormatTest::testCourseFileIsImportedCompletely`, `testImportCourseFileWithDryRunFirst` ja selain `import-json.mjs`: kurssin tiedosto sellaisenaan tuottaa 9 sarjaa ja kaikki 22 kysymystä oikeassa järjestyksessä. Oikeat vastaukset ja selitykset ovat tallessa, ja M6:n Q&A tuodaan avoimena tekstinä (`fallbackType`). Vienti ja uudelleentuonti tuottavat samat kysymykset (`testExportRoundTrips`). |
-| H15 | Esitysnäkymä Teams-jaossa luettavissa | 🧪 | Vaihe 6 (esitysnäkymä), sitten koeajo Teamsissa. |
+| H15 | Esitysnäkymä Teams-jaossa luettavissa | 🧪 | Selain `presenter.mjs`: 1920×1080-näkymässä kysymyksen fontti on noin 67 px (vaatimus noin 40 px), koodi, QR ja vastausmäärä aina kulmassa, iso QR (Q), vaalea teema (T). Varsinainen luettavuus Teamsin vastaanottajan näkymässä koeajossa. |
 
 ## Vaiheiden tila
 
@@ -35,7 +35,7 @@ Todennustavat:
 | 2 | Sarjat, aktiivinen kysymys, odotusnäkymä, osallistujan kieli | ✅ PR #11 |
 | 3 | JSON-tuonti ja -vienti | ✅ PR #12 |
 | 4 | T3 avoin teksti, pysyvä moderointi, kirosanasuodatin, T4 30 merkkiä | ✅ PR #13 |
-| 5 | Oikea vastaus, selitykset, paljastus, tulosten näyttö/piilotus, tulokset osallistujille (SHOULD 4.8) | ✅ tämä PR (`reveal.mjs`) |
-| 6 | Esitysnäkymä ja pikanäppäimet | ⏳ |
+| 5 | Oikea vastaus, selitykset, paljastus, tulosten näyttö/piilotus, tulokset osallistujille (SHOULD 4.8) | ✅ PR #14 (`reveal.mjs`) |
+| 6 | Esitysnäkymä, pikanäppäimet (myös esitysohjain), iso QR, teemat, puhelinohjain (SHOULD 5.3) | ✅ tämä PR (`presenter.mjs`) |
 | 7 | Nopeusrajat (myös osoitekohtainen tiiviste), julkaisujäädytys | ⏳ |
 | 8 | SHOULD: tulokset osallistujille, CSV, monistus/siirto, teemat, kirosanasuodatin, puhelinohjain, esikatselu | ⏳ |

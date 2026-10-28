@@ -186,6 +186,7 @@ final class PollSecurityTest extends AppTestCase
         yield ['POST', '/admin/api/events/1/sets'];
         yield ['POST', '/admin/api/events/1/live'];
         yield ['POST', '/admin/api/events/1/lang'];
+        yield ['POST', '/admin/api/events/1/qr'];
         yield ['POST', '/admin/api/sets/1/update'];
         yield ['POST', '/admin/api/sets/1/move'];
         yield ['POST', '/admin/api/sets/1/skip'];
@@ -313,6 +314,29 @@ final class PollSecurityTest extends AppTestCase
         $answers = $this->json($this->request('GET', '/admin/api/events/' . $this->eventId . '/poll-answers?after=0'));
         self::assertCount(1, $answers['answers'], 'Perjantain vastaukset tallessa');
         self::assertSame($friday, $answers['answers'][0]['poll_id']);
+    }
+
+    /** Puhelimen ohjain ja läppäri: iso QR ja ohjausversio, josta toinen hallintaikkuna huomaa muutokset. */
+    public function testControlVersionAndBigQrSyncAdminWindows(): void
+    {
+        $h = ['X-CSRF-Token' => $this->loginAdmin()];
+        $state = fn (): array => $this->json($this->request('GET', '/admin/api/events/' . $this->eventId . '/polls'));
+        $answersVersion = fn (): int => $this->json($this->request('GET', '/admin/api/events/' . $this->eventId . '/poll-answers?after=0'))['version'];
+        $before = $state();
+        self::assertFalse($before['show_qr']);
+        self::assertSame($before['version'], $answersVersion());
+
+        self::assertSame(422, $this->request('POST', '/admin/api/events/' . $this->eventId . '/qr', ['show' => 'yes'], $h)->status);
+        self::assertSame(200, $this->request('POST', '/admin/api/events/' . $this->eventId . '/qr', ['show' => true], $h)->status);
+        $after = $state();
+        self::assertTrue($after['show_qr']);
+        self::assertGreaterThan($before['version'], $after['version'], 'Toinen ikkuna huomaa muutoksen versiosta');
+        self::assertSame($after['version'], $answersVersion());
+        self::assertStringNotContainsString('show_qr', $this->request('GET', '/api/live?code=' . $this->code)->body, 'Ei osallistujalle');
+
+        $this->poll('draft');
+        $this->request('POST', '/admin/api/events/' . $this->eventId . '/live', ['action' => 'next'], $h);
+        self::assertGreaterThan($after['version'], $answersVersion());
     }
 
     public function testEventLanguageIsDefaultForParticipants(): void

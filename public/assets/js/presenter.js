@@ -101,6 +101,8 @@
       img.alt = 'QR-koodi';
       var count = h('p', 'poll-stage-count');
       var info = h('div', 'poll-stage-info');
+      // Liittymiskoodi ja osoite aina kulmassa (myöhässä tulevat ja Teams-osallistujat).
+      info.appendChild(h('p', 'poll-stage-code', m.code));
       info.appendChild(h('p', 'poll-stage-url', m.url.replace(/^https?:\/\//, '')));
       info.appendChild(count);
       var foot = h('div', 'poll-stage-foot');
@@ -147,10 +149,31 @@
   }
   window.addEventListener('resize', trimList);
 
+  // ---------------------------------------------------------------- iso QR-koodi (Q)
+
+  var bigQr = null;
+  function setBigQr(code, url) {
+    if (bigQr) { bigQr.remove(); bigQr = null; }
+    if (!code) return;
+    var qr = window.qrcode(0, 'M');
+    qr.addData(url);
+    qr.make();
+    var img = h('img');
+    img.src = qr.createDataURL(12, 4);
+    img.alt = 'QR-koodi';
+    bigQr = h('div', 'stage-bigqr');
+    bigQr.appendChild(h('p', 'stage-code', code));
+    bigQr.appendChild(img);
+    bigQr.appendChild(h('p', 'stage-url', url));
+    document.body.appendChild(bigQr);
+  }
+
   function onMessage(ev) {
     if (ev.origin !== window.location.origin || !window.opener || ev.source !== window.opener) return;
     var m = ev.data;
     if (!m || typeof m !== 'object') return;
+    // Iso QR-koodi kulkee jokaisen viestin mukana (tila on hallinnassa ja palvelimella).
+    if (m.type !== 'end') setBigQr(m.bigQr === true && str(m.code, 20) && str(m.url, 500) ? m.code : null, m.url);
     switch (m.type) {
       case 'qr':
         if (str(m.code, 20) && str(m.url, 500)) renderQr(m.code, m.url);
@@ -183,8 +206,33 @@
     else if (document.documentElement.requestFullscreen) document.documentElement.requestFullscreen().catch(function () {});
   }
   document.addEventListener('dblclick', toggleFullscreen);
+
+  // ---------------------------------------------------------------- teema (T)
+
+  var THEME_KEY = 'hessutalks.stage-theme';
+  function applyTheme(light) {
+    document.body.classList.toggle('light', light);
+    try { window.localStorage.setItem(THEME_KEY, light ? 'light' : 'dark'); } catch (e) { /* ei tallennusta */ }
+  }
+  try { applyTheme(window.localStorage.getItem(THEME_KEY) === 'light'); } catch (e) { /* oletus tumma */ }
+
+  // ---------------------------------------------------------------- pikanäppäimet
+  //
+  // Esitysikkunalla ei ole pääsyä rajapintaan: komento lähetetään hallintaikkunalle (avaaja), joka
+  // tekee toiminnon. Langattomat esitysohjaimet lähettävät yleensä PageUp/PageDown tai nuolinäppäimiä.
+  var KEYS = {
+    ArrowRight: 'next', PageDown: 'next', ArrowDown: 'next',
+    ArrowLeft: 'prev', PageUp: 'prev', ArrowUp: 'prev',
+    ' ': 'toggle', r: 'results', R: 'results', a: 'reveal', A: 'reveal', q: 'qr', Q: 'qr'
+  };
   document.addEventListener('keydown', function (e) {
-    if (e.key === 'f' || e.key === 'F') toggleFullscreen();
+    if (e.ctrlKey || e.metaKey || e.altKey) return;
+    if (e.key === 'f' || e.key === 'F') { toggleFullscreen(); return; }
+    if (e.key === 't' || e.key === 'T') { applyTheme(!document.body.classList.contains('light')); return; }
+    var cmd = KEYS[e.key];
+    if (!cmd || !window.opener || window.opener.closed) return;
+    e.preventDefault();
+    window.opener.postMessage({ type: 'command', cmd: cmd }, window.location.origin);
   });
   document.addEventListener('fullscreenchange', function () {
     if (hint) hint.hidden = !!document.fullscreenElement;

@@ -69,6 +69,29 @@ Tuonti on kaikki tai ei mitään. Virhe (myös luennolla jo oleva sarjan tunnist
 **Osallistujien kieli** valitaan luennolle (luontilomake tai luennon sivu): *English*, *Suomi* tai selaimen kielen mukaan.
 Osallistuja voi silti vaihtaa kieltä FI/EN-kytkimestä.
 
+### Esitysnäkymä, pikanäppäimet ja puhelinohjain
+
+*Aktiivinen projektorille* on luennon pääesitysnäkymä Teams-jakoon ja salin projektorille. Kulmassa ovat aina
+QR-koodi, liittymiskoodi ja vastausmäärä, ja kysymys on isolla fontilla (yli 40 px 1080p:llä).
+
+| Näppäin | Toiminto |
+|---|---|
+| → / PageDown | Seuraava kysymys (myös langaton esitysohjain) |
+| ← / PageUp | Edellinen kysymys |
+| Välilyönti | Avaa / sulje vastaukset |
+| R | Näytä / piilota tulokset |
+| A | Paljasta oikea vastaus |
+| Q | Iso QR-koodi koko näytölle |
+| T | Vaalea / tumma teema (esitysikkuna) |
+| F tai kaksoisklikkaus | Koko näyttö (esitysikkuna) |
+
+Näppäimet toimivat esitysikkunassa ja hallinnassa (ei lomakekentissä). Esitysikkuna ei käytä rajapintaa itse,
+vaan lähettää komennon hallintaikkunalle.
+
+**Puhelinohjain:** kirjaudu puhelimella hallintaan ja valitse *Puhelinohjain* (avausnäkymässä) tai luennon *Ohjain*.
+Isot napit ohjaavat aktiivista kysymystä kävellessä salissa. Ohjain ei pura viestejä, joten salausavainta ei tarvita.
+Projektoria ohjaava läppäri huomaa muutokset parissa sekunnissa.
+
 ### Esitys projektorilla
 
 Kun projektori on kytketty jatketuksi näytöksi (ei peilaus), luennon *…projektorille*-napit avaavat
@@ -225,7 +248,6 @@ Kirjastoja ei ladata CDN:stä.
 
 MMoIT 2026 -kurssin vaatimukset (13.–14.11.2026), tilanne: [docs/hyvaksymistestit.md](docs/hyvaksymistestit.md).
 
-- Yksi esitysnäkymä pikanäppäimineen (QR kulmassa, vastausmäärä, Teams-luettavuus)
 - Nopeusrajat osoitteen mukaan (vain tiiviste, 10 min) ja julkaisujäädytys tapahtuman ajaksi
 
 ## Lisenssi
