@@ -23,7 +23,8 @@ Katso README.md (käyttö, käyttöönotto) ja SECURITY.md (uhkamalli). Älä he
 public/            index.php (front controller), .htaccess, assets/ (css, js, vendor)
 src/               PHP 8.4, PSR-4 HessuTalks\ – App (reititys), I18n (fi/en), Controller/, Repository/, Auth/, Security/, Http/
 templates/         PHP-templatet, escapoi aina $e():llä
-migrations/        SQL-migraatiot (ajetaan automaattisesti), numeroidaan juoksevasti (001_, 002_ …)
+migrations/        SQL-migraatiot (ajetaan automaattisesti), numeroidaan juoksevasti (001_, 002_ …).
+                   Taulun uudelleenrakennus: rivi `-- hessutalks:foreign-keys-off` (ks. 005)
 tests/Unit, tests/Security   PHPUnit; tests/js  Node-testit (krypto, kyselytulokset, PRF)
 tests/e2e          selaintestit (headless Chrome, virtuaalinen passkey), ajo scripts/e2e.sh
 bin/init.php       asetustiedoston luonti; bin/dev-router.php kehityspalvelin; bin/seed-demo.php testiluento (dev/CI)
@@ -53,14 +54,16 @@ Lisää jokaiselle uudelle ominaisuudelle testit, myös tietoturvatestit (`tests
   vanhan PR:n ja avata uuden, jos ryhmään on tullut päivityksiä. Seuraa silloin uutta PR:ää.
 
 ## Julkaisu (GitHub Actions → cPanel)
+- Julkaisujäädytys tapahtuman aikana: .github/deploy-freeze.txt. Älä ehdota julkaisua jäädytysikkunassa.
 - FTPS-tunnus on rajattu kansioon `~/public_html/hessutalks/`. Sovelluskoodi menee `app/`-alikansioon (pääsy estetty).
 - Asetukset, tietokanta ja istunnot: `~/hessutalks-data/` webrootin ulkopuolella – deploy ei koske niihin.
 - Secretit `production`-ympäristössä: FTP_SERVER, FTP_USERNAME, FTP_PASSWORD. Muuttuja APP_URL.
 - Actionit on lukittu commit-SHA:han. Päivitä SHA ja versiokommentti yhdessä.
 - Selainkirjastot päivitetään vain `scripts/update-vendor.sh`-skriptillä (SHA-256-lukitus).
 
-## Tulossa
-MMoIT 2026 -kurssin vaatimukset (tapahtuma 13.–14.11.2026, ei julkaisuja tapahtuman aikana).
-Tila ja hyväksymistestit: docs/hyvaksymistestit.md. Valmiina: passkey-avaus (PRF), sarjat ja aktiivinen kysymys, JSON-tuonti/vienti (src/Import/SetFormat.php).
-Seuraavaksi: avoin teksti + moderointi (lisää myös SetFormatiin type open), oikea vastaus/paljastus, esitysnäkymä + pikanäppäimet,
-nopeusrajat + julkaisujäädytys.
+## Tila
+MMoIT 2026 -kurssin vaatimukset (tapahtuma 13.–14.11.2026, ei julkaisuja tapahtuman aikana, .github/deploy-freeze.txt)
+on toteutettu vaiheittain PR:inä #8–#17. Tila ja hyväksymistestit: docs/hyvaksymistestit.md.
+Jäljellä: kuormitustesti (Hessu siirsi myöhemmäksi) ja koeajo oikeilla laitteilla ja Teamsilla (H1, H13, H15).
+Selaintestit (scripts/e2e.sh) ajetaan aina käyttöliittymämuutosten jälkeen. Sarjojen haku testeissä otsikon mukaan
+(valikot sisältävät muiden sarjojen nimiä).

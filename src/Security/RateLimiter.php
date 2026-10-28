@@ -38,6 +38,15 @@ final class RateLimiter
         return true;
     }
 
+    /** Poistaa etuliitteen ämpärien vanhentuneet rivit heti (lyhytikäiset tiivisteet, esim. osoiterajat). */
+    public function purge(string $prefix, int $windowSeconds): void
+    {
+        $this->db->exec(
+            'DELETE FROM rate_limits WHERE substr(bucket, 1, ?) = ? AND ts <= ?',
+            [strlen($prefix), $prefix, $this->clock->now() - $windowSeconds],
+        );
+    }
+
     public function reset(string $bucket): void
     {
         $this->db->exec('DELETE FROM rate_limits WHERE bucket = ?', [$bucket]);

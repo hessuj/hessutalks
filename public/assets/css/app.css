@@ -346,3 +346,66 @@ body.presenter { padding: 0; min-height: 0; height: 100vh; overflow: hidden; }
 .poll-stage-url { font: 600 min(2.2vw, 3.2vh)/1.2 var(--sans); color: var(--accent); margin: 0; word-break: break-all; }
 .poll-stage-count { font: 600 min(2vw, 3vh)/1.2 var(--mono); margin: .5vh 0 0; }
 .set-head .code, .live-now .code, .poll-card-head .code { font: 700 .95rem var(--mono); letter-spacing: .06em; color: var(--accent); }
+
+/* ---- avoin teksti ---- */
+.res-open { list-style: none; margin: 0; padding: 0; display: grid; gap: .45rem; }
+.res-open li { display: flex; gap: .6rem; align-items: flex-start; justify-content: space-between; border-left: 4px solid var(--accent); padding: .35rem .7rem; background: rgba(0, 0, 0, .15); }
+.res-open-text { white-space: pre-wrap; overflow-wrap: anywhere; font-size: var(--res-text); }
+.res-empty { color: var(--ink-dim); margin: 0; }
+.poll-stage-results .res-open { gap: 1.2vh; align-content: start; overflow: hidden; }
+.poll-stage-results .res-open li { border-left-width: .5vw; padding: .8vh 1.2vw; }
+label.check { display: flex; gap: .5rem; align-items: center; margin: .6rem 0; }
+label.check input { width: auto; }
+.poll textarea { width: 100%; }
+.poll .counter { text-align: right; margin: .2rem 0 .6rem; }
+
+/* ---- paljastus ja tuloskooste ---- */
+.res-explanation { grid-column: 1 / -1; color: var(--ink-dim); font-size: .85em; margin: -.2rem 0 .3rem; overflow-wrap: anywhere; }
+.res-row.correct .res-label { color: var(--ok); font-weight: 700; }
+.res-row.correct .res-bar { background: var(--ok); }
+.res-row.wrong { opacity: .6; }
+.results.res-hidden .res-value, .results.res-hidden .res-track { visibility: hidden; }
+.poll-choice.correct { border-color: var(--ok); background: rgba(166, 230, 160, .14); }
+.poll-choice.correct > span:first-of-type::before { content: '✓ '; color: var(--ok); font-weight: 700; }
+.poll-choice.wrong { opacity: .7; }
+.poll-choice { flex-wrap: wrap; }
+.poll-explanation { flex-basis: 100%; font-size: .85rem; color: var(--ink-dim); padding-left: 1.8rem; }
+.poll-results-box { margin-top: 1rem; padding-top: .6rem; border-top: 1px solid var(--frame); }
+.poll-results-box .res-columns { height: 8rem; }
+.poll-results-box .res-row { grid-template-columns: minmax(5rem, 2fr) 2fr 5.5em; }
+.poll-stage-results .res-explanation { font-size: .7em; }
+
+/* ---- esitysnäkymä: Teams-jako ja salin projektori (vaatimus 5.1) ---- */
+/* Kysymys vähintään noin 40 px 1080p:llä, vastausten teksti ja luvut isoina, ei ohuita viivoja. */
+.poll-stage-prompt { font-size: max(40px, min(4vw, 6.2vh)); }
+.poll-stage-results { --res-text: max(26px, min(2.6vw, 3.8vh)); }
+.poll-stage-results .res-track, .poll-stage-results .res-col-track { background: rgba(0, 0, 0, .35); }
+.poll-stage-count { font-size: max(24px, min(2.2vw, 3.4vh)); font-weight: 700; }
+.poll-stage-code { font: 700 max(28px, min(3vw, 4.4vh))/1 var(--mono); letter-spacing: .1em; margin: 0 0 .4vh; }
+.poll-stage-foot { margin-top: auto; }
+
+/* Iso QR-koodi (Q) peittää esitysnäkymän. */
+.stage-bigqr {
+  position: fixed; inset: 0; z-index: 20; background: var(--screen); border: var(--frame-w) solid var(--frame);
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2.5vh; text-align: center;
+}
+.stage-bigqr .stage-code { font: 700 min(10vw, 13vh)/1 var(--mono); letter-spacing: .12em; margin: 0; }
+.stage-bigqr .stage-url { font: 600 min(3vw, 4vh)/1.2 var(--sans); color: var(--accent); margin: 0; word-break: break-all; }
+.stage-bigqr img { height: min(62vh, 80vw); width: auto; image-rendering: pixelated; background: #fff; padding: 14px; }
+
+/* Vaalea teema (T): suuri kontrasti myös heikossa Teams-kuvassa. */
+body.presenter.light {
+  --screen: #ffffff; --frame: #1f1a4d; --ink: #0d0b26; --ink-dim: #3b3766; --accent: #0a5d67; --ok: #1b6d10; --bad: #9b1c0c;
+  background: var(--frame);
+}
+body.presenter.light .res-track, body.presenter.light .res-col-track { background: #e3e1f0; }
+body.presenter.light .res-bar, body.presenter.light .res-col-bar { background: #0a5d67; }
+body.presenter.light .res-open li { background: #f1f0f8; }
+
+/* ---- puhelinohjain ---- */
+.remote-now { margin: .5rem 0 1rem; }
+.remote-prompt { font-size: 1.35rem; font-weight: 700; margin: .2rem 0; overflow-wrap: anywhere; }
+.remote-grid { display: grid; grid-template-columns: 1fr 1fr; gap: .6rem; }
+.remote-btn { min-height: 4.2rem; font-size: 1.1rem; width: 100%; }
+.shortcuts { font-size: .8rem; }
+.move-set { width: auto; max-width: 14rem; font-size: .85rem; padding: .2rem .4rem; }

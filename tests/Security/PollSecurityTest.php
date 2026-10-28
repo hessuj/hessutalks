@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace HessuTalks\Tests\Security;
 
+use HessuTalks\Controller\ParticipantController;
 use HessuTalks\Repository\LiveRepository;
 use HessuTalks\Repository\PollRepository;
 use HessuTalks\Repository\SetRepository;
@@ -83,7 +84,7 @@ final class PollSecurityTest extends AppTestCase
         $data = $this->json($r);
         self::assertSame($open, $data['poll']['id']);
         self::assertSame('open', $data['poll']['status']);
-        self::assertSame(['id', 'type', 'prompt', 'config', 'generation', 'status'], array_keys($data['poll']));
+        self::assertSame(['id', 'type', 'prompt', 'config', 'generation', 'status', 'results', 'reveal'], array_keys($data['poll']));
         self::assertStringNotContainsString('ciphertext', $r->body);
         self::assertStringNotContainsString('voter', $r->body);
         self::assertStringNotContainsString('answer', $r->body);
@@ -149,14 +150,43 @@ final class PollSecurityTest extends AppTestCase
         self::assertSame(405, $this->request('GET', '/api/polls/answer')->status);
     }
 
-    public function testAnswerRateLimitPerVoter(): void
+    /** H9: sama laite vastaa 50 kertaa skriptillä: yksi vastaus lasketaan, ja nopeusraja aktivoituu. */
+    public function testScriptedRepeatAnswersCountOnceAndAreRateLimited(): void
     {
         $poll = $this->poll();
-        for ($i = 0; $i < 30; $i++) {
-            self::assertSame(201, $this->answer($poll)->status);
+        $codes = [];
+        for ($i = 0; $i < 50; $i++) {
+            $codes[] = $this->answer($poll)->status;
         }
-        self::assertSame(429, $this->answer($poll)->status);
-        self::assertSame(201, $this->answer($poll, ['voter' => self::voter('toinen')])->status);
+        self::assertSame(array_fill(0, 10, 201), array_slice($codes, 0, 10), '10 / minuutti sallitaan');
+        self::assertSame(array_fill(0, 40, 429), array_slice($codes, 10), 'loput hylätään');
+        self::assertSame(1, (int) ($this->db->one('SELECT COUNT(*) AS n FROM poll_answers')['n'] ?? 0), 'Lasketaan yhtenä vastauksena');
+        self::assertSame(201, $this->answer($poll, ['voter' => self::voter('toinen')])->status, 'Toinen laite ei kärsi');
+        $this->clock->freeze($this->clock->now() + ParticipantController::VOTE_WINDOW + 1);
+        self::assertSame(201, $this->answer($poll)->status, 'Minuutin jälkeen sallitaan taas');
+    }
+
+    /** Osoitekohtainen raja (P3): hiljainen hylkäys, vain tiiviste, joka poistuu ikkunan jälkeen. */
+    public function testAddressRateLimitDropsSilentlyAndForgetsAddress(): void
+    {
+        $poll = $this->poll();
+        for ($i = 0; $i < ParticipantController::VOTE_LIMIT_PER_ADDRESS; $i++) {
+            $this->db->exec('INSERT INTO rate_limits (bucket, ts) VALUES (?, ?)', [
+                ParticipantController::ADDRESS_BUCKET . substr(hash_hmac('sha256', 'ratelimit|203.0.113.7', $this->config->appSecret), 0, 32),
+                $this->clock->now(),
+            ]);
+        }
+        $r = $this->answer($poll, ['voter' => self::voter('skripti')]);
+        self::assertSame(201, $r->status, 'Hylkäys on hiljainen: skripti näkee onnistumisen');
+        self::assertSame(0, (int) ($this->db->one('SELECT COUNT(*) AS n FROM poll_answers')['n'] ?? -1), '... mutta mitään ei tallennettu');
+        $dump = (string) json_encode($this->db->all('SELECT * FROM rate_limits'));
+        self::assertStringNotContainsString('203.0.113.7', $dump, 'IP-osoitetta ei tallenneta');
+
+        $this->clock->freeze($this->clock->now() + ParticipantController::VOTE_WINDOW + 1);
+        self::assertSame(201, $this->answer($poll, ['voter' => self::voter('ihminen')])->status);
+        self::assertSame(1, (int) ($this->db->one('SELECT COUNT(*) AS n FROM poll_answers')['n'] ?? 0));
+        $left = $this->db->one("SELECT COUNT(*) AS n FROM rate_limits WHERE bucket LIKE 'ipvote|%' AND ts < ?", [$this->clock->now()]);
+        self::assertSame(0, (int) ($left['n'] ?? -1), 'Vanhat osoitetiivisteet poistettiin heti ikkunan jälkeen');
     }
 
     public function testPollEndpointsSetNoCookies(): void
@@ -179,13 +209,20 @@ final class PollSecurityTest extends AppTestCase
         yield ['POST', '/admin/api/polls/1/reset'];
         yield ['POST', '/admin/api/polls/1/delete'];
         yield ['POST', '/admin/api/polls/1/move'];
+        yield ['POST', '/admin/api/polls/1/moderation'];
+        yield ['POST', '/admin/api/polls/1/results'];
+        yield ['POST', '/admin/api/polls/1/reveal'];
+        yield ['POST', '/admin/api/polls/1/summary'];
         yield ['POST', '/admin/api/events/1/sets'];
         yield ['POST', '/admin/api/events/1/live'];
         yield ['POST', '/admin/api/events/1/lang'];
+        yield ['POST', '/admin/api/events/1/qr'];
         yield ['POST', '/admin/api/sets/1/update'];
         yield ['POST', '/admin/api/sets/1/move'];
         yield ['POST', '/admin/api/sets/1/skip'];
         yield ['POST', '/admin/api/sets/1/delete'];
+        yield ['POST', '/admin/api/sets/1/duplicate'];
+        yield ['POST', '/admin/api/polls/1/set'];
         yield ['POST', '/admin/api/events/1/import'];
         yield ['GET', '/admin/api/events/1/export'];
     }
@@ -311,6 +348,71 @@ final class PollSecurityTest extends AppTestCase
         self::assertSame($friday, $answers['answers'][0]['poll_id']);
     }
 
+    /** Puhelimen ohjain ja läppäri: iso QR ja ohjausversio, josta toinen hallintaikkuna huomaa muutokset. */
+    public function testControlVersionAndBigQrSyncAdminWindows(): void
+    {
+        $h = ['X-CSRF-Token' => $this->loginAdmin()];
+        $state = fn (): array => $this->json($this->request('GET', '/admin/api/events/' . $this->eventId . '/polls'));
+        $answersVersion = fn (): int => $this->json($this->request('GET', '/admin/api/events/' . $this->eventId . '/poll-answers?after=0'))['version'];
+        $before = $state();
+        self::assertFalse($before['show_qr']);
+        self::assertSame($before['version'], $answersVersion());
+
+        self::assertSame(422, $this->request('POST', '/admin/api/events/' . $this->eventId . '/qr', ['show' => 'yes'], $h)->status);
+        self::assertSame(200, $this->request('POST', '/admin/api/events/' . $this->eventId . '/qr', ['show' => true], $h)->status);
+        $after = $state();
+        self::assertTrue($after['show_qr']);
+        self::assertGreaterThan($before['version'], $after['version'], 'Toinen ikkuna huomaa muutoksen versiosta');
+        self::assertSame($after['version'], $answersVersion());
+        self::assertStringNotContainsString('show_qr', $this->request('GET', '/api/live?code=' . $this->code)->body, 'Ei osallistujalle');
+
+        $this->poll('draft');
+        $this->request('POST', '/admin/api/events/' . $this->eventId . '/live', ['action' => 'next'], $h);
+        self::assertGreaterThan($after['version'], $answersVersion());
+    }
+
+    public function testDuplicateSetAndMoveQuestionBetweenSets(): void
+    {
+        $h = ['X-CSRF-Token' => $this->loginAdmin()];
+        $quiz = $this->poll('open', 'single', ['options' => ['A', 'B'], 'correct' => [1]]);
+        $this->answer($quiz);
+        $r = $this->request('POST', '/admin/api/sets/' . $this->setId . '/duplicate', [], $h);
+        self::assertSame(200, $r->status, $r->body);
+        $state = $this->json($r);
+        self::assertSame(['M1', 'M1-2'], array_column($state['sets'], 'slug'));
+        self::assertSame('Sarja M1 (kopio)', $state['sets'][1]['title']);
+        $copy = array_values(array_filter($state['polls'], static fn (array $p): bool => $p['set_id'] === $state['sets'][1]['id']))[0];
+        self::assertSame('draft', $copy['status'], 'Kopio on luonnos');
+        self::assertSame(0, $copy['answer_count'], 'Vastauksia ei kopioida');
+        self::assertSame([1], $copy['config']['correct'], 'Oikea vastaus kopioituu');
+        self::assertSame('M1-3', $this->json($this->request('POST', '/admin/api/sets/' . $this->setId . '/duplicate', [], $h))['sets'][2]['slug']);
+
+        // Siirto toiseen sarjaan säilyttää vastaukset; toisen luennon sarjaan ei voi siirtää.
+        $target = (int) $state['sets'][1]['id'];
+        $moved = $this->json($this->request('POST', '/admin/api/polls/' . $quiz . '/set', ['set_id' => $target], $h));
+        $poll = array_values(array_filter($moved['polls'], static fn (array $p): bool => $p['id'] === $quiz))[0];
+        self::assertSame($target, $poll['set_id']);
+        self::assertSame(1, $poll['answer_count']);
+        $foreign = $this->set((int) $this->createEvent('Toinen')['id'], 'X');
+        self::assertSame(404, $this->request('POST', '/admin/api/polls/' . $quiz . '/set', ['set_id' => $foreign], $h)->status);
+    }
+
+    public function testPreviewRequiresLoginAndHidesAnswerKey(): void
+    {
+        $quiz = $this->poll('draft', 'single', ['options' => ['A', 'B'], 'correct' => [1], 'explanations' => ['Ei', 'Salainen selitys']]);
+        self::assertSame(401, $this->request('GET', '/admin/esikatselu?poll=' . $quiz)->status);
+        $this->loginAdmin();
+        $r = $this->request('GET', '/admin/esikatselu?poll=' . $quiz);
+        self::assertSame(200, $r->status);
+        self::assertStringContainsString('data-preview=', $r->body);
+        self::assertStringContainsString('Kysymys?', $r->body);
+        self::assertStringNotContainsString('Salainen selitys', $r->body);
+        self::assertStringNotContainsString('correct', $r->body);
+        self::assertSame(404, $this->request('GET', '/admin/esikatselu?poll=999999')->status);
+        self::assertSame(404, $this->request('GET', '/admin/esikatselu?poll=<script>')->status);
+        self::assertStringContainsString("script-src 'self'", $r->headers['Content-Security-Policy'] ?? '');
+    }
+
     public function testEventLanguageIsDefaultForParticipants(): void
     {
         $h = ['X-CSRF-Token' => $this->loginAdmin()];
@@ -320,6 +422,96 @@ final class PollSecurityTest extends AppTestCase
         self::assertSame(200, $this->request('POST', '/admin/api/events/' . $this->eventId . '/lang', ['lang' => 'en'], $h)->status);
         self::assertStringContainsString('<html lang="en"', $this->request('GET', '/k/' . $this->code, null, $fi)->body, 'Luennon kieli voittaa selaimen kielen');
         self::assertStringContainsString('<html lang="fi"', $this->request('GET', '/k/' . $this->code . '?lang=fi', null, $fi)->body, 'Osallistujan oma valinta voittaa');
+    }
+
+    // ------------------------------------------------------------ avoin teksti ja moderointi
+
+    public function testOpenTextWithMultipleAnswersKeepsEachAnswer(): void
+    {
+        $multi = $this->poll('open', 'open', ['multiple' => true]);
+        foreach (['eka', 'toka', 'kolmas'] as $t) {
+            self::assertSame(201, $this->answer($multi, ['ciphertext' => $this->seal('{"v":1,"a":"' . $t . '"}')])->status);
+        }
+        self::assertSame(3, (int) ($this->db->one('SELECT COUNT(*) AS n FROM poll_answers WHERE poll_id = ?', [$multi])['n'] ?? 0));
+        $hashes = array_column($this->db->all('SELECT voter_hash FROM poll_answers WHERE poll_id = ?', [$multi]), 'voter_hash');
+        self::assertCount(3, array_unique($hashes), 'Useita vastauksia ei voi yhdistää samaan vastaajaan');
+
+        $single = $this->poll('open', 'open', ['multiple' => false]);
+        $this->answer($single);
+        $this->answer($single);
+        self::assertSame(1, (int) ($this->db->one('SELECT COUNT(*) AS n FROM poll_answers WHERE poll_id = ?', [$single])['n'] ?? 0), 'Uusi vastaus korvaa vanhan');
+        $live = $this->json($this->request('GET', '/api/live?code=' . $this->code));
+        self::assertSame(['multiple' => false], $live['poll']['config']);
+    }
+
+    public function testModerationIsStoredOnlyEncryptedAndClearedOnReset(): void
+    {
+        $h = ['X-CSRF-Token' => $this->loginAdmin()];
+        $poll = $this->poll('open', 'words', []);
+        $url = '/admin/api/polls/' . $poll . '/moderation';
+        self::assertSame(422, $this->request('POST', $url, ['ciphertext' => base64_encode('{"words":["kirosana"]}')], $h)->status, 'Selväkielinen hylätään');
+        self::assertSame(422, $this->request('POST', $url, ['ciphertext' => base64_encode(random_bytes(PollRepository::MODERATION_MAX_BYTES + 1))], $h)->status);
+        $sealed = $this->seal('{"v":1,"words":["kirosana"],"answers":[5]}');
+        self::assertSame(200, $this->request('POST', $url, ['ciphertext' => $sealed], $h)->status);
+
+        $state = $this->json($this->request('GET', '/admin/api/events/' . $this->eventId . '/polls'));
+        self::assertSame($sealed, $state['polls'][0]['moderation']);
+        self::assertStringNotContainsString('kirosana', (string) json_encode($this->db->all('SELECT * FROM polls')));
+        self::assertStringNotContainsString('moderation', $this->request('GET', '/api/live?code=' . $this->code)->body, 'Ei osallistujalle');
+
+        $this->request('POST', '/admin/api/polls/' . $poll . '/reset', [], $h);
+        self::assertNull($this->json($this->request('GET', '/admin/api/events/' . $this->eventId . '/polls'))['polls'][0]['moderation']);
+        self::assertSame(200, $this->request('POST', $url, ['ciphertext' => null], $h)->status, 'Tyhjennys');
+    }
+
+    // ------------------------------------------------------------ tulokset ja paljastus (vaihe 5)
+
+    public function testRevealSendsAnswerKeyOnlyAfterReveal(): void
+    {
+        $h = ['X-CSRF-Token' => $this->loginAdmin()];
+        $plain = $this->poll('open', 'single', ['options' => ['A', 'B']]);
+        self::assertSame(409, $this->request('POST', '/admin/api/polls/' . $plain . '/reveal', ['revealed' => true], $h)->status, 'Ei oikeaa vastausta');
+
+        $quiz = $this->poll('open', 'single', ['options' => ['A', 'B', 'C'], 'correct' => [1], 'explanations' => ['Ei', 'Kyllä – oikein', 'Ei']]);
+        $live = fn (): array => $this->json($this->request('GET', '/api/live?code=' . $this->code))['poll'];
+        self::assertNull($live()['reveal']);
+        self::assertStringNotContainsString('Kyllä – oikein', $this->request('GET', '/api/live?code=' . $this->code)->body);
+        self::assertSame(422, $this->request('POST', '/admin/api/polls/' . $quiz . '/reveal', ['revealed' => 1], $h)->status);
+        self::assertSame(200, $this->request('POST', '/admin/api/polls/' . $quiz . '/reveal', ['revealed' => true], $h)->status);
+        self::assertSame(['correct' => [1], 'explanations' => ['Ei', 'Kyllä – oikein', 'Ei']], $live()['reveal']);
+        self::assertSame(['options'], array_keys($live()['config']), 'config pysyy julkisena myös paljastuksen jälkeen');
+        self::assertSame(200, $this->request('POST', '/admin/api/polls/' . $quiz . '/reveal', ['revealed' => false], $h)->status);
+        self::assertNull($live()['reveal']);
+    }
+
+    public function testSummaryIsPublishedOnlyWhenResultsVisibleAndValidated(): void
+    {
+        $h = ['X-CSRF-Token' => $this->loginAdmin()];
+        $poll = $this->poll('open', 'likert', ['points' => 5]);
+        $url = '/admin/api/polls/' . $poll;
+        $ok = ['voters' => 4, 'counts' => [0, 1, 1, 2, 0], 'mean' => 3.25, 'median' => 3.5];
+        self::assertSame(409, $this->request('POST', $url . '/summary', ['summary' => $ok], $h)->status, 'Tulokset piilossa');
+        self::assertSame(200, $this->request('POST', $url . '/results', ['visible' => true], $h)->status);
+        foreach ([
+            'väärä pituus' => ['voters' => 4, 'counts' => [1, 1, 2]],
+            'negatiivinen' => ['voters' => 4, 'counts' => [0, -1, 1, 2, 0]],
+            'keskiarvo yli asteikon' => ['voters' => 4, 'counts' => [0, 1, 1, 2, 0], 'mean' => 9],
+            'teksti mukana' => ['voters' => 1, 'counts' => ['vittu', 0, 0, 0, 0]],
+            'liikaa vastaajia' => ['voters' => PollRepository::MAX_ANSWERS + 1, 'counts' => [0, 0, 0, 0, 0]],
+        ] as $name => $bad) {
+            self::assertSame(422, $this->request('POST', $url . '/summary', ['summary' => $bad], $h)->status, $name);
+        }
+        self::assertSame(200, $this->request('POST', $url . '/summary', ['summary' => $ok + ['extra' => 'x']], $h)->status);
+        $results = $this->json($this->request('GET', '/api/live?code=' . $this->code))['poll']['results'];
+        self::assertSame(['voters' => 4, 'counts' => [0, 1, 1, 2, 0], 'from' => 1, 'mean' => 3.25, 'median' => 3.5], $results, 'Vain tunnetut kentät');
+
+        self::assertSame(200, $this->request('POST', $url . '/results', ['visible' => false], $h)->status);
+        self::assertNull($this->json($this->request('GET', '/api/live?code=' . $this->code))['poll']['results'], 'Piilotus poistaa koosteen');
+
+        // Avoimille vastauksille ja sanapilvelle ei julkaista koostetta (P2).
+        $words = $this->poll('open', 'words', []);
+        $this->request('POST', '/admin/api/polls/' . $words . '/results', ['visible' => true], $h);
+        self::assertSame(422, $this->request('POST', '/admin/api/polls/' . $words . '/summary', ['summary' => ['voters' => 1, 'counts' => [1]]], $h)->status);
     }
 
     // ------------------------------------------------------------ JSON-tuonti ja -vienti (H14)
@@ -350,23 +542,23 @@ final class PollSecurityTest extends AppTestCase
         $dry = $this->request('POST', $url, ['json' => $this->courseFile(), 'dry_run' => true], $h);
         self::assertSame(200, $dry->status, $dry->body);
         $summary = $this->json($dry);
-        self::assertSame(17, $summary['questions']);
+        self::assertSame(22, $summary['questions']);
         self::assertCount(9, $summary['sets']);
-        self::assertCount(5, $summary['warnings'], 'Avoimet tekstit ohitetaan (vaihe 4)');
+        self::assertSame([], $summary['warnings'], 'Kaikki kysymykset tuodaan');
         self::assertSame($before, [$this->countRows('poll_sets'), $this->countRows('polls')], 'Esikatselu ei kirjoita mitään');
 
         $r = $this->request('POST', $url, ['json' => $this->courseFile()], $h);
         self::assertSame(201, $r->status, $r->body);
         $state = $this->json($r);
         self::assertSame(['OPEN', 'M1', 'M2', 'M3', 'M4', 'M5', 'M6', 'WRAP-FRI', 'CLOSE-SAT'], array_column($state['sets'], 'slug'));
-        self::assertSame(17, count($state['polls']));
+        self::assertSame(22, count($state['polls']));
         self::assertSame(1, (int) ($this->db->one("SELECT COUNT(*) AS n FROM audit_log WHERE action = 'sets_imported'")['n'] ?? 0));
 
         // Sama tiedosto uudelleen: sarjat ovat jo luennolla, eikä mitään tuoda.
         $again = $this->request('POST', $url, ['json' => $this->courseFile()], $h);
         self::assertSame(422, $again->status);
         self::assertStringContainsString('on jo luennolla', $again->body);
-        self::assertSame(17, $this->countRows('polls'));
+        self::assertSame(22, $this->countRows('polls'));
     }
 
     public function testImportIsAllOrNothing(): void

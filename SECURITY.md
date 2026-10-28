@@ -25,11 +25,19 @@ Ilmoita haavoittuvuuksista yksityisesti GitHubin *Security → Report a vulnerab
 | XSS viestien kautta | CSP ilman inline-skriptejä. Purettu sisältö lisätään DOMiin vain `textContent`illa. Templatet escapoidaan. |
 | Toisen nimimerkin käyttö | Varaus sidotaan satunnaiseen 256-bittiseen omistajatunnisteeseen, josta palvelimella on vain tiiviste |
 | Projektorin esitysikkuna | Esitysikkunassa ei ole salausavainta eikä salauskirjastoa. Hallintaikkuna lähettää sille vain näytettävän tekstin `postMessage`lla omaan originiinsa. Esitysikkuna hyväksyy viestit vain avaajaltaan ja samasta originista, ja se vaatii kirjautumisen. Näyttö tyhjennetään, kun hallintaikkuna suljetaan. |
+| Esitysikkunan komennot | Esitysikkunalla ei ole pääsyä rajapintaan. Pikanäppäin lähettää hallintaikkunalle `postMessage`-komennon omaan originiin. Hallinta hyväksyy vain omien esitysikkunoidensa viestit ja vain tunnetut komennot, ja tekee toiminnon tavallisena kirjautuneena pyyntönä (CSRF-token). |
+| Puhelinohjain | Vaatii kirjautumisen (passkey) kuten muukin hallinta, mutta ei salausavainta, koska se ei käsittele viestien sisältöä. |
 | Kyselyvastaukset | Vastaus salataan selaimessa (sealed box) ja sidotaan luentoon ja kyselyyn salatun sisällön sisällä. Palvelin hyväksyy vastauksen vain luennon aktiiviseen ja avoimeen kysymykseen, ja osallistuja näkee vain sen (ei luonnoksia eikä muita kysymyksiä). Luennoitsijan selain hylkää väärän muotoiset tai toiselle kyselylle salatut vastaukset. Kysymysteksti ja vaihtoehdot ovat luennoitsijan julkista sisältöä ja tallennetaan selväkielisinä. |
+| Moderointi | Piilotetut vastaukset ja sanat sekä suodattimen hyväksynnät salataan luennoitsijan julkisella avaimella (sealed box) ennen tallennusta, joten palvelin ei näe piilotettuja sanoja. Kirosanasuodatin toimii luennoitsijan selaimessa. Avoimet vastaukset näytetään vain `textContent`illa (H6). |
+| Useat avoimet vastaukset | Kun kysely sallii useita vastauksia, jokainen vastaus saa satunnaisen tiivisteen, eikä saman osallistujan vastauksia voi yhdistää tietokannasta. Rajana nopeusraja ja kyselykohtainen enimmäismäärä. |
+| Tuloskooste osallistujille (päätös P2) | Kun luennoitsija näyttää tulokset, hänen selaimensa julkaisee palvelimelle koosteen (vaihtoehtojen määrät, keskiarvo, mediaani). Tämä on tietoinen poikkeus periaatteesta, ettei palvelin näe sisältöä: kooste on sama, joka näkyy projektorilla ja Teamsissa. Vain monivalinnat ja asteikot, ei avoimia vastauksia eikä sanapilveä. Palvelin tarkistaa muodon ja rajat, ja piilotus poistaa koosteen. |
+| CSV-vienti | Vastaukset puretaan luennoitsijan selaimessa, joten palvelin ei näe tiedostoa. Ei osallistujatunnisteita. Kaavainjektion esto: osallistujan teksti, joka alkaa merkillä `=`, `+`, `-` tai `@`, saa eteensä heittomerkin, jottei Excel suorita sitä kaavana (esim. `=HYPERLINK(...)`). |
+| Esikatselu | `/admin/esikatselu` vaatii kirjautumisen ja näyttää vain julkiset kentät (ei oikeita vastauksia). Vastausta ei lähetetä. |
 | Oikeat vastaukset ennen paljastusta | Oikeat vastaukset ja selitykset ovat vain hallinnan rajapinnassa. Osallistujan rajapinta (`/api/live`) ja sivu suodattavat ne pois, joten niitä ei näe selaimen kehitystyökaluistakaan. |
 | Kyselyvastaajan tunnistaminen | Ei nimimerkkiä. Selaimen satunnaisesta tunnisteesta tallennetaan vain kyselykohtainen HMAC, joten saman selaimen vastauksia eri kyselyissä ei voi yhdistää tietokannasta. |
 | Viestin siirto toiselle luennolle | Luennon koodi on salatun viestin sisällä. Ylläpitonäkymä varoittaa ristiriidasta. |
 | Roskapostitus | Nimimerkki- ja luentokohtaiset rajat sekä luentokohtaiset enimmäismäärät |
+| Kyselyvastausten massalähetys (H9) | Enintään 10 vastausta minuutissa laitetta ja kysymystä kohden (ylitys 429). Lisäksi 600 vastausta minuutissa osoitetta kohden (P3). Osoiteraja hylkää ylimääräiset **hiljaa** (skripti näkee onnistumisen, mitään ei tallenneta), jotta skripti ei voi säätää tahtiaan. Osoitteesta tallennetaan vain avaimellinen tiiviste, ja rivit poistetaan heti minuutin ikkunan jälkeen. Raja on reilu, koska luentosali voi näkyä yhtenä osoitteena (NAT). |
 | Luentokoodien arvailu | Avaruus 31⁶ ≈ 887 milj. Epäonnistuneita hakuja rajoitetaan palvelun tasolla. |
 | Toimitusketju | Selainkirjastot vendoroitu SHA-256-lukituksella, ei CDN:ää. Actionit kiinnitetty commit-SHA:han. Dependabot, composer audit. |
 
@@ -41,14 +49,16 @@ Ilmoita haavoittuvuuksista yksityisesti GitHubin *Security → Report a vulnerab
   Riskiä pienentävät: julkaisu vain CI/CD:n kautta, FTPS-tunnuksen suojaus ja tuotannon savutesti.
 - **Tunnuslauseen menetys.** Viestejä ei voi palauttaa ilman tunnuslausetta. Tämä on tarkoituksellista.
 - **Webhotellin lokit.** Apache voi kirjata IP-osoitteita palvelinlokeihin sovelluksen ulkopuolella.
-  Lokien säilytystä voi rajoittaa cPanelin *Raw Access* -asetuksista.
+  Vaatimuksen 7.7 mukainen enintään 7 päivän säilytys asetetaan cPanelissa: *Raw Access* → poista
+  *Archive logs in your home directory* käytöstä tai rajaa arkistointi, jolloin lokit kiertävät webhotellin oletuksen mukaan.
+  Sovellus itse ei tallenna IP-osoitteita.
 - **Osallistujan oma tieto.** Jos osallistuja kirjoittaa nimimerkkiin tai viestiin henkilötietoja,
   ne tallentuvat salattuina. Lomake ohjeistaa olemaan tekemättä niin.
 - **Saman verkon käyttäjät.** Rajoitukset eivät perustu IP-osoitteisiin, joten luentosali voi olla NAT:n takana ilman haittaa.
   Tämä tarkoittaa myös, että yksittäistä häiriköijää voi rajoittaa vain nimimerkin perusteella.
 - **Kyselyjen äänten monistaminen.** Koska vastaajia ei tunnisteta, muokattu asiakasohjelma voi luoda
-  uusia satunnaisia tunnisteita ja vastata useasti. Rajoja: lomaketoken, vastaajakohtainen nopeusraja ja
-  kyselykohtainen enimmäismäärä (3000). Kyselyt sopivat mielipiteiden ja osaamisen kartoitukseen, eivät äänestyksiin,
+  uusia satunnaisia tunnisteita ja vastata useasti. Rajoja: lomaketoken, laitekohtainen nopeusraja,
+  osoitekohtainen nopeusraja ja kyselykohtainen enimmäismäärä (3000). Kyselyt sopivat mielipiteiden ja osaamisen kartoitukseen, eivät äänestyksiin,
   joiden tuloksella on seurauksia.
 
 ## Ylläpitäjän muistilista

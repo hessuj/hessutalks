@@ -21,17 +21,17 @@ const chooseFile = async () => {
 };
 
 await chooseFile();
-await admin.waitFor(admin.hasText('Tuodaan 9 sarjaa ja 17 kysymystä'), 'esikatselu');
+await admin.waitFor(admin.hasText('Tuodaan 9 sarjaa ja 22 kysymystä'), 'esikatselu');
 const preview = await admin.js(`document.querySelector('.import-preview').innerText`);
-if ((preview.match(/ohitetaan:/g) || []).length !== 5) throw new Error('Esikatselussa pitäisi olla 5 ohitettavaa:\n' + preview);
+if (preview.includes('Ohitetaan')) throw new Error('Esikatselussa ei pitäisi olla ohitettavia:\n' + preview);
 if (await admin.js(`document.querySelectorAll('section.set-card').length`) !== 0) throw new Error('Esikatselu tallensi sarjoja');
-step('Esikatselu: 9 sarjaa, 17 kysymystä, 5 avointa tekstiä ohitetaan; mitään ei vielä tallennettu');
+step('Esikatselu: 9 sarjaa, 22 kysymystä, ei ohitettavia; mitään ei vielä tallennettu');
 
 await admin.click('Tuo');
-await admin.waitFor(admin.hasText('Tuotu 9 sarjaa ja 17 kysymystä. Ohitettiin 5 kysymystä.'), 'tuonti');
+await admin.waitFor(admin.hasText('Tuotu 9 sarjaa ja 22 kysymystä.'), 'tuonti');
 const slugs = await admin.js(`[...document.querySelectorAll('section.set-card .set-head .code')].map((e) => e.textContent)`);
 if (slugs.join(',') !== 'OPEN,M1,M2,M3,M4,M5,M6,WRAP-FRI,CLOSE-SAT') throw new Error('Sarjat: ' + slugs);
-const m3 = await admin.js(`[...document.querySelectorAll('section.set-card')].find((s) => s.innerText.includes('M3 Rules of the game')).innerText`);
+const m3 = await admin.js(`[...document.querySelectorAll('section.set-card')].find((s) => s.querySelector('.set-head h3').textContent === 'M3 Rules of the game').innerText`);
 if (!m3.includes('Oikea: 1, 2, 3, 4 · selitykset')) throw new Error('M3:n oikeat vastaukset puuttuvat:\n' + m3);
 step('H14: tuonti loi sarjat oikeassa järjestyksessä; M3:n oikeat vastaukset ja selitykset tallessa');
 

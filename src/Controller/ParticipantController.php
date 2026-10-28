@@ -30,7 +30,12 @@ final class ParticipantController
     public const CLAIM_LIMIT_PER_EVENT = 300;     // nimimerkkivarauksia / luento / 10 min
     public const SUBMIT_LIMIT_PER_NICK = 20;      // viestejä / nimimerkki / 10 min
     public const EVENT_MAX_QUESTIONS = 2000;
-    public const VOTE_LIMIT_PER_VOTER = 30;       // vastauksia (myös muutoksia) / vastaaja / kysely / 10 min
+    public const VOTE_LIMIT_PER_VOTER = 10;       // vastauksia (myös muutoksia) / laite / kysely / minuutti
+    public const VOTE_WINDOW = 60;
+    // Osoitekohtainen raja (päätös P3): luentosali voi näkyä yhtenä osoitteena (NAT), joten raja on reilu.
+    // Osoitteesta tallennetaan vain avaimellinen tiiviste, ja rivit poistetaan heti ikkunan jälkeen.
+    public const VOTE_LIMIT_PER_ADDRESS = 600;    // vastauksia / osoite / minuutti
+    public const ADDRESS_BUCKET = 'ipvote|';
 
     public function __construct(
         private readonly Config $config,
@@ -97,7 +102,7 @@ final class ParticipantController
             'jsStrings' => (string) json_encode(I18n::jsStrings($lang), JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR),
             'liveEndpoint' => $this->config->url('/api/live'),
             'answerEndpoint' => $this->config->url('/api/polls/answer'),
-            'scripts' => ['vendor/sodium.js', 'js/lang.js', 'js/participant.js', 'js/polls.js'],
+            'scripts' => ['vendor/sodium.js', 'js/lang.js', 'js/participant.js', 'js/results.js', 'js/polls.js'],
         ]);
     }
 
@@ -195,11 +200,19 @@ final class ParticipantController
         if (!PollRepository::isValidVoter($in['voter'] ?? null) || !PollRepository::isValidCiphertext($in['ciphertext'] ?? null)) {
             return Response::error(I18n::t($lang, 'err.invalid_answer'), 422);
         }
+        // Osoitekohtainen raja hylkää liialliset pyynnöt hiljaa (vaatimus 7.5): skripti ei näe rajaa
+        // eikä voi säätää tahtiaan sen mukaan, eikä tuloksia voi vääristää.
+        $this->limiter->purge(self::ADDRESS_BUCKET, self::VOTE_WINDOW);
+        $address = self::ADDRESS_BUCKET . substr(hash_hmac('sha256', 'ratelimit|' . $req->clientIp, $this->config->appSecret), 0, 32);
+        if (!$this->limiter->hit($address, self::VOTE_LIMIT_PER_ADDRESS, self::VOTE_WINDOW)) {
+            return Response::json(['ok' => true], 201);
+        }
         $bucket = 'vote|' . $poll['id'] . '|' . hash('sha256', (string) $in['voter']);
-        if (!$this->limiter->hit($bucket, self::VOTE_LIMIT_PER_VOTER, self::WINDOW)) {
+        if (!$this->limiter->hit($bucket, self::VOTE_LIMIT_PER_VOTER, self::VOTE_WINDOW)) {
             return Response::error(I18n::t($lang, 'err.vote_rate'), 429);
         }
-        if (!$this->polls->answer((int) $poll['id'], (string) $in['voter'], (string) $in['ciphertext'])) {
+        $multiple = $poll['type'] === 'open' && ($poll['config']['multiple'] ?? false) === true;
+        if (!$this->polls->answer((int) $poll['id'], (string) $in['voter'], (string) $in['ciphertext'], $multiple)) {
             return Response::error(I18n::t($lang, 'err.poll_quota'), 429);
         }
         return Response::json(['ok' => true], 201);

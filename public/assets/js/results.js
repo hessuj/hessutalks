@@ -8,9 +8,42 @@
 (function (global) {
   'use strict';
 
-  var WORDS_MAX_CHARS = 40;
+  var WORDS_MAX_CHARS = 40;   // osallistujan kenttä sallii 30; vanhat vastaukset 40 merkkiin asti kelpaavat
   var WORDS_MAX_WORDS = 3;
   var CLOUD_MAX_WORDS = 60;
+  var OPEN_MAX = 280;
+
+  // ---------------------------------------------------------------- kirosanasuodatin
+  //
+  // Yksinkertainen suodatin (englanti ja suomi): osumat piilotetaan automaattisesti luennoitsijan
+  // tarkistettavaksi, ja luennoitsija voi hyväksyä ne näkyviin. Suomen taivutukset: sanan alku riittää.
+  var BAD_EXACT = ['ass', 'dick', 'cock', 'tits', 'piss', 'kyrpä', 'pillu', 'perse'];
+  var BAD_PREFIX = [
+    'fuck', 'shit', 'cunt', 'bitch', 'asshole', 'bastard', 'whore', 'slut', 'nigg', 'fag', 'retard', 'motherf', 'bullshit', 'wank', 'twat',
+    'vittu', 'vitu', 'perkele', 'saatana', 'paska', 'huora', 'kusip', 'mulkku', 'runkk', 'neeker', 'ryssä', 'hintti', 'jumalauta', 'helvet', 'kyrvä', 'pillun', 'persee', 'persr'
+  ];
+
+  /** true, jos tekstissä on kirosana. Vertailu pienillä kirjaimilla sanoittain. */
+  function isProfane(text) {
+    if (typeof text !== 'string') return false;
+    var words = text.normalize('NFC').toLocaleLowerCase('fi').split(/[^\p{L}\p{N}]+/u);
+    return words.some(function (w) {
+      if (!w) return false;
+      if (BAD_EXACT.indexOf(w) !== -1) return true;
+      return BAD_PREFIX.some(function (p) { return w.indexOf(p) === 0; });
+    });
+  }
+
+  /** Moderointitila: piilotetut ja hyväksytyt (suodattimen osumat) vastaukset ja sanat. */
+  function emptyModeration() {
+    return { words: {}, answers: {}, approved: {}, approvedWords: {} };
+  }
+  function isHiddenWord(mod, w) {
+    return !!(mod && mod.words[w]) || (isProfane(w) && !(mod && mod.approvedWords[w]));
+  }
+  function isHiddenAnswer(mod, item) {
+    return !!(mod && mod.answers[item.id]) || (isProfane(item.text) && !(mod && mod.approved[item.id]));
+  }
 
   function range(poll) {
     if (poll.type === 'scale') return [0, 10];
@@ -46,16 +79,34 @@
         if (typeof a !== 'string' || a.length > WORDS_MAX_CHARS) return null;
         var w = normalizeWords(a);
         return w && w.split(' ').length <= WORDS_MAX_WORDS ? w : null;
+      case 'open':
+        return cleanOpen(a);
     }
     return null;
   }
 
+  /** Avoin vastaus: ohjausmerkit pois (rivinvaihdot säilyvät), reunat siistitään, 1–280 merkkiä. */
+  function cleanOpen(a) {
+    if (typeof a !== 'string') return null;
+    var text = a.normalize('NFC').replace(/\r\n?/g, '\n').replace(/[\u0000-\u0009\u000B-\u001F\u007F-\u009F\u200B-\u200F\u202A-\u202E\u2066-\u2069]/g, '')
+      .replace(/\n{3,}/g, '\n\n').trim();
+    var len = Array.from(text).length;
+    return len >= 1 && len <= OPEN_MAX ? text : null;
+  }
+
   /**
    * Laskee jakauman kelvollisista vastauksista.
-   * hidden: sanapilven piilotetut sanat (luennoitsijan moderointi).
+   * mod: luennoitsijan moderointi (piilotetut sanat ja vastaukset; kirosanasuodattimen osumat piilossa,
+   * kunnes ne hyväksytään). Avoimessa tekstissä vastaukset ovat { id, text, ts }.
    */
-  function tally(poll, answers, hidden) {
+  function tally(poll, answers, mod) {
     var out = { voters: answers.length };
+    if (poll.type === 'open') {
+      var visible = answers.filter(function (it) { return !isHiddenAnswer(mod, it); });
+      out.hidden = answers.length - visible.length;
+      out.items = visible.slice().sort(function (x, y) { return (y.ts || 0) - (x.ts || 0) || y.id - x.id; });
+      return out;
+    }
     if (poll.type === 'single' || poll.type === 'multi') {
       var counts = (poll.config.options || []).map(function () { return 0; });
       answers.forEach(function (a) { [].concat(a).forEach(function (i) { counts[i]++; }); });
@@ -75,10 +126,34 @@
       }
     } else {
       var map = {};
-      answers.forEach(function (a) { if (!hidden || !hidden[a]) map[a] = (map[a] || 0) + 1; });
+      answers.forEach(function (a) { if (!isHiddenWord(mod, a)) map[a] = (map[a] || 0) + 1; });
       out.words = Object.keys(map).map(function (k) { return [k, map[k]]; })
         .sort(function (x, y) { return y[1] - x[1] || (x[0] < y[0] ? -1 : 1); });
     }
+    return out;
+  }
+
+  // ---------------------------------------------------------------- CSV-vienti
+
+  /**
+   * CSV-solu Exceliä varten. Kaavainjektion esto: osallistujan kirjoittama teksti, joka alkaa merkillä
+   * = + - @ (tai sarkain/rivinvaihto), saa eteensä heittomerkin, jottei taulukkolaskenta suorita sitä kaavana.
+   */
+  function csvCell(v) {
+    var s = v === null || v === undefined ? '' : String(v);
+    if (/^[=+\-@\t\r\n]/.test(s)) s = "'" + s;
+    return /[";\r\n]|^\s|\s$/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+  }
+
+  /** Rivit CSV-tekstiksi (erotin ;, rivinvaihto CRLF). BOM lisätään latauksessa. */
+  function csv(rows) {
+    return rows.map(function (r) { return r.map(csvCell).join(';'); }).join('\r\n') + '\r\n';
+  }
+
+  /** Projektorille ja osallistujille: ilman oikeita vastauksia ja selityksiä (paljastetaan erikseen). */
+  function publicConfig(config) {
+    var out = {};
+    Object.keys(config || {}).forEach(function (k) { if (k !== 'correct' && k !== 'explanations') out[k] = config[k]; });
     return out;
   }
 
@@ -95,8 +170,13 @@
   }
   function pct(n, total) { return total ? Math.round(100 * n / total) : 0; }
 
-  /** Vaakapalkit monivalinnoille. Rivit säilytetään, jotta leveydet animoituvat. */
-  function renderBars(el, poll, data) {
+  /**
+   * Vaakapalkit monivalinnoille. Rivit säilytetään, jotta leveydet animoituvat.
+   * opts.hidden: tulokset piilossa (vain vaihtoehdot), opts.reveal: { correct, explanations } korostaa oikeat.
+   */
+  function renderBars(el, poll, data, opts) {
+    var hidden = !!(opts && opts.hidden);
+    var reveal = opts && opts.reveal && Array.isArray(opts.reveal.correct) ? opts.reveal : null;
     var rows = el.querySelectorAll('.res-row');
     if (rows.length !== data.counts.length) {
       el.replaceChildren();
@@ -107,20 +187,30 @@
         track.appendChild(h('span', 'res-bar'));
         row.appendChild(track);
         row.appendChild(h('span', 'res-value'));
+        row.appendChild(h('span', 'res-explanation'));
         el.appendChild(row);
       });
       rows = el.querySelectorAll('.res-row');
     }
     var max = Math.max.apply(null, data.counts.concat([1]));
+    el.classList.toggle('res-hidden', hidden);
     data.counts.forEach(function (n, i) {
-      rows[i].querySelector('.res-label').textContent = poll.config.options[i];
-      rows[i].querySelector('.res-bar').style.width = (100 * n / max) + '%';
-      rows[i].querySelector('.res-value').textContent = pct(n, data.voters) + ' % (' + n + ')';
+      var correct = !!reveal && reveal.correct.indexOf(i) !== -1;
+      var expl = reveal && Array.isArray(reveal.explanations) && typeof reveal.explanations[i] === 'string' ? reveal.explanations[i] : '';
+      rows[i].classList.toggle('correct', correct);
+      rows[i].classList.toggle('wrong', !!reveal && !correct);
+      rows[i].querySelector('.res-label').textContent = (correct ? '✓ ' : '') + poll.config.options[i];
+      rows[i].querySelector('.res-bar').style.width = hidden ? '0' : (100 * n / max) + '%';
+      rows[i].querySelector('.res-value').textContent = hidden ? '' : pct(n, data.voters) + ' % (' + n + ')';
+      var ex = rows[i].querySelector('.res-explanation');
+      ex.textContent = expl;
+      ex.hidden = !expl;
     });
   }
 
   /** Pystypylväät Likertille ja asteikolle sekä keskiarvo ja mediaani. */
-  function renderColumns(el, poll, data) {
+  function renderColumns(el, poll, data, opts) {
+    var hidden = !!(opts && opts.hidden);
     var cols = el.querySelectorAll('.res-col');
     if (cols.length !== data.counts.length) {
       el.replaceChildren();
@@ -147,11 +237,12 @@
     }
     var max = Math.max.apply(null, data.counts.concat([1]));
     data.counts.forEach(function (n, i) {
-      cols[i].querySelector('.res-col-bar').style.height = (100 * n / max) + '%';
-      cols[i].querySelector('.res-col-value').textContent = n ? String(n) : '';
+      cols[i].querySelector('.res-col-bar').style.height = hidden ? '0' : (100 * n / max) + '%';
+      cols[i].querySelector('.res-col-value').textContent = n && !hidden ? String(n) : '';
     });
-    el.querySelector('.res-stats').textContent = data.mean === undefined ? '' :
-      'Keskiarvo ' + fmt(data.mean, 1) + ' · mediaani ' + fmt(data.median, data.median % 1 ? 1 : 0);
+    var stats = (opts && opts.labels) || { mean: 'Keskiarvo', median: 'mediaani' };
+    el.querySelector('.res-stats').textContent = hidden || typeof data.mean !== 'number' ? '' :
+      stats.mean + ' ' + fmt(data.mean, 1) + (typeof data.median === 'number' ? ' · ' + stats.median + ' ' + fmt(data.median, data.median % 1 ? 1 : 0) : '');
   }
 
   // ---------------------------------------------------------------- sanapilvi
@@ -237,19 +328,46 @@
   }
 
   /**
+   * Avoimet vastaukset listana, uusin ensin. opts.onAnswer(item): hallinnan Piilota-nappi.
+   * opts.max: näytettävien enimmäismäärä (projektori).
+   */
+  function renderOpen(el, poll, data, opts) {
+    var items = opts && opts.max ? data.items.slice(0, opts.max) : data.items;
+    var list = h('ol', 'res-open');
+    items.forEach(function (it) {
+      var li = h('li');
+      li.appendChild(h('span', 'res-open-text', typeof it === 'string' ? it : it.text));
+      if (opts && typeof opts.onAnswer === 'function' && typeof it === 'object') {
+        var b = h('button', 'btn ghost small', 'Piilota');
+        b.type = 'button';
+        b.addEventListener('click', function () { opts.onAnswer(it); });
+        li.appendChild(b);
+      }
+      list.appendChild(li);
+    });
+    el.replaceChildren(items.length ? list : h('p', 'res-empty', 'Ei vastauksia.'));
+  }
+
+  /**
    * Piirtää tuloksen elementtiin el. Saman kyselyn uusi piirto päivittää olemassa olevat elementit.
-   * opts.onWord(word): sanapilven sanan klikkaus (hallinnan moderointi).
+   * opts.onWord(word): sanapilven sanan klikkaus, opts.onAnswer(item): avoimen vastauksen piilotus (hallinta).
    */
   function render(el, poll, data, opts) {
     var key = poll.id + '|' + poll.type;
     if (el.dataset.key !== key) { el.replaceChildren(); el.dataset.key = key; }
     el.classList.add('results');
-    if (poll.type === 'single' || poll.type === 'multi') renderBars(el, poll, data);
-    else if (poll.type === 'likert' || poll.type === 'scale') renderColumns(el, poll, data);
+    if (poll.type === 'single' || poll.type === 'multi') renderBars(el, poll, data, opts);
+    else if (poll.type === 'likert' || poll.type === 'scale') renderColumns(el, poll, data, opts);
+    else if (opts && opts.hidden) { el.replaceChildren(h('p', 'res-empty', opts.hiddenText || 'Tulokset näytetään myöhemmin.')); el.dataset.key = ''; }
+    else if (poll.type === 'open') renderOpen(el, poll, data, opts);
     else renderCloud(el, poll, data, opts);
   }
 
-  var api = { validAnswer: validAnswer, normalizeWords: normalizeWords, tally: tally, render: render };
+  var api = {
+    validAnswer: validAnswer, normalizeWords: normalizeWords, tally: tally, render: render,
+    isProfane: isProfane, emptyModeration: emptyModeration, publicConfig: publicConfig, OPEN_MAX: OPEN_MAX,
+    isHiddenWord: isHiddenWord, isHiddenAnswer: isHiddenAnswer, csv: csv, csvCell: csvCell
+  };
   if (typeof module === 'object' && module.exports) module.exports = api;
   else global.HessuResults = api;
 })(this);

@@ -17,7 +17,7 @@ Osoite: <https://hessujarvinen.com/hessutalks/>
 ### Kyselyt ja kysymyssarjat
 
 Luento koostuu **kysymyssarjoista** (esim. moduulit `M1`, `M4`), joissa on kysymykset järjestyksessä.
-Kysymystyypit: monivalinta (yksi tai useita vastauksia), sanapilvi, Likert-asteikko (5 tai 7 kohtaa) ja asteikko 0–10.
+Kysymystyypit: monivalinta (yksi tai useita vastauksia), avoin teksti (280 merkkiä, valinnaisesti useita vastauksia), sanapilvi (1–3 sanaa, 30 merkkiä), Likert-asteikko (5 tai 7 kohtaa) ja asteikko 0–10.
 
 1. Luo luennon sivulla sarjat (*Uusi sarja*) ja niihin kysymykset (*Uusi kysymys*) valmiiksi ennen luentoa.
    Sarjoja ja kysymyksiä voi siirtää nuolilla, ja sarjan voi **ohittaa** kesken luennon. Ohitetun sarjan
@@ -29,13 +29,29 @@ Kysymystyypit: monivalinta (yksi tai useita vastauksia), sanapilvi, Likert-astei
    (*Waiting for the next question…*), kunnes avaat sen. Vain aktiivinen kysymys voi olla auki.
 3. Osallistujat käyttävät koko ajan samaa luennon QR-koodia tai linkkiä. Näkymä vaihtuu itsestään noin
    sekunnin viiveellä ilman sivun päivitystä. Yhteyskatkon jälkeen sivu yhdistää uudelleen, ja oma vastaus säilyy myös uudelleenlatauksessa.
-4. *Aktiivinen projektorille* avaa ikkunan, joka seuraa aktiivista kysymystä ja sen tuloksia (ilman aktiivista kysymystä
+4. **Tulokset ja paljastus:** tulokset ovat aluksi piilossa (projektorilla kysymys, vaihtoehdot ja vastausmäärä).
+   *Näytä tulokset* tuo ne projektorille ja tuloskoosteena myös osallistujien puhelimiin (monivalinnat ja asteikot).
+   *Paljasta oikea vastaus* korostaa oikeat vaihtoehdot ja näyttää selitykset, jos kysymykselle on määritelty oikea vastaus.
+   Oikeat vastaukset ja selitykset annetaan kysymyslomakkeella tai JSON-tiedostossa, eikä niitä lähetetä osallistujille ennen paljastusta.
+5. *Aktiivinen projektorille* avaa ikkunan, joka seuraa aktiivista kysymystä ja sen tuloksia (ilman aktiivista kysymystä
    siinä näkyy luennon QR-koodi). *Tulokset projektorille* näyttää yksittäisen kysymyksen tulokset omassa ikkunassaan.
-5. Sanapilvessä sopimattoman sanan voi piilottaa klikkaamalla sitä hallinnan tuloksissa.
+6. **Moderointi:** avoimen vastauksen voi piilottaa *Piilota*-napilla ja sanapilven sanan klikkaamalla sitä. Piilotus katoaa projektorilta heti.
+   Kirosanasuodatin (englanti ja suomi) piilottaa osumat automaattisesti, ja ne odottavat hyväksyntää (⚠ … ✓).
+   Piilotukset tallennetaan palvelimelle salattuina luennoitsijan avaimella, joten ne säilyvät uudelleenlatauksen yli.
 
 Kyselyyn vastataan ilman nimimerkkiä. Vastaukset salataan selaimessa kuten kysymyksetkin, ja tulokset
 lasketaan luennoitsijan selaimessa, joten hallinnan pitää olla auki ja avattuna. Saman selaimen uusi vastaus
 korvaa aiemman, kunnes kysely suljetaan.
+
+#### Esikatselu, monistus, siirto ja CSV
+
+- **Esikatsele** avaa kysymyksen osallistujan ulkoasussa (puhelimen kokoinen ikkuna, vastausta ei lähetetä) ja
+  **Esikatsele projektorilla** esitysnäkymässä ennen avaamista.
+- **Monista** kopioi sarjan kysymyksineen ilman vastauksia (tunniste saa jatkeen `-2`). Kysymyksen voi siirtää toiseen sarjaan
+  valikosta *Siirrä sarjaan…*. Vastaukset säilyvät.
+- **Vie CSV** (koko luento) ja sarjan **CSV**: kysymys, vaihtoehto tai teksti, vastausmäärä ja aikaleima, ei osallistujatunnisteita.
+  Vastaukset puretaan selaimessasi, joten palvelin ei näe tiedoston sisältöä. Erotin `;` ja UTF-8-BOM, jolloin Excel avaa tiedoston suoraan.
+  Kaavana alkavat tekstit (`=`, `+`, `-`, `@`) saavat eteensä heittomerkin (CSV-injektion esto).
 
 #### Tuonti ja vienti JSON-tiedostona
 
@@ -57,11 +73,34 @@ Tuonti on kaikki tai ei mitään. Virhe (myös luennolla jo oleva sarjan tunnist
 | `single`, `multi` | Monivalinta. `correct` = oikeiden vaihtoehtojen indeksit (0-pohjainen), `explanations` = selitys per vaihtoehto. Molemmat valinnaisia, eikä niitä näytetä osallistujille. |
 | `scale` | `min`–`max` 1–5 tai 1–7 = Likert, 0–10 = asteikko |
 | `wordcloud` | Sanapilvi, `maxWords` 1–3 |
-| `open` | Avoin teksti (tulossa, ohitetaan toistaiseksi varoituksella) |
+| `open` | Avoin teksti, `multipleAnswers` = useita vastauksia |
 | `qa` | Ei käytössä; tuodaan `fallbackType`-kentän tyyppinä, jos se on annettu |
 
 **Osallistujien kieli** valitaan luennolle (luontilomake tai luennon sivu): *English*, *Suomi* tai selaimen kielen mukaan.
 Osallistuja voi silti vaihtaa kieltä FI/EN-kytkimestä.
+
+### Esitysnäkymä, pikanäppäimet ja puhelinohjain
+
+*Aktiivinen projektorille* on luennon pääesitysnäkymä Teams-jakoon ja salin projektorille. Kulmassa ovat aina
+QR-koodi, liittymiskoodi ja vastausmäärä, ja kysymys on isolla fontilla (yli 40 px 1080p:llä).
+
+| Näppäin | Toiminto |
+|---|---|
+| → / PageDown | Seuraava kysymys (myös langaton esitysohjain) |
+| ← / PageUp | Edellinen kysymys |
+| Välilyönti | Avaa / sulje vastaukset |
+| R | Näytä / piilota tulokset |
+| A | Paljasta oikea vastaus |
+| Q | Iso QR-koodi koko näytölle |
+| T | Vaalea / tumma teema (esitysikkuna) |
+| F tai kaksoisklikkaus | Koko näyttö (esitysikkuna) |
+
+Näppäimet toimivat esitysikkunassa ja hallinnassa (ei lomakekentissä). Esitysikkuna ei käytä rajapintaa itse,
+vaan lähettää komennon hallintaikkunalle.
+
+**Puhelinohjain:** kirjaudu puhelimella hallintaan ja valitse *Puhelinohjain* (avausnäkymässä) tai luennon *Ohjain*.
+Isot napit ohjaavat aktiivista kysymystä kävellessä salissa. Ohjain ei pura viestejä, joten salausavainta ei tarvita.
+Projektoria ohjaava läppäri huomaa muutokset parissa sekunnissa.
 
 ### Esitys projektorilla
 
@@ -121,6 +160,10 @@ Jokainen push ja pull request ajaa:
 - **Kryptotestit**: selaimen ja ylläpidon salausformaatin yhteentoimivuus
 
 Kun kaikki menevät läpi `main`-haarassa, sovellus julkaistaan FTPS:llä webhotelliin ja tuotanto savutestataan.
+
+**Julkaisujäädytys:** tiedoston `.github/deploy-freeze.txt` aikaikkunoina (Suomen aikaa) deploy-job pysähtyy, eikä
+tuotantoon julkaista. Tämä koskee esimerkiksi luentoa pe 13.11. 14:00–20:30 ja la 14.11. 08:30–15:30. Hätätapauksessa
+*Actions → CI/CD → Run workflow* ja valinta *Ohita julkaisujäädytys*. Tiedoston muoto tarkistetaan PHPUnitissa jokaisessa PR:ssä.
 
 ZAP-säännöt ovat tiedostossa `.zap/rules.tsv`: FAIL kaataa CI:n, WARN raportoidaan ja IGNORE ohitetaan perustellusti.
 
@@ -215,14 +258,11 @@ hallinnan ja osallistujan rinnakkain omissa ikkunoissaan ja todentavat hyväksym
 Ne haetaan suoraan lähderepoista komennolla `scripts/update-vendor.sh`, ja niiden SHA-256-summat lukitaan tiedostoon `VENDOR.lock`.
 Kirjastoja ei ladata CDN:stä.
 
-## Tulossa
+## Tila
 
-MMoIT 2026 -kurssin vaatimukset (13.–14.11.2026), tilanne: [docs/hyvaksymistestit.md](docs/hyvaksymistestit.md).
-
-- Avoin teksti (280 merkkiä) ja pysyvä moderointi, myös sanapilvelle
-- Oikea vastaus, selitykset ja paljastus; tulosten näyttö ja piilotus
-- Yksi esitysnäkymä pikanäppäimineen (QR kulmassa, vastausmäärä, Teams-luettavuus)
-- Nopeusrajat osoitteen mukaan (vain tiiviste, 10 min) ja julkaisujäädytys tapahtuman ajaksi
+MMoIT 2026 -kurssin vaatimukset (13.–14.11.2026) on toteutettu, kuormitustestiä lukuun ottamatta.
+Hyväksymistestit ja niiden todennus: [docs/hyvaksymistestit.md](docs/hyvaksymistestit.md).
+Tulossa: kuormitustesti 150–200 osallistujalla. Kysymysten tykkäykset (Q&A, COULD) on jätetty pois.
 
 ## Lisenssi
 

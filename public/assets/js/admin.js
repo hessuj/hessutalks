@@ -370,6 +370,8 @@
     mount(h('h1', { text: 'Avaa kysymykset' }),
       h('p', null, 'Avaimen sormenjälki ', h('span.fingerprint', { text: state.keys.fingerprint })),
       pendingPrf ? null : h('p', null, prfBtn),
+      state.events && state.events.length ? h('p', null, h('button.btn.ghost.small', { type: 'button', text: 'Puhelinohjain',
+        title: 'Ohjaa aktiivista kysymystä avaamatta salausavainta', onclick: showRemotePicker })) : null,
       h('form', { onsubmit: function (ev) {
         ev.preventDefault();
         out.replaceChildren(notice('Avataan…'));
@@ -494,6 +496,26 @@
   var screens = {};           // avain -> { win, msg, live, fitTo }
   var presenterNote = h('span.hint');
   var liveRefresh = null;     // nykyisen luentonäkymän päivitysfunktio (tick kutsuu)
+  var liveCommand = null;     // nykyisen luentonäkymän ohjausfunktio (pikanäppäimet ja esitysikkunan komennot)
+
+  // Pikanäppäimet (hallinta ja esitysikkuna). Esitysohjaimet lähettävät yleensä PageUp/PageDown.
+  var COMMAND_KEYS = {
+    ArrowRight: 'next', PageDown: 'next', ArrowLeft: 'prev', PageUp: 'prev',
+    ' ': 'toggle', r: 'results', R: 'results', a: 'reveal', A: 'reveal', q: 'qr', Q: 'qr'
+  };
+  var COMMANDS = { next: 1, prev: 1, toggle: 1, results: 1, reveal: 1, qr: 1 };
+  document.addEventListener('keydown', function (e) {
+    if (!liveCommand || e.ctrlKey || e.metaKey || e.altKey || e.repeat) return;
+    var t = e.target;
+    // Lomakkeissa näppäimet toimivat normaalisti. Ohjauspalkin napeissa pikanäppäin voittaa: muuten
+    // hiirellä painettu (fokukseen jäänyt) Seuraava-nappi painuisi välilyönnistä uudelleen.
+    var inControl = t && t.closest && t.closest('.live-control');
+    if (t && !inControl && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT|BUTTON|A|SUMMARY)$/.test(t.tagName))) return;
+    var cmd = COMMAND_KEYS[e.key];
+    if (!cmd) return;
+    e.preventDefault();
+    liveCommand(cmd);
+  });
   var lastTick = 0;
 
   function screenOpen(sc) { return !!sc && !!sc.win && !sc.win.closed; }
@@ -596,6 +618,8 @@
     if (ev.data.type === 'ready') {
       fitScreen(sc);
       if (sc.msg) screenPost(sc, sc.msg);
+    } else if (ev.data.type === 'command' && liveCommand && COMMANDS[ev.data.cmd] === 1) {
+      liveCommand(ev.data.cmd);
     } else if (ev.data.type === 'tick' && liveRefresh && Date.now() - lastTick > 1500) {
       lastTick = Date.now();
       liveRefresh();
@@ -621,7 +645,7 @@
 
   // ================================================================ kyselyt (luennon näkymässä)
 
-  var TYPE_LABEL = { single: 'Monivalinta, yksi vastaus', multi: 'Monivalinta, useita vastauksia', words: 'Sanapilvi', likert: 'Likert-asteikko', scale: 'Asteikko 0–10' };
+  var TYPE_LABEL = { single: 'Monivalinta, yksi vastaus', multi: 'Monivalinta, useita vastauksia', open: 'Avoin teksti', words: 'Sanapilvi', likert: 'Likert-asteikko', scale: 'Asteikko 0–10' };
   var POLL_STATUS_LABEL = { draft: 'Luonnos', open: 'Auki', closed: 'Suljettu' };
   var LABEL_DEFAULTS = {
     likert: ['Täysin eri mieltä', 'Täysin samaa mieltä'],
@@ -664,12 +688,15 @@
     var sets = [];
     var polls = [];
     var active = null;      // aktiivisen kysymyksen id tai null (odotusnäkymä)
+    var showQr = false;     // projektorin iso QR-koodi
+    var version = null;     // ohjaustilan versio: muuttuu, kun toinen hallintaikkuna (esim. puhelin) ohjaa
     var answers = {};       // kyselyn id -> { vastaaja: vastaus }
     var invalid = {};       // kyselyn id -> hylättyjen vastausten määrä
     var generations = {};   // kyselyn id -> sukupolvi (kasvaa, kun vastaukset tyhjennetään)
-    var hidden = {};        // kyselyn id -> { sana: true } (sanapilven moderointi, vain muistissa)
+    var mods = {};          // kyselyn id -> moderointi (piilotetut/hyväksytyt), tallennetaan salattuna palvelimelle
     var expanded = {};      // kyselyn id -> tulokset auki
     var lastAnswerId = 0;
+    var lastTs = {};        // kyselyn id -> viimeisimmän vastauksen aikaleima (CSV)
     var views = {};         // kyselyn id -> tuloselementti (säilyy, jotta kaaviot animoituvat)
     var controlEl = h('div.live-control');
     var setsEl = h('div.set-list');
@@ -686,6 +713,7 @@
       h('div.toolbar', null, h('h2', { text: 'Kysymyssarjat' }), h('span.spacer'),
         h('button.btn.ghost.small', { type: 'button', text: 'Tuo JSON', title: 'Tuo sarjat JSON-tiedostosta', onclick: function () { fileInput.click(); } }),
         h('button.btn.ghost.small', { type: 'button', text: 'Vie JSON', title: 'Lataa kaikki sarjat JSON-tiedostona', onclick: function () { exportJson(null); } }),
+        h('button.btn.ghost.small', { type: 'button', text: 'Vie CSV', title: 'Tulokset taulukkona (puretaan tässä selaimessa)', onclick: function () { exportCsv(null); } }),
         h('button.btn.small', { type: 'button', text: 'Uusi sarja', onclick: function () { showSetForm(null); } })),
       controlEl, outEl, formEl, setsEl);
 
@@ -701,9 +729,42 @@
 
     function applyState(r) {
       sets = r.sets; polls = r.polls; active = r.active;
+      if (typeof r.version === 'number') version = r.version;
+      if (typeof r.show_qr === 'boolean') showQr = r.show_qr;
+      polls.forEach(function (p) { mods[p.id] = readModeration(p.moderation); });
       outEl.replaceChildren();
       renderAll();
     }
+
+    // ---------------------------------------------------------------- moderointi
+    // Piilotukset salataan omalla julkisella avaimella (sealed box): palvelin ei näe piilotettuja sanoja.
+
+    function toSet(list, numeric) {
+      var out = {};
+      (Array.isArray(list) ? list : []).forEach(function (v) {
+        if (numeric ? Number.isInteger(v) : typeof v === 'string' && v.length <= 100) out[v] = true;
+      });
+      return out;
+    }
+    function readModeration(ct) {
+      var m = ct ? decrypt(ct) : null;
+      var mod = HessuResults.emptyModeration();
+      if (!m || m.v !== 1) return mod;
+      mod.words = toSet(m.words); mod.answers = toSet(m.answers, true);
+      mod.approved = toSet(m.approved, true); mod.approvedWords = toSet(m.approvedWords);
+      return mod;
+    }
+    function keys(o, numeric) { return Object.keys(o).map(function (k) { return numeric ? parseInt(k, 10) : k; }); }
+    function saveModeration(poll) {
+      var m = mods[poll.id];
+      var empty = !Object.keys(m.words).length && !Object.keys(m.answers).length && !Object.keys(m.approved).length && !Object.keys(m.approvedWords).length;
+      var ct = empty ? null : b64(sodium.crypto_box_seal(sodium.from_string(JSON.stringify({
+        v: 1, words: keys(m.words), answers: keys(m.answers, true), approved: keys(m.approved, true), approvedWords: keys(m.approvedWords)
+      })), publicKey));
+      updateResults();
+      api('POST', 'polls/' + poll.id + '/moderation', { ciphertext: ct }).catch(fail);
+    }
+    function modFor(poll) { return mods[poll.id] || (mods[poll.id] = HessuResults.emptyModeration()); }
     function load() {
       return api('GET', 'events/' + eventId + '/polls').then(applyState);
     }
@@ -713,27 +774,76 @@
 
     function tallyFor(poll) {
       var map = answers[poll.id] || {};
-      return HessuResults.tally(poll, Object.keys(map).map(function (k) { return map[k]; }), hidden[poll.id]);
+      return HessuResults.tally(poll, Object.keys(map).map(function (k) { return map[k]; }), modFor(poll));
     }
 
     function pollMessage(pid) {
       var poll = findPoll(pid);
       if (!poll) return { type: 'blank' };
+      var data = tallyFor(poll);
+      // Projektorille vain näkyvien avoimien vastausten tekstit (uusimmat), ei tunnisteita.
+      if (poll.type === 'open') data = { voters: data.voters, items: data.items.slice(0, 30).map(function (it) { return it.text; }) };
       return {
         type: 'poll', code: getEvent().code, url: poll.url, status: poll.status,
-        poll: { id: poll.id, type: poll.type, prompt: poll.prompt, config: poll.config },
-        data: tallyFor(poll)
+        poll: { id: poll.id, type: poll.type, prompt: poll.prompt, config: HessuResults.publicConfig(poll.config) },
+        data: data, results: poll.results_visible, reveal: revealFor(poll), bigQr: showQr
       };
     }
+    function revealFor(poll) {
+      return poll.revealed && Array.isArray(poll.config.correct)
+        ? { correct: poll.config.correct, explanations: poll.config.explanations || null } : null;
+    }
+
+    // Tuloskooste osallistujille (P2): vain kun tulokset ovat näkyvissä, vain määrät ja tunnusluvut.
+    // Lähetetään, kun luvut muuttuvat, enintään parin sekunnin välein.
+    var SUMMARY_TYPES = { single: 1, multi: 1, likert: 1, scale: 1 };
+    var published = {};      // kyselyn id -> { key, at }
+    var summaryTimer = null;
+    function publishSummaries() {
+      polls.forEach(function (poll) {
+        if (!poll.results_visible || !SUMMARY_TYPES[poll.type]) { delete published[poll.id]; return; }
+        var d = tallyFor(poll);
+        var summary = { voters: d.voters, counts: d.counts };
+        if (typeof d.mean === 'number') { summary.mean = Math.round(d.mean * 100) / 100; summary.median = d.median; }
+        var key = JSON.stringify(summary);
+        var prev = published[poll.id];
+        if (prev && prev.key === key) return;
+        if (prev && Date.now() - prev.at < 2000) {
+          if (!summaryTimer) summaryTimer = setTimeout(function () { summaryTimer = null; publishSummaries(); }, 2100);
+          return;
+        }
+        published[poll.id] = { key: key, at: Date.now() };
+        api('POST', 'polls/' + poll.id + '/summary', { summary: summary }).catch(function () { delete published[poll.id]; });
+      });
+    }
+
     /** Projektorin "aktiivinen kysymys" -ikkuna: aktiivinen kysymys tai luennon QR-koodi. */
     function liveMessage() {
       var ev = getEvent();
       return active ? pollMessage(active) : { type: 'qr', code: ev.code, url: ev.url };
     }
 
+    /** Ohjauskomento pikanäppäimestä, esitysikkunasta tai napista. */
+    function command(cmd) {
+      var poll = findPoll(active);
+      switch (cmd) {
+        case 'next': return liveAct({ action: 'next' });
+        case 'prev': return liveAct({ action: 'prev' });
+        case 'toggle': if (poll) act(poll, 'status', { status: poll.status === 'open' ? 'closed' : 'open' }); return;
+        case 'results': if (poll) act(poll, 'results', { visible: !poll.results_visible }); return;
+        case 'reveal': if (poll && Array.isArray(poll.config.correct)) act(poll, 'reveal', { revealed: !poll.revealed }); return;
+        case 'qr':
+          api('POST', 'events/' + eventId + '/qr', { show: !showQr }).then(load).catch(fail);
+      }
+    }
+
     /** Hakee uudet salatut vastaukset, purkaa ja tarkistaa ne. */
     function refreshAnswers() {
       return api('GET', 'events/' + eventId + '/poll-answers?after=' + lastAnswerId).then(function (r) {
+        // Toinen hallintaikkuna (puhelimen ohjain) muutti tilaa: ladataan kysymykset ja ohjaustila.
+        if (typeof r.version === 'number' && version !== null && r.version !== version) {
+          return load().then(function () { return refreshAnswers(); });
+        }
         var changed = false;
         var gens = r.generations || {};
         Object.keys(gens).forEach(function (pid) {
@@ -745,17 +855,78 @@
         var code = getEvent().code;
         r.answers.forEach(function (a) {
           if (a.id > lastAnswerId) lastAnswerId = a.id;
+          if (!lastTs[a.poll_id] || a.ts > lastTs[a.poll_id]) lastTs[a.poll_id] = a.ts;
           var poll = findPoll(a.poll_id);
           var m = decrypt(a.ciphertext);
           // Vastaus hyväksytään vain, jos se on salattu juuri tälle luennolle ja kyselylle.
           var value = m && m.e === code && m.p === a.poll_id ? HessuResults.validAnswer(poll, m.a) : null;
           var map = answers[a.poll_id] || (answers[a.poll_id] = {});
           if (value === null) { invalid[a.poll_id] = (invalid[a.poll_id] || 0) + 1; delete map[a.voter]; }
-          else map[a.voter] = value;
+          else map[a.voter] = poll.type === 'open' ? { id: a.id, text: value, ts: a.ts } : value;
           changed = true;
         });
         if (changed) updateResults();
+        return r.answers.length;
       });
+    }
+
+    // ---------------------------------------------------------------- CSV-vienti (vaatimus 5.4)
+    // Vastaukset puretaan tässä selaimessa: palvelin ei näe CSV:n sisältöä. Ei osallistujatunnisteita.
+
+    function loadAllAnswers() {
+      return refreshAnswers().then(function (n) { return n >= 2000 ? loadAllAnswers() : null; });
+    }
+    function iso(ts) { return ts ? new Date(ts * 1000).toISOString() : ''; }
+
+    function csvRows(onlySet) {
+      var rows = [['Sarja', 'Sarjan nimi', 'Nro', 'Kysymys', 'Tyyppi', 'Vaihtoehto tai vastaus', 'Määrä', 'Aikaleima (UTC)', 'Piilotettu']];
+      sets.forEach(function (set) {
+        if (onlySet && set.id !== onlySet.id) return;
+        polls.filter(function (p) { return p.set_id === set.id; }).forEach(function (poll, i) {
+          var map = answers[poll.id] || {};
+          var values = Object.keys(map).map(function (k) { return map[k]; });
+          var mod = modFor(poll);
+          var row = function (label, count, ts, hidden) {
+            rows.push([set.slug, set.title, i + 1, poll.prompt, TYPE_LABEL[poll.type] || poll.type, label, count, iso(ts), hidden ? 'kyllä' : '']);
+          };
+          var d = HessuResults.tally(poll, values, mod);
+          if (poll.type === 'single' || poll.type === 'multi') {
+            poll.config.options.forEach(function (opt, j) { row(opt, d.counts[j], lastTs[poll.id]); });
+          } else if (poll.type === 'likert' || poll.type === 'scale') {
+            d.counts.forEach(function (n, j) { row(String(d.from + j), n, lastTs[poll.id]); });
+          } else if (poll.type === 'words') {
+            var counts = {};
+            values.forEach(function (w) { counts[w] = (counts[w] || 0) + 1; });
+            Object.keys(counts).sort(function (x, y) { return counts[y] - counts[x] || (x < y ? -1 : 1); })
+              .forEach(function (w) { row(w, counts[w], lastTs[poll.id], HessuResults.isHiddenWord(mod, w)); });
+          } else {
+            values.slice().sort(function (x, y) { return x.ts - y.ts || x.id - y.id; })
+              .forEach(function (it) { row(it.text, 1, it.ts, HessuResults.isHiddenAnswer(mod, it)); });
+          }
+          if (!values.length && (poll.type === 'words' || poll.type === 'open')) row('', 0, null);
+        });
+      });
+      return rows;
+    }
+
+    function exportCsv(set) {
+      loadAllAnswers().then(function () {
+        var blob = new Blob(['\ufeff' + HessuResults.csv(csvRows(set))], { type: 'text/csv;charset=utf-8' });
+        var a = h('a', { href: URL.createObjectURL(blob), download: 'hessutalks-' + getEvent().code + (set ? '-' + set.slug : '') + '-tulokset.csv' });
+        document.body.appendChild(a); a.click(); a.remove();
+        setTimeout(function () { URL.revokeObjectURL(a.href); }, 1000);
+      }).catch(fail);
+    }
+
+    // ---------------------------------------------------------------- esikatselu (vaatimus 6)
+
+    function previewParticipant(poll) {
+      window.open(BASE + '/admin/esikatselu?poll=' + poll.id, 'hessutalks-esikatselu', 'popup,noopener,width=430,height=780');
+    }
+    function previewStage(poll) {
+      var msg = pollMessage(poll.id);
+      msg.results = false; msg.reveal = null; msg.bigQr = false;
+      present('esikatselu', msg);
     }
 
     function updateResults() {
@@ -766,30 +937,57 @@
         view.count.textContent = data.voters + ' vastausta' +
           (invalid[poll.id] ? ', ' + invalid[poll.id] + ' hylätty (virheellinen tai toiselle kyselylle salattu)' : '');
         if (view.details.open) {
-          HessuResults.render(view.el, poll, data, poll.type === 'words' ? { onWord: function (word) { hideWord(poll, word); } } : null);
+          // Hallinnassa luvut näkyvät aina; oikeat vastaukset korostetaan (vain luennoitsijalle).
+          var opts = poll.type === 'words' ? { onWord: function (word) { hideWord(poll, word); } }
+            : poll.type === 'open' ? { onAnswer: function (it) { hideAnswer(poll, it); } }
+            : { reveal: Array.isArray(poll.config.correct) ? { correct: poll.config.correct, explanations: poll.config.explanations || null } : null };
+          HessuResults.render(view.el, poll, data, opts);
           renderHidden(poll);
         }
       });
       renderControlCount();
+      publishSummaries();
       updateScreens();
     }
 
     function hideWord(poll, word) {
       if (!window.confirm('Piilotetaanko "' + word + '" tuloksista ja projektorilta?')) return;
-      (hidden[poll.id] || (hidden[poll.id] = {}))[word] = true;
-      updateResults();
+      modFor(poll).words[word] = true;
+      delete modFor(poll).approvedWords[word];
+      saveModeration(poll);
     }
+    function hideAnswer(poll, it) {
+      modFor(poll).answers[it.id] = true;
+      delete modFor(poll).approved[it.id];
+      saveModeration(poll);
+    }
+
+    /** Piilotetut ja suodattimen piilottamat (tarkistettavat) vastaukset ja sanat, palautus- ja hyväksyntänapein. */
     function renderHidden(poll) {
       var view = views[poll.id];
-      var words = Object.keys(hidden[poll.id] || {});
+      var mod = modFor(poll);
+      var map = answers[poll.id] || {};
+      var all = Object.keys(map).map(function (k) { return map[k]; });
       view.hidden.replaceChildren();
-      if (!words.length) return;
-      view.hidden.appendChild(h('span.hint', { text: 'Piilotetut: ' }));
-      words.forEach(function (word) {
-        view.hidden.appendChild(h('button.btn.ghost.small', { type: 'button', text: word + ' ↺', title: 'Palauta näkyviin', onclick: function () {
-          delete hidden[poll.id][word]; updateResults();
-        } }));
-      });
+      var chip = function (label, title, onclick) { return h('button.btn.ghost.small', { type: 'button', text: label, title: title, onclick: onclick }); };
+      var rows = [];
+      if (poll.type === 'words') {
+        var uniq = {};
+        all.forEach(function (w) { uniq[w] = true; });
+        Object.keys(uniq).forEach(function (w) {
+          if (mod.words[w]) rows.push(chip(w + ' ↺', 'Palauta näkyviin', function () { delete mod.words[w]; saveModeration(poll); }));
+          else if (HessuResults.isProfane(w) && !mod.approvedWords[w]) rows.push(chip('⚠ ' + w + ' ✓', 'Kirosanasuodatin piilotti. Hyväksy näkyviin', function () { mod.approvedWords[w] = true; saveModeration(poll); }));
+        });
+        Object.keys(mod.words).forEach(function (w) { if (!uniq[w]) rows.push(chip(w + ' ↺', 'Palauta näkyviin', function () { delete mod.words[w]; saveModeration(poll); })); });
+      } else if (poll.type === 'open') {
+        all.forEach(function (it) {
+          if (mod.answers[it.id]) rows.push(chip(it.text.slice(0, 60) + ' ↺', 'Palauta näkyviin', function () { delete mod.answers[it.id]; saveModeration(poll); }));
+          else if (HessuResults.isProfane(it.text) && !mod.approved[it.id]) rows.push(chip('⚠ ' + it.text.slice(0, 60) + ' ✓', 'Kirosanasuodatin piilotti. Hyväksy näkyviin', function () { mod.approved[it.id] = true; saveModeration(poll); }));
+        });
+      }
+      if (!rows.length) return;
+      view.hidden.appendChild(h('span.hint', { text: 'Piilotetut (↺ palauta, ⚠ suodatin: ✓ hyväksy): ' }));
+      rows.forEach(function (r) { view.hidden.appendChild(r); });
     }
 
     function act(poll, action, body, confirmText) {
@@ -836,10 +1034,19 @@
           h('button.btn.ghost.small', { type: 'button', text: '← Edellinen', onclick: function () { liveAct({ action: 'prev' }); } }),
           h('button.btn.small', { type: 'button', text: 'Seuraava →', onclick: function () { liveAct({ action: 'next' }); } }),
           toggle,
+          poll ? h('button.btn.small' + (poll.results_visible ? '' : '.ghost'), { type: 'button', 'aria-pressed': String(poll.results_visible),
+            text: poll.results_visible ? 'Piilota tulokset' : 'Näytä tulokset', title: 'Tulokset projektorille ja osallistujille (R)',
+            onclick: function () { act(poll, 'results', { visible: !poll.results_visible }); } }) : null,
+          poll && Array.isArray(poll.config.correct) ? h('button.btn.small' + (poll.revealed ? '' : '.ghost'), { type: 'button', 'aria-pressed': String(poll.revealed),
+            text: poll.revealed ? 'Piilota oikea vastaus' : 'Paljasta oikea vastaus', title: 'Oikea vastaus ja selitykset (A)',
+            onclick: function () { act(poll, 'reveal', { revealed: !poll.revealed }); } }) : null,
           poll ? h('button.btn.ghost.small', { type: 'button', text: 'Odotusnäkymä', title: 'Ei aktiivista kysymystä', onclick: function () { liveAct({ action: 'activate', poll: null }); } }) : null,
+          h('button.btn.small' + (showQr ? '' : '.ghost'), { type: 'button', 'aria-pressed': String(showQr), text: showQr ? 'QR pieneksi' : 'QR isona', title: 'Iso QR-koodi projektorille (Q)',
+            onclick: function () { command('qr'); } }),
           h('button.btn.ghost.small', { type: 'button', text: 'Aktiivinen projektorille', onclick: function () {
             present('aktiivinen', liveMessage(), liveMessage);
           } })),
+        h('p.hint.shortcuts', { text: 'Pikanäppäimet (myös esitysikkunassa): → / PageDown seuraava · ← / PageUp edellinen · välilyönti avaa/sulkee · R tulokset · A oikea vastaus · Q iso QR' }),
         poll && poll.status === 'draft'
           ? h('p.hint', { text: 'Luonnos: kysymys näkyy projektorilla, mutta osallistujat näkevät odotusnäkymän, kunnes avaat sen vastauksille.' })
           : null]);
@@ -869,6 +1076,8 @@
           h('span.code', { text: String(i + 1) }),
           h('span.badge.' + poll.status, { text: POLL_STATUS_LABEL[poll.status] || poll.status }),
           isActive ? h('span.badge.live', { text: 'Aktiivinen' }) : null,
+          poll.results_visible ? h('span.badge.open', { text: 'Tulokset näkyvissä' }) : null,
+          poll.revealed ? h('span.badge.open', { text: 'Paljastettu' }) : null,
           h('span.hint', { text: TYPE_LABEL[poll.type] || poll.type }),
           correctHint(poll)),
         h('p.poll-card-prompt', { text: poll.prompt }),
@@ -882,7 +1091,16 @@
           h('button.btn.ghost.small', { type: 'button', text: 'Tulokset projektorille', onclick: function () {
             present('kysely-' + poll.id, pollMessage(poll.id), function () { return pollMessage(poll.id); });
           } }),
+          h('button.btn.ghost.small', { type: 'button', text: 'Esikatsele', title: 'Osallistujan näkymä', onclick: function () { previewParticipant(poll); } }),
+          h('button.btn.ghost.small', { type: 'button', text: 'Esikatsele projektorilla', onclick: function () { previewStage(poll); } }),
           h('button.btn.ghost.small', { type: 'button', text: 'Muokkaa', onclick: function () { showForm(poll, findSet(poll.set_id)); } }),
+          sets.length > 1 ? (function () {
+            var sel = h('select.move-set', { 'aria-label': 'Siirrä toiseen sarjaan' },
+              h('option', { value: '', text: 'Siirrä sarjaan…' }),
+              sets.filter(function (s) { return s.id !== poll.set_id; }).map(function (s) { return h('option', { value: String(s.id), text: s.slug + ' ' + s.title }); }));
+            sel.addEventListener('change', function () { if (sel.value) act(poll, 'set', { set_id: parseInt(sel.value, 10) }); });
+            return sel;
+          })() : null,
           h('button.btn.ghost.small', { type: 'button', text: 'Tyhjennä vastaukset', onclick: function () {
             act(poll, 'reset', {}, 'Tyhjennetäänkö kyselyn "' + poll.prompt + '" kaikki vastaukset pysyvästi?');
           } }),
@@ -914,6 +1132,8 @@
               onclick: function () { setAct(set, 'skip', { skipped: !set.skipped }); } }),
             h('button.btn.ghost.small', { type: 'button', text: 'Muokkaa', onclick: function () { showSetForm(set); } }),
             h('button.btn.ghost.small', { type: 'button', text: 'Vie', title: 'Lataa sarja JSON-tiedostona', onclick: function () { exportJson(set); } }),
+            h('button.btn.ghost.small', { type: 'button', text: 'CSV', title: 'Sarjan tulokset taulukkona', onclick: function () { exportCsv(set); } }),
+            h('button.btn.ghost.small', { type: 'button', text: 'Monista', title: 'Kopio sarjasta ja sen kysymyksistä ilman vastauksia', onclick: function () { setAct(set, 'duplicate'); } }),
             h('button.btn.small', { type: 'button', text: 'Uusi kysymys', onclick: function () { showForm(null, set); } }),
             h('button.btn.danger.small', { type: 'button', text: 'Poista', onclick: function () {
               setAct(set, 'delete', {}, 'Poistetaanko sarja ' + set.slug + ' "' + set.title + '", sen ' + inSet.length + ' kysymystä ja kaikki vastaukset pysyvästi?');
@@ -1024,7 +1244,13 @@
         if (t === 'single' || t === 'multi') {
           inputs.options = h('textarea', { id: 'poll-options', rows: 5, placeholder: 'Yksi vaihtoehto per rivi (2–10)' });
           inputs.options.value = (cfg.options || []).join('\n');
-          fields.append(h('label', { for: 'poll-options', text: 'Vaihtoehdot' }), inputs.options);
+          inputs.correct = h('input', { type: 'text', id: 'poll-correct', placeholder: t === 'single' ? 'esim. 2' : 'esim. 1, 3',
+            value: Array.isArray(cfg.correct) ? cfg.correct.map(function (i) { return i + 1; }).join(', ') : '' });
+          inputs.explanations = h('textarea', { id: 'poll-explanations', rows: 4, placeholder: 'Valinnainen: selitys kullekin vaihtoehdolle omalle rivilleen' });
+          inputs.explanations.value = (cfg.explanations || []).join('\n');
+          fields.append(h('label', { for: 'poll-options', text: 'Vaihtoehdot' }), inputs.options,
+            h('label', { for: 'poll-correct', text: 'Oikeat vastaukset (vaihtoehtojen numerot, tyhjä = ei oikeaa vastausta)' }), inputs.correct,
+            h('label', { for: 'poll-explanations', text: 'Selitykset (näytetään paljastuksessa)' }), inputs.explanations);
         } else if (t === 'likert' || t === 'scale') {
           if (t === 'likert') {
             inputs.points = h('select', { id: 'poll-points' },
@@ -1038,6 +1264,10 @@
           fields.append(
             h('label', { for: 'poll-min', text: t === 'scale' ? 'Selite arvolle 0' : 'Selite arvolle 1' }), inputs.min,
             h('label', { for: 'poll-max', text: t === 'scale' ? 'Selite arvolle 10' : 'Selite suurimmalle arvolle' }), inputs.max);
+        } else if (t === 'open') {
+          inputs.multiple = h('input', { type: 'checkbox', id: 'poll-multiple', checked: !!cfg.multiple });
+          fields.append(h('label.check', null, inputs.multiple, ' Salli useita vastauksia samalta osallistujalta'),
+            h('p.hint', { text: 'Enintään 280 merkkiä. Vastaukset näkyvät listana uusin ensin. Kirosanasuodatin piilottaa osumat tarkistettavaksi, ja voit piilottaa minkä tahansa vastauksen.' }));
         } else {
           fields.append(h('p.hint', { text: 'Kuulijat vastaavat 1–3 sanalla. Samat vastaukset kasvattavat sanaa pilvessä. Voit piilottaa sopimattoman sanan klikkaamalla sitä tuloksissa.' }));
         }
@@ -1048,15 +1278,21 @@
         if (t === 'single' || t === 'multi') {
           var options = inputs.options.value.split('\n').map(function (x) { return x.trim(); }).filter(Boolean);
           var out = { options: options };
-          // Oikea vastaus ja selitykset säilyvät, kun vaihtoehtojen määrä ei muutu (muokkaus vaiheessa 5).
-          if (editing && (cfg.options || []).length === options.length) {
-            if (cfg.correct) out.correct = cfg.correct;
-            if (cfg.explanations) out.explanations = cfg.explanations;
+          var nums = inputs.correct.value.split(/[\s,;]+/).filter(Boolean);
+          if (nums.length) {
+            out.correct = nums.map(function (n) { return /^\d+$/.test(n) ? parseInt(n, 10) - 1 : -1; });
+          }
+          var expl = inputs.explanations.value.split('\n').map(function (x) { return x.trim(); });
+          while (expl.length && expl[expl.length - 1] === '') expl.pop();
+          if (expl.length) {
+            while (expl.length < options.length) expl.push('');
+            out.explanations = expl;
           }
           return out;
         }
         if (t === 'likert') return { points: parseInt(inputs.points.value, 10), min_label: inputs.min.value, max_label: inputs.max.value };
         if (t === 'scale') return { min_label: inputs.min.value, max_label: inputs.max.value };
+        if (t === 'open') return { multiple: inputs.multiple.checked };
         return {};
       }
 
@@ -1082,7 +1318,7 @@
       prompt.focus();
     }
 
-    return { el: el, load: load, refresh: refreshAnswers };
+    return { el: el, load: load, refresh: refreshAnswers, command: command };
   }
 
   function showEvent(id) {
@@ -1098,7 +1334,9 @@
     function renderHead() {
       var url = event.url;
       headEl.replaceChildren(
-        toolbar(event.title, h('button.btn.ghost.small', { type: 'button', text: 'Kaikki luennot', onclick: function () { loadState().then(function () { showEvents(); }); } })),
+        toolbar(event.title, [
+          h('button.btn.ghost.small', { type: 'button', text: 'Ohjain', title: 'Puhelinohjain: isot napit aktiivisen kysymyksen ohjaukseen', onclick: function () { showRemote(id); } }),
+          h('button.btn.ghost.small', { type: 'button', text: 'Kaikki luennot', onclick: function () { loadState().then(function () { showEvents(); }); } })]),
         h('div.share', null,
           h('img', { src: qrDataUrl(url, 4), alt: 'QR-koodi luennon kysymyssivulle' }),
           h('div', null,
@@ -1249,6 +1487,7 @@
     filtersEl.replaceChildren.apply(filtersEl, filterButtons());
     poll().then(function () { return panel.load(); }).then(function () { return panel.refresh(); }).then(function () {
       liveRefresh = function () { refreshAll().catch(function () {}); };
+      liveCommand = panel.command;
       pollTimer = setInterval(function () {
         if (document.hidden) return;
         refreshAll().catch(function () {});
@@ -1256,8 +1495,70 @@
     }).catch(function (e) { if (e.message !== '401') root.appendChild(notice(e.message, 'error')); });
   }
 
+  // ================================================================ näkymä: puhelinohjain
+  //
+  // Ohjaa aktiivista kysymystä kävellessä salissa. Ei pura viestejä eikä vastauksia, joten se toimii
+  // myös avaamatta salausavainta. Projektoria ohjaava läppäri huomaa muutokset ohjaustilan versiosta.
+
+  function showRemote(eventId) {
+    var data = null;
+    var out = h('div');
+    var body = h('div.remote');
+    function find(pid) { return (data.polls || []).filter(function (p) { return p.id === pid; })[0] || null; }
+    function load() { return api('GET', 'events/' + eventId + '/polls').then(function (r) { data = r; render(); }); }
+    function post(path, b) {
+      return api('POST', path, b).then(function (r) { out.replaceChildren(); if (r && r.polls) { data = r; render(); } else return load(); })
+        .catch(function (e) { if (e.message !== '401') out.replaceChildren(notice(e.message, 'error')); });
+    }
+    function big(text, onclick, primary) { return h('button.btn.remote-btn' + (primary ? '' : '.ghost'), { type: 'button', text: text, onclick: onclick }); }
+    function render() {
+      var poll = find(data.active);
+      var order = data.polls.filter(function (p) { return !p.skipped || p.id === data.active; });
+      var set = poll ? (data.sets || []).filter(function (s) { return s.id === poll.set_id; })[0] : null;
+      body.replaceChildren();
+      append(body, [
+        h('div.remote-now', null,
+          h('p.eyebrow', { text: poll ? 'Aktiivinen ' + (order.indexOf(poll) + 1) + '/' + order.length + (set ? ' · ' + set.slug : '') : 'Ei aktiivista kysymystä' }),
+          h('p.remote-prompt', { text: poll ? poll.prompt : 'Osallistujat näkevät odotusnäkymän.' }),
+          poll ? h('p.hint', { text: (POLL_STATUS_LABEL[poll.status] || poll.status) + ' · ' + poll.answer_count + ' vastausta'
+            + (poll.results_visible ? ' · tulokset näkyvissä' : '') + (poll.revealed ? ' · paljastettu' : '') }) : null),
+        h('div.remote-grid', null,
+          big('← Edellinen', function () { post('events/' + eventId + '/live', { action: 'prev' }); }),
+          big('Seuraava →', function () { post('events/' + eventId + '/live', { action: 'next' }); }, true),
+          poll ? big(poll.status === 'open' ? 'Sulje vastaukset' : 'Avaa vastauksille', function () {
+            post('polls/' + poll.id + '/status', { status: poll.status === 'open' ? 'closed' : 'open' });
+          }, true) : null,
+          poll ? big(poll.results_visible ? 'Piilota tulokset' : 'Näytä tulokset', function () {
+            post('polls/' + poll.id + '/results', { visible: !poll.results_visible });
+          }) : null,
+          poll && Array.isArray(poll.config.correct) ? big(poll.revealed ? 'Piilota oikea vastaus' : 'Paljasta oikea vastaus', function () {
+            post('polls/' + poll.id + '/reveal', { revealed: !poll.revealed });
+          }) : null,
+          big(data.show_qr ? 'QR pieneksi' : 'QR isona', function () { post('events/' + eventId + '/qr', { show: !data.show_qr }); }),
+          poll ? big('Odotusnäkymä', function () { post('events/' + eventId + '/live', { action: 'activate', poll: null }); }) : null)
+      ]);
+    }
+    mount(h('div.toolbar', null, h('h1', { text: 'Ohjain' }), h('span.spacer'),
+      h('button.btn.ghost.small', { type: 'button', text: secretKey ? 'Luennon näkymä' : 'Takaisin', onclick: function () {
+        if (secretKey) showEvent(eventId); else start();
+      } })), out, body);
+    load().catch(function (e) { if (e.message !== '401') out.replaceChildren(notice(e.message, 'error')); });
+    pollTimer = setInterval(function () { if (!document.hidden) load().catch(function () {}); }, 2000);
+  }
+
+  function showRemotePicker() {
+    mount(h('div.toolbar', null, h('h1', { text: 'Ohjain' }), h('span.spacer'),
+      h('button.btn.ghost.small', { type: 'button', text: 'Takaisin', onclick: function () { start(); } })),
+      h('p', { text: 'Valitse luento. Ohjain ei avaa viestejä, joten salausavainta ei tarvita.' }),
+      h('ul.event-list', null, state.events.map(function (ev) {
+        return h('li', null, h('span.code', { text: ev.code }), h('strong', { text: ev.title }),
+          h('button.btn.small.open-btn', { type: 'button', text: 'Ohjaa', onclick: function () { showRemote(ev.id); } }));
+      })));
+  }
+
   function stopPolling() {
     liveRefresh = null;
+    liveCommand = null;
     if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
   }
 

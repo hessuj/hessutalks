@@ -26,7 +26,8 @@
   var REQUEST_TIMEOUT_MS = 5000; // roikkuva pyyntö (esim. heikko mobiiliverkko) katkaistaan ja yritetään uudelleen
   var VOTER_KEY = 'hessutalks.voter';
   var ANSWERS_KEY = 'hessutalks.answers';
-  var WORDS_MAX_CHARS = 40;
+  var WORDS_MAX_CHARS = 30;
+  var OPEN_MAX = 280;
   var WORDS_MAX_WORDS = 3;
 
   var code = ask.dataset.code;
@@ -122,9 +123,12 @@
       var multi = poll.type === 'multi';
       if (multi) body.appendChild(h('p', 'hint', t('poll_multi_hint')));
       var list = h('div', 'poll-choices');
+      form.choiceLabels = [];
       (cfg.options || []).forEach(function (opt, i) {
         var checked = multi ? Array.isArray(own) && own.indexOf(i) !== -1 : own === i;
-        list.appendChild(choice(multi ? 'checkbox' : 'radio', name, i, opt, checked));
+        var label = choice(multi ? 'checkbox' : 'radio', name, i, opt, checked);
+        form.choiceLabels.push(label);
+        list.appendChild(label);
       });
       body.appendChild(list);
       getAnswer = function () {
@@ -150,6 +154,32 @@
         if (!sel) throw new Error(t('poll_choose_one'));
         return parseInt(sel.value, 10);
       };
+    } else if (poll.type === 'open') {
+      var many = !!cfg.multiple;
+      var area = h('textarea');
+      area.rows = 4;
+      area.maxLength = OPEN_MAX * 2;   // merkit lasketaan alla (emoji = 2 UTF-16-yksikköä)
+      area.placeholder = t('poll_open_placeholder');
+      area.setAttribute('aria-label', poll.prompt);
+      if (!many && typeof own === 'string') area.value = own;
+      var counter = h('p', 'counter', '');
+      var count = function () { counter.textContent = Array.from(area.value).length + '/' + OPEN_MAX; };
+      area.addEventListener('input', count);
+      count();
+      body.appendChild(area);
+      body.appendChild(counter);
+      body.appendChild(h('p', 'hint', t('poll_open_hint')));
+      if (many && Array.isArray(own) && own.length) body.appendChild(h('p', 'hint', t('poll_sent_count', { n: own.length })));
+      getAnswer = function () {
+        var text = area.value.trim();
+        if (!text) throw new Error(t('poll_open_empty'));
+        if (Array.from(text).length > OPEN_MAX) throw new Error(t('poll_open_long'));
+        return text;
+      };
+      if (many) {
+        form.dataset.multiple = '1';
+        form.resetAfterSend = function () { area.value = ''; count(); };
+      }
     } else { // words
       var input = h('input');
       input.type = 'text';
@@ -169,9 +199,17 @@
     }
 
     form.appendChild(body);
-    var btn = h('button', 'btn', t(own !== null ? 'poll_change' : 'poll_submit'));
+    // Paljastus ja tuloskooste päivitetään erikseen (updateExtras), jotta keskeneräinen valinta säilyy.
+    form.resultsBox = h('div', 'poll-results-box');
+    form.resultsBox.hidden = true;
+    form.resultsBox.appendChild(h('p', 'eyebrow', t('poll_results')));
+    form.resultsEl = h('div');
+    form.resultsBox.appendChild(form.resultsEl);
+    form.appendChild(form.resultsBox);
+    var manyOpen = poll.type === 'open' && !!cfg.multiple;
+    var btn = h('button', 'btn', t(own !== null && !manyOpen ? 'poll_change' : 'poll_submit'));
     btn.type = 'submit';
-    var status = h('p', own !== null ? 'notice ok' : 'hint', own !== null ? t('poll_saved') : t('poll_anonymous'));
+    var status = h('p', own !== null && !manyOpen ? 'notice ok' : 'hint', own !== null && !manyOpen ? t('poll_saved') : t('poll_anonymous'));
     status.setAttribute('role', 'status');
     form.appendChild(btn);
     form.appendChild(status);
@@ -179,7 +217,7 @@
     // Suljettu kysely: vastaus näkyy, mutta sitä ei voi enää muuttaa.
     if (poll.status === 'closed') {
       form.classList.add('closed');
-      Array.prototype.forEach.call(form.querySelectorAll('input'), function (i) { i.disabled = true; });
+      Array.prototype.forEach.call(form.querySelectorAll('input, textarea'), function (i) { i.disabled = true; });
       btn.hidden = true;
       status.className = 'notice';
       status.textContent = t('poll_closed_state') + (own !== null ? ' ' + t('poll_your_answer') : '');
@@ -194,8 +232,16 @@
       status.className = 'notice';
       status.textContent = t('sending');
       send(poll, answer).then(function () {
-        saveOwnAnswer(poll, answer);
         status.className = 'notice ok';
+        if (form.resetAfterSend) {
+          // Useita vastauksia: kenttä tyhjenee seuraavaa vastausta varten.
+          var sent = ownAnswer(poll);
+          saveOwnAnswer(poll, (Array.isArray(sent) ? sent : []).concat([answer]).slice(-50));
+          form.resetAfterSend();
+          status.textContent = t('poll_saved_more') + ' ' + t('poll_sent_count', { n: ownAnswer(poll).length });
+          return;
+        }
+        saveOwnAnswer(poll, answer);
         status.textContent = t('poll_saved');
         btn.textContent = t('poll_change');
       }).catch(function (e) {
@@ -206,7 +252,10 @@
     return form;
   }
 
+  var previewMode = !!box.dataset.preview;
+
   function send(poll, answer) {
+    if (previewMode) return Promise.reject(new Error(t('preview_no_send')));
     var payload = JSON.stringify({ v: 1, e: code, p: poll.id, a: answer, ts: new Date().toISOString() });
     var ciphertext = sodium.to_base64(
       sodium.crypto_box_seal(sodium.from_string(payload), publicKey),
@@ -233,13 +282,36 @@
     return el;
   }
 
+  /** Oikean vastauksen paljastus ja tuloskooste (kun luennoitsija näyttää ne). */
+  function updateExtras(form, poll) {
+    var reveal = poll.reveal && Array.isArray(poll.reveal.correct) ? poll.reveal : null;
+    (form.choiceLabels || []).forEach(function (label, i) {
+      var correct = !!reveal && reveal.correct.indexOf(i) !== -1;
+      label.classList.toggle('correct', correct);
+      label.classList.toggle('wrong', !!reveal && !correct);
+      var old = label.querySelector('.poll-explanation');
+      if (old) old.remove();
+      var expl = reveal && Array.isArray(reveal.explanations) ? reveal.explanations[i] : '';
+      if (typeof expl === 'string' && expl) label.appendChild(h('span', 'poll-explanation', expl));
+    });
+    var res = poll.results && typeof poll.results === 'object' && Array.isArray(poll.results.counts) ? poll.results : null;
+    form.resultsBox.hidden = !res || !window.HessuResults;
+    if (res && window.HessuResults) {
+      window.HessuResults.render(form.resultsEl, poll, res, {
+        reveal: reveal, labels: { mean: t('poll_mean'), median: t('poll_median') }
+      });
+    }
+  }
+
   /** Näyttää aktiivisen kysymyksen tai odotusnäkymän. Keskeneräinen vastaus säilyy, jos mikään ei muuttunut. */
   function render(poll) {
     var sig = poll ? JSON.stringify([poll.id, poll.type, poll.prompt, poll.config, poll.generation, poll.status]) : 'waiting';
-    if (current && current.sig === sig) return;
-    var el = poll ? buildCard(poll) : waitingView();
-    if (current) current.el.replaceWith(el); else box.appendChild(el);
-    current = { sig: sig, el: el };
+    if (!current || current.sig !== sig) {
+      var el = poll ? buildCard(poll) : waitingView();
+      if (current) current.el.replaceWith(el); else box.appendChild(el);
+      current = { sig: sig, el: el };
+    }
+    if (poll && current.el.resultsBox) updateExtras(current.el, poll);
     box.hidden = false;
   }
 
@@ -282,6 +354,12 @@
       if (failures >= 2) { reconnect.textContent = t('reconnecting'); reconnect.hidden = false; }
       schedule(Math.min(POLL_MS * Math.pow(2, failures - 1), MAX_BACKOFF_MS));
     });
+  }
+
+  // Esikatselu (hallinnan /admin/esikatselu): kortti piirretään sivun datasta, mitään ei haeta eikä lähetetä.
+  if (previewMode) {
+    try { render(JSON.parse(box.dataset.preview)); } catch (e) { box.textContent = 'Esikatselu epäonnistui.'; }
+    return;
   }
 
   var s = window.sodium;

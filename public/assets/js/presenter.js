@@ -47,7 +47,8 @@
 
   // ---------------------------------------------------------------- kyselyn tulokset
 
-  var POLL_TYPES = ['single', 'multi', 'words', 'likert', 'scale'];
+  var POLL_TYPES = ['single', 'multi', 'words', 'likert', 'scale', 'open'];
+  var OPEN_ON_STAGE = 10;
   var pollView = null;   // { id, prompt, results, count } – sama näkymä päivitetään, jotta kaaviot animoituvat
   var lastPoll = null;
 
@@ -68,9 +69,22 @@
       return Array.isArray(d.counts) && d.counts.length <= 11 && d.counts.every(isCount) && isCount(d.from) &&
         (d.mean === undefined || typeof d.mean === 'number') && (d.median === undefined || typeof d.median === 'number');
     }
+    if (p.type === 'open') {
+      return Array.isArray(d.items) && d.items.length <= 50 && d.items.every(function (t) { return str(t, 600) !== null; });
+    }
     return Array.isArray(d.words) && d.words.length <= 500 && d.words.every(function (w) {
       return Array.isArray(w) && w.length === 2 && str(w[0], 40) !== null && isCount(w[1]);
     });
+  }
+
+  /** Paljastus: oikeiden vaihtoehtojen indeksit ja valinnaiset selitykset (tarkistetaan kuten muukin sisältö). */
+  function validReveal(m) {
+    var r = m.reveal;
+    var n = m.poll.config && Array.isArray(m.poll.config.options) ? m.poll.config.options.length : 0;
+    if (!r || typeof r !== 'object' || !Array.isArray(r.correct) || !r.correct.every(function (i) { return isCount(i) && i < n; })) return null;
+    var ex = r.explanations;
+    if (ex !== null && ex !== undefined && (!Array.isArray(ex) || ex.length !== n || !ex.every(function (e) { return str(e, 300) !== null; }))) return null;
+    return { correct: r.correct, explanations: ex || null };
   }
 
   function renderPoll(m) {
@@ -87,6 +101,8 @@
       img.alt = 'QR-koodi';
       var count = h('p', 'poll-stage-count');
       var info = h('div', 'poll-stage-info');
+      // Liittymiskoodi ja osoite aina kulmassa (myöhässä tulevat ja Teams-osallistujat).
+      info.appendChild(h('p', 'poll-stage-code', m.code));
       info.appendChild(h('p', 'poll-stage-url', m.url.replace(/^https?:\/\//, '')));
       info.appendChild(count);
       var foot = h('div', 'poll-stage-foot');
@@ -98,7 +114,9 @@
     }
     pollView.prompt.textContent = p.prompt;
     pollView.count.textContent = m.data.voters + ' vastausta' + (m.status === 'closed' ? ' · kysely on suljettu' : '');
-    window.HessuResults.render(pollView.results, p, m.data);
+    window.HessuResults.render(pollView.results, p, m.data, {
+      max: OPEN_ON_STAGE, hidden: m.results !== true, reveal: validReveal(m), hiddenText: 'Tulokset näytetään myöhemmin.'
+    });
   }
 
   // Sanapilvi asetellaan ikkunan koon mukaan: piirretään uudelleen, kun koko muuttuu.
@@ -131,10 +149,31 @@
   }
   window.addEventListener('resize', trimList);
 
+  // ---------------------------------------------------------------- iso QR-koodi (Q)
+
+  var bigQr = null;
+  function setBigQr(code, url) {
+    if (bigQr) { bigQr.remove(); bigQr = null; }
+    if (!code) return;
+    var qr = window.qrcode(0, 'M');
+    qr.addData(url);
+    qr.make();
+    var img = h('img');
+    img.src = qr.createDataURL(12, 4);
+    img.alt = 'QR-koodi';
+    bigQr = h('div', 'stage-bigqr');
+    bigQr.appendChild(h('p', 'stage-code', code));
+    bigQr.appendChild(img);
+    bigQr.appendChild(h('p', 'stage-url', url));
+    document.body.appendChild(bigQr);
+  }
+
   function onMessage(ev) {
     if (ev.origin !== window.location.origin || !window.opener || ev.source !== window.opener) return;
     var m = ev.data;
     if (!m || typeof m !== 'object') return;
+    // Iso QR-koodi kulkee jokaisen viestin mukana (tila on hallinnassa ja palvelimella).
+    if (m.type !== 'end') setBigQr(m.bigQr === true && str(m.code, 20) && str(m.url, 500) ? m.code : null, m.url);
     switch (m.type) {
       case 'qr':
         if (str(m.code, 20) && str(m.url, 500)) renderQr(m.code, m.url);
@@ -167,8 +206,33 @@
     else if (document.documentElement.requestFullscreen) document.documentElement.requestFullscreen().catch(function () {});
   }
   document.addEventListener('dblclick', toggleFullscreen);
+
+  // ---------------------------------------------------------------- teema (T)
+
+  var THEME_KEY = 'hessutalks.stage-theme';
+  function applyTheme(light) {
+    document.body.classList.toggle('light', light);
+    try { window.localStorage.setItem(THEME_KEY, light ? 'light' : 'dark'); } catch (e) { /* ei tallennusta */ }
+  }
+  try { applyTheme(window.localStorage.getItem(THEME_KEY) === 'light'); } catch (e) { /* oletus tumma */ }
+
+  // ---------------------------------------------------------------- pikanäppäimet
+  //
+  // Esitysikkunalla ei ole pääsyä rajapintaan: komento lähetetään hallintaikkunalle (avaaja), joka
+  // tekee toiminnon. Langattomat esitysohjaimet lähettävät yleensä PageUp/PageDown tai nuolinäppäimiä.
+  var KEYS = {
+    ArrowRight: 'next', PageDown: 'next', ArrowDown: 'next',
+    ArrowLeft: 'prev', PageUp: 'prev', ArrowUp: 'prev',
+    ' ': 'toggle', r: 'results', R: 'results', a: 'reveal', A: 'reveal', q: 'qr', Q: 'qr'
+  };
   document.addEventListener('keydown', function (e) {
-    if (e.key === 'f' || e.key === 'F') toggleFullscreen();
+    if (e.ctrlKey || e.metaKey || e.altKey) return;
+    if (e.key === 'f' || e.key === 'F') { toggleFullscreen(); return; }
+    if (e.key === 't' || e.key === 'T') { applyTheme(!document.body.classList.contains('light')); return; }
+    var cmd = KEYS[e.key];
+    if (!cmd || !window.opener || window.opener.closed) return;
+    e.preventDefault();
+    window.opener.postMessage({ type: 'command', cmd: cmd }, window.location.origin);
   });
   document.addEventListener('fullscreenchange', function () {
     if (hint) hint.hidden = !!document.fullscreenElement;

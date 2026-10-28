@@ -17,8 +17,8 @@ use HessuTalks\Repository\SetRepository;
  *   single, multi      → monivalinta (options, correct = oikeiden indeksit, explanations = selitys per vaihtoehto)
  *   scale              → min–max 1–5 tai 1–7 = Likert, 0–10 = asteikko (minLabel, maxLabel)
  *   wordcloud          → sanapilvi (enintään 3 sanaa)
+ *   open               → avoin teksti (280 merkkiä), multipleAnswers = useita vastauksia
  *   qa                 → ei tueta; käytetään fallbackType-kenttää, jos se on annettu
- *   open               → ei vielä tuettu (vaihe 4): ohitetaan varoituksella
  *
  * Tuonti on kaikki tai ei mitään: virheet estävät tuonnin, varoitukset kertovat ohitetuista kysymyksistä.
  * Tiedosto on luennoitsijan omaa julkista sisältöä, mutta se validoidaan kuten käsin luodut kysymykset.
@@ -152,7 +152,9 @@ final class SetFormat
                 }
                 return $skip('Q&A (tykkäykset) ei ole käytössä eikä varatyyppiä (fallbackType) ole annettu.');
             case 'open':
-                return $skip('avoin teksti tulee käyttöön vaiheessa 4.');
+                $local = 'open';
+                $config = ['multiple' => ($q['multipleAnswers'] ?? false) === true];
+                break;
             default:
                 return 'tuntematon type ' . (is_string($type) ? '"' . mb_substr($type, 0, 20) . '"' : '') . '.';
         }
@@ -197,6 +199,7 @@ final class SetFormat
                 + (isset($c['explanations']) ? ['explanations' => $c['explanations']] : []),
             'likert' => ['type' => 'scale', 'text' => $prompt, 'min' => 1, 'max' => (int) ($c['points'] ?? 5)] + $labels,
             'scale' => ['type' => 'scale', 'text' => $prompt, 'min' => 0, 'max' => 10] + $labels,
+            'open' => ['type' => 'open', 'text' => $prompt, 'multipleAnswers' => ($c['multiple'] ?? false) === true],
             default => ['type' => 'wordcloud', 'text' => $prompt, 'maxWords' => 3],
         };
     }

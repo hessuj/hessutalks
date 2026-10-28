@@ -125,6 +125,44 @@ final class SetRepository
         }
     }
 
+    /**
+     * Monistaa sarjan kysymyksineen (ilman vastauksia, luonnoksina) sarjojen loppuun.
+     * Tunniste saa jatkeen -2, -3 …, ja nimeen lisätään "(kopio)".
+     * @return int|string uuden sarjan id tai virheilmoitus
+     */
+    public function duplicate(int $id, PollRepository $polls): int|string
+    {
+        $set = $this->find($id);
+        if ($set === null) {
+            return 'Sarjaa ei löytynyt.';
+        }
+        $eventId = (int) $set['event_id'];
+        $slug = null;
+        for ($n = 2; $n < 100 && $slug === null; $n++) {
+            $candidate = substr((string) $set['slug'], 0, 16 - strlen('-' . $n)) . '-' . $n;
+            if ($this->findBySlug($eventId, $candidate) === null) {
+                $slug = $candidate;
+            }
+        }
+        if ($slug === null) {
+            return 'Vapaata tunnistetta ei löytynyt.';
+        }
+        $title = mb_substr((string) $set['title'], 0, self::TITLE_MAX - 8) . ' (kopio)';
+        $source = array_values(array_filter($polls->forEvent($eventId), static fn (array $p): bool => $p['set_id'] === $id));
+        if ($polls->countForEvent($eventId) + count($source) > PollRepository::MAX_PER_EVENT) {
+            return 'Luennolla voi olla enintään ' . PollRepository::MAX_PER_EVENT . ' kysymystä.';
+        }
+        $this->import($eventId, [[
+            'slug' => $slug,
+            'title' => $title,
+            'polls' => array_map(static fn (array $p): array => [
+                'type' => (string) $p['type'], 'prompt' => (string) $p['prompt'], 'config' => is_array($p['config']) ? $p['config'] : [],
+            ], $source),
+        ]], $polls);
+        $created = $this->findBySlug($eventId, $slug);
+        return $created === null ? 'Monistus epäonnistui.' : (int) $created['id'];
+    }
+
     /** Siirtää sarjaa yhden askeleen (-1 ylös, 1 alas). false = ei voi siirtää. */
     public function move(int $id, int $dir): bool
     {
