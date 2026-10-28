@@ -61,11 +61,9 @@ Lisää jokaiselle uudelle ominaisuudelle testit, myös tietoturvatestit (`tests
 - Actionit on lukittu commit-SHA:han. Päivitä SHA ja versiokommentti yhdessä.
 - Selainkirjastot päivitetään vain `scripts/update-vendor.sh`-skriptillä (SHA-256-lukitus).
 
-## Tulossa
-MMoIT 2026 -kurssin vaatimukset (tapahtuma 13.–14.11.2026, ei julkaisuja tapahtuman aikana).
-Tila ja hyväksymistestit: docs/hyvaksymistestit.md. Valmiina: passkey-avaus (PRF), sarjat ja aktiivinen kysymys, JSON-tuonti/vienti (src/Import/SetFormat.php),
-avoin teksti + salattu moderointi + kirosanasuodatin (results.js),
-tulosten näyttö/piilotus, oikean vastauksen paljastus ja tuloskooste osallistujille (P2),
-esitysnäkymä + pikanäppäimet + puhelinohjain, nopeusrajat (laite + osoitetiiviste) ja julkaisujäädytys
-(.github/deploy-freeze.txt, bin/deploy-freeze.php).
-Seuraavaksi: SHOULD-kohdat (CSV, monistus/siirto, esikatselu).
+## Tila
+MMoIT 2026 -kurssin vaatimukset (tapahtuma 13.–14.11.2026, ei julkaisuja tapahtuman aikana, .github/deploy-freeze.txt)
+on toteutettu vaiheittain PR:inä #8–#17. Tila ja hyväksymistestit: docs/hyvaksymistestit.md.
+Jäljellä: kuormitustesti (Hessu siirsi myöhemmäksi) ja koeajo oikeilla laitteilla ja Teamsilla (H1, H13, H15).
+Selaintestit (scripts/e2e.sh) ajetaan aina käyttöliittymämuutosten jälkeen. Sarjojen haku testeissä otsikon mukaan
+(valikot sisältävät muiden sarjojen nimiä).

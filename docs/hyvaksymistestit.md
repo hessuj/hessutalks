@@ -37,5 +37,17 @@ Todennustavat:
 | 4 | T3 avoin teksti, pysyvä moderointi, kirosanasuodatin, T4 30 merkkiä | ✅ PR #13 |
 | 5 | Oikea vastaus, selitykset, paljastus, tulosten näyttö/piilotus, tulokset osallistujille (SHOULD 4.8) | ✅ PR #14 (`reveal.mjs`) |
 | 6 | Esitysnäkymä, pikanäppäimet (myös esitysohjain), iso QR, teemat, puhelinohjain (SHOULD 5.3) | ✅ PR #15 (`presenter.mjs`) |
-| 7 | Nopeusrajat (laite 10/min, osoitetiiviste 600/min hiljaa), julkaisujäädytys | ✅ tämä PR (`DeployFreezeTest`) |
-| 8 | SHOULD: tulokset osallistujille, CSV, monistus/siirto, teemat, kirosanasuodatin, puhelinohjain, esikatselu | ⏳ |
+| 7 | Nopeusrajat (laite 10/min, osoitetiiviste 600/min hiljaa), julkaisujäädytys | ✅ PR #16 (`DeployFreezeTest`) |
+| 8 | SHOULD: CSV-vienti (kaavainjektion esto), sarjan monistus, kysymyksen siirto, esikatselu. (Tulokset osallistujille, teemat, kirosanasuodatin ja puhelinohjain tehtiin vaiheissa 4–6.) | ✅ tämä PR (`should.mjs`) |
+
+## Vaatimusten kattavuus
+
+| Luku | MUST | SHOULD | COULD |
+|---|---|---|---|
+| 3 Kysymystyypit | T1 ✅ T2 ✅ T3 ✅ | T4 ✅ T5 ✅ | T6 Q&A ✖ (P6: korvattu avoimella tekstillä) |
+| 4 Osallistuja | 1–7, 9 ✅ | 8 tulokset osallistujille ✅ | |
+| 5 Esittäjä | 5.1, 5.2, 5.4 ✅ | 5.1 teemat ✅, 5.3 puhelinohjain ✅, 5.4 CSV ✅ | |
+| 6 Sisältö | luonti ja muokkaus etukäteen ✅ | JSON ✅, monistus ja siirto ✅ | esikatselu ✅ |
+| 7 Tietoturva | 1–5, 7–9 ✅ | 6 kirosanasuodatin ✅ | |
+| 8 Suorituskyky | 443 + varayhteys ✅ (lyhyt pollaus), julkaisujäädytys ✅ | kuormitustesti ⏳ (siirretty) | |
+| 9 Hyväksymistestit | H2–H12, H14 ✅; H1, H15 koeajossa 🧪; H13 kuormitustesti ⏳ | | |

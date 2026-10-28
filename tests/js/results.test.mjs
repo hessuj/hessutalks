@@ -110,3 +110,16 @@ test('kirosanasuodatin: englanti ja suomi, taivutukset, ei vääriä osumia', ()
   mod.approvedWords.vittu = true;
   assert.deepEqual(R.tally(words, ['vittu', 'mfa'], mod).words.map((w) => w[0]).sort(), ['mfa', 'vittu']);
 });
+
+test('CSV: puolipiste-erotin, lainausmerkit ja kaavainjektion esto', () => {
+  assert.equal(R.csvCell('Hacktivist'), 'Hacktivist');
+  assert.equal(R.csvCell('a;b'), '"a;b"');
+  assert.equal(R.csvCell('sanoi "hei"'), '"sanoi ""hei"""');
+  assert.equal(R.csvCell('rivi1\nrivi2'), '"rivi1\nrivi2"');
+  for (const evil of ['=HYPERLINK("http://evil","klik")', '+1+1', '-2+3', '@SUM(A1)', '\t=1']) {
+    assert.ok(R.csvCell(evil).replace(/^"/, '').startsWith("'"), evil);
+  }
+  assert.equal(R.csvCell(5), '5');
+  assert.equal(R.csvCell(null), '');
+  assert.equal(R.csv([['a', 'b'], ['=1', 'x;y']]), "a;b\r\n'=1;\"x;y\"\r\n");
+});

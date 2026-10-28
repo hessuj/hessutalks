@@ -133,6 +133,23 @@
     return out;
   }
 
+  // ---------------------------------------------------------------- CSV-vienti
+
+  /**
+   * CSV-solu Exceliä varten. Kaavainjektion esto: osallistujan kirjoittama teksti, joka alkaa merkillä
+   * = + - @ (tai sarkain/rivinvaihto), saa eteensä heittomerkin, jottei taulukkolaskenta suorita sitä kaavana.
+   */
+  function csvCell(v) {
+    var s = v === null || v === undefined ? '' : String(v);
+    if (/^[=+\-@\t\r\n]/.test(s)) s = "'" + s;
+    return /[";\r\n]|^\s|\s$/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+  }
+
+  /** Rivit CSV-tekstiksi (erotin ;, rivinvaihto CRLF). BOM lisätään latauksessa. */
+  function csv(rows) {
+    return rows.map(function (r) { return r.map(csvCell).join(';'); }).join('\r\n') + '\r\n';
+  }
+
   /** Projektorille ja osallistujille: ilman oikeita vastauksia ja selityksiä (paljastetaan erikseen). */
   function publicConfig(config) {
     var out = {};
@@ -348,7 +365,8 @@
 
   var api = {
     validAnswer: validAnswer, normalizeWords: normalizeWords, tally: tally, render: render,
-    isProfane: isProfane, emptyModeration: emptyModeration, publicConfig: publicConfig, OPEN_MAX: OPEN_MAX
+    isProfane: isProfane, emptyModeration: emptyModeration, publicConfig: publicConfig, OPEN_MAX: OPEN_MAX,
+    isHiddenWord: isHiddenWord, isHiddenAnswer: isHiddenAnswer, csv: csv, csvCell: csvCell
   };
   if (typeof module === 'object' && module.exports) module.exports = api;
   else global.HessuResults = api;

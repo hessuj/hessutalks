@@ -56,12 +56,16 @@ async function connect(wsUrl) {
     click: (text, within) => js(`(() => {
       let scope = document;
       if (${JSON.stringify(within || '')}) {
-        scope = [...document.querySelectorAll('section.set-card, article.poll-card, .live-control')].find((e) => e.innerText.includes(${JSON.stringify(within || '')}));
-        if (!scope) throw new Error('alue puuttuu: ${within}');
+        // Alue tunnistetaan otsikosta (sarjan nimi, kysymysteksti tai ohjauspalkin kysymys), ei koko tekstistä:
+        // valikot (esim. Siirrä sarjaan) sisältävät muiden sarjojen nimiä.
+        const w = ${JSON.stringify(within || '')};
+        const title = (e) => (e.querySelector('.set-head h3, .poll-card-prompt, .live-now strong') || e).textContent;
+        scope = [...document.querySelectorAll('article.poll-card, section.set-card, .live-control')].find((e) => title(e).includes(w));
+        if (!scope) throw new Error('alue puuttuu: ' + w);
       }
       const b = [...scope.querySelectorAll('button')].find((x) => x.textContent.trim() === ${JSON.stringify(text)});
-      if (!b) throw new Error('nappi puuttuu: ${text}');
-      if (b.disabled) throw new Error('nappi pois käytöstä: ${text}');
+      if (!b) throw new Error('nappi puuttuu: ' + ${JSON.stringify(text)});
+      if (b.disabled) throw new Error('nappi pois käytöstä: ' + ${JSON.stringify(text)});
       b.click(); return true; })()`),
     fill: (sel, v) => js(`(() => { const e = document.querySelector(${JSON.stringify(sel)}); e.value = ${JSON.stringify(v)}; e.dispatchEvent(new Event('change')); return true; })()`),
     submit: (sel) => js(`(() => { document.querySelector(${JSON.stringify(sel)}).closest('form').requestSubmit(); return true; })()`),

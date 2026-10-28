@@ -408,3 +408,4 @@ body.presenter.light .res-open li { background: #f1f0f8; }
 .remote-grid { display: grid; grid-template-columns: 1fr 1fr; gap: .6rem; }
 .remote-btn { min-height: 4.2rem; font-size: 1.1rem; width: 100%; }
 .shortcuts { font-size: .8rem; }
+.move-set { width: auto; max-width: 14rem; font-size: .85rem; padding: .2rem .4rem; }

@@ -696,6 +696,7 @@
     var mods = {};          // kyselyn id -> moderointi (piilotetut/hyväksytyt), tallennetaan salattuna palvelimelle
     var expanded = {};      // kyselyn id -> tulokset auki
     var lastAnswerId = 0;
+    var lastTs = {};        // kyselyn id -> viimeisimmän vastauksen aikaleima (CSV)
     var views = {};         // kyselyn id -> tuloselementti (säilyy, jotta kaaviot animoituvat)
     var controlEl = h('div.live-control');
     var setsEl = h('div.set-list');
@@ -712,6 +713,7 @@
       h('div.toolbar', null, h('h2', { text: 'Kysymyssarjat' }), h('span.spacer'),
         h('button.btn.ghost.small', { type: 'button', text: 'Tuo JSON', title: 'Tuo sarjat JSON-tiedostosta', onclick: function () { fileInput.click(); } }),
         h('button.btn.ghost.small', { type: 'button', text: 'Vie JSON', title: 'Lataa kaikki sarjat JSON-tiedostona', onclick: function () { exportJson(null); } }),
+        h('button.btn.ghost.small', { type: 'button', text: 'Vie CSV', title: 'Tulokset taulukkona (puretaan tässä selaimessa)', onclick: function () { exportCsv(null); } }),
         h('button.btn.small', { type: 'button', text: 'Uusi sarja', onclick: function () { showSetForm(null); } })),
       controlEl, outEl, formEl, setsEl);
 
@@ -853,6 +855,7 @@
         var code = getEvent().code;
         r.answers.forEach(function (a) {
           if (a.id > lastAnswerId) lastAnswerId = a.id;
+          if (!lastTs[a.poll_id] || a.ts > lastTs[a.poll_id]) lastTs[a.poll_id] = a.ts;
           var poll = findPoll(a.poll_id);
           var m = decrypt(a.ciphertext);
           // Vastaus hyväksytään vain, jos se on salattu juuri tälle luennolle ja kyselylle.
@@ -863,7 +866,67 @@
           changed = true;
         });
         if (changed) updateResults();
+        return r.answers.length;
       });
+    }
+
+    // ---------------------------------------------------------------- CSV-vienti (vaatimus 5.4)
+    // Vastaukset puretaan tässä selaimessa: palvelin ei näe CSV:n sisältöä. Ei osallistujatunnisteita.
+
+    function loadAllAnswers() {
+      return refreshAnswers().then(function (n) { return n >= 2000 ? loadAllAnswers() : null; });
+    }
+    function iso(ts) { return ts ? new Date(ts * 1000).toISOString() : ''; }
+
+    function csvRows(onlySet) {
+      var rows = [['Sarja', 'Sarjan nimi', 'Nro', 'Kysymys', 'Tyyppi', 'Vaihtoehto tai vastaus', 'Määrä', 'Aikaleima (UTC)', 'Piilotettu']];
+      sets.forEach(function (set) {
+        if (onlySet && set.id !== onlySet.id) return;
+        polls.filter(function (p) { return p.set_id === set.id; }).forEach(function (poll, i) {
+          var map = answers[poll.id] || {};
+          var values = Object.keys(map).map(function (k) { return map[k]; });
+          var mod = modFor(poll);
+          var row = function (label, count, ts, hidden) {
+            rows.push([set.slug, set.title, i + 1, poll.prompt, TYPE_LABEL[poll.type] || poll.type, label, count, iso(ts), hidden ? 'kyllä' : '']);
+          };
+          var d = HessuResults.tally(poll, values, mod);
+          if (poll.type === 'single' || poll.type === 'multi') {
+            poll.config.options.forEach(function (opt, j) { row(opt, d.counts[j], lastTs[poll.id]); });
+          } else if (poll.type === 'likert' || poll.type === 'scale') {
+            d.counts.forEach(function (n, j) { row(String(d.from + j), n, lastTs[poll.id]); });
+          } else if (poll.type === 'words') {
+            var counts = {};
+            values.forEach(function (w) { counts[w] = (counts[w] || 0) + 1; });
+            Object.keys(counts).sort(function (x, y) { return counts[y] - counts[x] || (x < y ? -1 : 1); })
+              .forEach(function (w) { row(w, counts[w], lastTs[poll.id], HessuResults.isHiddenWord(mod, w)); });
+          } else {
+            values.slice().sort(function (x, y) { return x.ts - y.ts || x.id - y.id; })
+              .forEach(function (it) { row(it.text, 1, it.ts, HessuResults.isHiddenAnswer(mod, it)); });
+          }
+          if (!values.length && (poll.type === 'words' || poll.type === 'open')) row('', 0, null);
+        });
+      });
+      return rows;
+    }
+
+    function exportCsv(set) {
+      loadAllAnswers().then(function () {
+        var blob = new Blob(['\ufeff' + HessuResults.csv(csvRows(set))], { type: 'text/csv;charset=utf-8' });
+        var a = h('a', { href: URL.createObjectURL(blob), download: 'hessutalks-' + getEvent().code + (set ? '-' + set.slug : '') + '-tulokset.csv' });
+        document.body.appendChild(a); a.click(); a.remove();
+        setTimeout(function () { URL.revokeObjectURL(a.href); }, 1000);
+      }).catch(fail);
+    }
+
+    // ---------------------------------------------------------------- esikatselu (vaatimus 6)
+
+    function previewParticipant(poll) {
+      window.open(BASE + '/admin/esikatselu?poll=' + poll.id, 'hessutalks-esikatselu', 'popup,noopener,width=430,height=780');
+    }
+    function previewStage(poll) {
+      var msg = pollMessage(poll.id);
+      msg.results = false; msg.reveal = null; msg.bigQr = false;
+      present('esikatselu', msg);
     }
 
     function updateResults() {
@@ -1028,7 +1091,16 @@
           h('button.btn.ghost.small', { type: 'button', text: 'Tulokset projektorille', onclick: function () {
             present('kysely-' + poll.id, pollMessage(poll.id), function () { return pollMessage(poll.id); });
           } }),
+          h('button.btn.ghost.small', { type: 'button', text: 'Esikatsele', title: 'Osallistujan näkymä', onclick: function () { previewParticipant(poll); } }),
+          h('button.btn.ghost.small', { type: 'button', text: 'Esikatsele projektorilla', onclick: function () { previewStage(poll); } }),
           h('button.btn.ghost.small', { type: 'button', text: 'Muokkaa', onclick: function () { showForm(poll, findSet(poll.set_id)); } }),
+          sets.length > 1 ? (function () {
+            var sel = h('select.move-set', { 'aria-label': 'Siirrä toiseen sarjaan' },
+              h('option', { value: '', text: 'Siirrä sarjaan…' }),
+              sets.filter(function (s) { return s.id !== poll.set_id; }).map(function (s) { return h('option', { value: String(s.id), text: s.slug + ' ' + s.title }); }));
+            sel.addEventListener('change', function () { if (sel.value) act(poll, 'set', { set_id: parseInt(sel.value, 10) }); });
+            return sel;
+          })() : null,
           h('button.btn.ghost.small', { type: 'button', text: 'Tyhjennä vastaukset', onclick: function () {
             act(poll, 'reset', {}, 'Tyhjennetäänkö kyselyn "' + poll.prompt + '" kaikki vastaukset pysyvästi?');
           } }),
@@ -1060,6 +1132,8 @@
               onclick: function () { setAct(set, 'skip', { skipped: !set.skipped }); } }),
             h('button.btn.ghost.small', { type: 'button', text: 'Muokkaa', onclick: function () { showSetForm(set); } }),
             h('button.btn.ghost.small', { type: 'button', text: 'Vie', title: 'Lataa sarja JSON-tiedostona', onclick: function () { exportJson(set); } }),
+            h('button.btn.ghost.small', { type: 'button', text: 'CSV', title: 'Sarjan tulokset taulukkona', onclick: function () { exportCsv(set); } }),
+            h('button.btn.ghost.small', { type: 'button', text: 'Monista', title: 'Kopio sarjasta ja sen kysymyksistä ilman vastauksia', onclick: function () { setAct(set, 'duplicate'); } }),
             h('button.btn.small', { type: 'button', text: 'Uusi kysymys', onclick: function () { showForm(null, set); } }),
             h('button.btn.danger.small', { type: 'button', text: 'Poista', onclick: function () {
               setAct(set, 'delete', {}, 'Poistetaanko sarja ' + set.slug + ' "' + set.title + '", sen ' + inSet.length + ' kysymystä ja kaikki vastaukset pysyvästi?');

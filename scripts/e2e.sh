@@ -67,7 +67,7 @@ stop_browser() {
   BROWSER=""
 }
 
-if [ $# -gt 0 ]; then TESTS=("$@"); else TESTS=("passkey-prf.mjs" "passkey-prf.mjs noprf" "live-polls.mjs" "import-json.mjs" "open-text.mjs" "reveal.mjs" "presenter.mjs"); fi
+if [ $# -gt 0 ]; then TESTS=("$@"); else TESTS=("passkey-prf.mjs" "passkey-prf.mjs noprf" "live-polls.mjs" "import-json.mjs" "open-text.mjs" "reveal.mjs" "presenter.mjs" "should.mjs"); fi
 status=0
 for t in "${TESTS[@]}"; do
   echo "== $t"

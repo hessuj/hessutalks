@@ -210,6 +210,16 @@ final class PollRepository
         return $this->db->lastId();
     }
 
+    /** Siirtää kyselyn toisen sarjan loppuun (saman luennon sisällä). Vastaukset säilyvät. */
+    public function moveToSet(int $id, int $setId): bool
+    {
+        $max = $this->db->one('SELECT COALESCE(MAX(position), 0) AS p FROM polls WHERE set_id = ?', [$setId]);
+        return $this->db->exec(
+            'UPDATE polls SET set_id = ?, position = ? WHERE id = ? AND event_id = (SELECT event_id FROM poll_sets WHERE id = ?)',
+            [$setId, (int) ($max['p'] ?? 0) + 1, $id, $setId],
+        ) === 1;
+    }
+
     /** Siirtää kyselyä sarjansa sisällä yhden askeleen (-1 ylös, 1 alas). */
     public function move(int $id, int $dir): bool
     {

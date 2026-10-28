@@ -8,6 +8,7 @@ use HessuTalks\Auth\AdminAuth;
 use HessuTalks\Config;
 use HessuTalks\Http\Request;
 use HessuTalks\Http\Response;
+use HessuTalks\I18n;
 use HessuTalks\Import\SetFormat;
 use HessuTalks\Repository\EventRepository;
 use HessuTalks\Repository\KeyRepository;
@@ -67,6 +68,37 @@ final class AdminController
     }
 
     /**
+     * Esikatselu osallistujan ulkoasussa (vaatimus 6): sama kortti kuin osallistujalla, mutta vastausta ei
+     * lähetetä. Vaatii kirjautumisen. Näytetään vain julkiset kentät (ei oikeita vastauksia).
+     */
+    public function preview(Request $req): Response
+    {
+        if (!$this->auth->isAuthenticated()) {
+            return Response::html('<!doctype html><meta charset="utf-8"><title>Kirjautuminen vaaditaan</title><p>Kirjautuminen vaaditaan.</p>', 401);
+        }
+        $raw = $req->query['poll'] ?? '';
+        $poll = is_string($raw) && ctype_digit($raw) ? $this->polls->find((int) $raw) : null;
+        $event = $poll === null ? null : $this->events->find((int) $poll['event_id']);
+        if ($poll === null || $event === null) {
+            return Response::html('<!doctype html><meta charset="utf-8"><title>Ei löytynyt</title><p>Kysymystä ei löytynyt.</p>', 404);
+        }
+        $lang = is_string($event['lang'] ?? null) && in_array($event['lang'], I18n::LANGS, true) ? $event['lang'] : I18n::DEFAULT;
+        $public = [
+            'id' => (int) $poll['id'], 'type' => (string) $poll['type'], 'prompt' => (string) $poll['prompt'],
+            'config' => (object) PollRepository::publicConfig(is_array($poll['config']) ? $poll['config'] : []),
+            'generation' => 0, 'status' => 'open', 'results' => null, 'reveal' => null,
+        ];
+        return Response::html($this->view->render('preview', [
+            'pageTitle' => 'Esikatselu',
+            'lang' => $lang,
+            'event' => $event,
+            'pollJson' => (string) json_encode($public, JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR),
+            'jsStrings' => (string) json_encode(I18n::jsStrings($lang), JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR),
+            'scripts' => ['js/results.js', 'js/polls.js'],
+        ]));
+    }
+
+    /**
      * Ohjaa /admin/api/* -pyynnöt. Kaikki POST-pyynnöt vaativat saman originin ja CSRF-tokenin;
      * kaikki paitsi kirjautumiseen liittyvät vaativat kirjautumisen.
      */
@@ -110,10 +142,10 @@ final class AdminController
         if (preg_match('#^events/(\d{1,10})/(polls|poll-answers|sets|live|import|export)$#', $route, $m) === 1) {
             return $this->eventPolls($req, (int) $m[1], $m[2], $in, $client);
         }
-        if (preg_match('#^polls/(\d{1,10})/(update|status|delete|reset|move|moderation|results|reveal|summary)$#', $route, $m) === 1 && $req->method === 'POST') {
+        if (preg_match('#^polls/(\d{1,10})/(update|status|delete|reset|move|moderation|results|reveal|summary|set)$#', $route, $m) === 1 && $req->method === 'POST') {
             return $this->pollAction((int) $m[1], $m[2], $in, $client);
         }
-        if (preg_match('#^sets/(\d{1,10})/(update|move|skip|delete)$#', $route, $m) === 1 && $req->method === 'POST') {
+        if (preg_match('#^sets/(\d{1,10})/(update|move|skip|delete|duplicate)$#', $route, $m) === 1 && $req->method === 'POST') {
             return $this->setAction((int) $m[1], $m[2], $in, $client);
         }
         if (preg_match('#^questions/(\d{1,10})/(status|delete)$#', $route, $m) === 1 && $req->method === 'POST') {
@@ -496,6 +528,12 @@ final class AdminController
                 $this->polls->setSummary($id, $summary);
                 $this->live->bump((int) $event['id']);
                 return Response::json(['ok' => true]);
+            case 'set':
+                $target = is_int($in['set_id'] ?? null) ? $this->sets->find($in['set_id']) : null;
+                if ($target === null || $target['event_id'] !== (int) $event['id'] || !$this->polls->moveToSet($id, (int) $target['id'])) {
+                    return Response::error('Sarjaa ei löytynyt.', 404);
+                }
+                return $this->pollsState($event);
             case 'moderation':
                 // Salattu luennoitsijan omalla julkisella avaimella: palvelin ei näe piilotettuja sanoja.
                 $ct = $in['ciphertext'] ?? null;
@@ -680,6 +718,12 @@ final class AdminController
                 $dir = $in['dir'] ?? null;
                 if (!is_int($dir) || !$this->sets->move($id, $dir)) {
                     return Response::error('Sarjaa ei voi siirtää.', 409);
+                }
+                break;
+            case 'duplicate':
+                $copy = $this->sets->duplicate($id, $this->polls);
+                if (is_string($copy)) {
+                    return Response::error($copy, 409);
                 }
                 break;
             case 'skip':

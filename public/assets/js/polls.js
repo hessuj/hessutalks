@@ -252,7 +252,10 @@
     return form;
   }
 
+  var previewMode = !!box.dataset.preview;
+
   function send(poll, answer) {
+    if (previewMode) return Promise.reject(new Error(t('preview_no_send')));
     var payload = JSON.stringify({ v: 1, e: code, p: poll.id, a: answer, ts: new Date().toISOString() });
     var ciphertext = sodium.to_base64(
       sodium.crypto_box_seal(sodium.from_string(payload), publicKey),
@@ -351,6 +354,12 @@
       if (failures >= 2) { reconnect.textContent = t('reconnecting'); reconnect.hidden = false; }
       schedule(Math.min(POLL_MS * Math.pow(2, failures - 1), MAX_BACKOFF_MS));
     });
+  }
+
+  // Esikatselu (hallinnan /admin/esikatselu): kortti piirretään sivun datasta, mitään ei haeta eikä lähetetä.
+  if (previewMode) {
+    try { render(JSON.parse(box.dataset.preview)); } catch (e) { box.textContent = 'Esikatselu epäonnistui.'; }
+    return;
   }
 
   var s = window.sodium;

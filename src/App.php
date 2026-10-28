@@ -96,6 +96,9 @@ final class App
             if ($path === '/admin/esitys') {
                 return $req->method === 'GET' ? $this->admin->presenter() : Response::error('Metodia ei tueta.', 405);
             }
+            if ($path === '/admin/esikatselu') {
+                return $req->method === 'GET' ? $this->admin->preview($req) : Response::error('Metodia ei tueta.', 405);
+            }
             if (str_starts_with($path, '/admin/api/')) {
                 $route = substr($path, strlen('/admin/api/'));
                 if (preg_match('#^[a-z0-9/_-]{1,64}$#', $route) !== 1) {

@@ -221,6 +221,8 @@ final class PollSecurityTest extends AppTestCase
         yield ['POST', '/admin/api/sets/1/move'];
         yield ['POST', '/admin/api/sets/1/skip'];
         yield ['POST', '/admin/api/sets/1/delete'];
+        yield ['POST', '/admin/api/sets/1/duplicate'];
+        yield ['POST', '/admin/api/polls/1/set'];
         yield ['POST', '/admin/api/events/1/import'];
         yield ['GET', '/admin/api/events/1/export'];
     }
@@ -367,6 +369,48 @@ final class PollSecurityTest extends AppTestCase
         $this->poll('draft');
         $this->request('POST', '/admin/api/events/' . $this->eventId . '/live', ['action' => 'next'], $h);
         self::assertGreaterThan($after['version'], $answersVersion());
+    }
+
+    public function testDuplicateSetAndMoveQuestionBetweenSets(): void
+    {
+        $h = ['X-CSRF-Token' => $this->loginAdmin()];
+        $quiz = $this->poll('open', 'single', ['options' => ['A', 'B'], 'correct' => [1]]);
+        $this->answer($quiz);
+        $r = $this->request('POST', '/admin/api/sets/' . $this->setId . '/duplicate', [], $h);
+        self::assertSame(200, $r->status, $r->body);
+        $state = $this->json($r);
+        self::assertSame(['M1', 'M1-2'], array_column($state['sets'], 'slug'));
+        self::assertSame('Sarja M1 (kopio)', $state['sets'][1]['title']);
+        $copy = array_values(array_filter($state['polls'], static fn (array $p): bool => $p['set_id'] === $state['sets'][1]['id']))[0];
+        self::assertSame('draft', $copy['status'], 'Kopio on luonnos');
+        self::assertSame(0, $copy['answer_count'], 'Vastauksia ei kopioida');
+        self::assertSame([1], $copy['config']['correct'], 'Oikea vastaus kopioituu');
+        self::assertSame('M1-3', $this->json($this->request('POST', '/admin/api/sets/' . $this->setId . '/duplicate', [], $h))['sets'][2]['slug']);
+
+        // Siirto toiseen sarjaan säilyttää vastaukset; toisen luennon sarjaan ei voi siirtää.
+        $target = (int) $state['sets'][1]['id'];
+        $moved = $this->json($this->request('POST', '/admin/api/polls/' . $quiz . '/set', ['set_id' => $target], $h));
+        $poll = array_values(array_filter($moved['polls'], static fn (array $p): bool => $p['id'] === $quiz))[0];
+        self::assertSame($target, $poll['set_id']);
+        self::assertSame(1, $poll['answer_count']);
+        $foreign = $this->set((int) $this->createEvent('Toinen')['id'], 'X');
+        self::assertSame(404, $this->request('POST', '/admin/api/polls/' . $quiz . '/set', ['set_id' => $foreign], $h)->status);
+    }
+
+    public function testPreviewRequiresLoginAndHidesAnswerKey(): void
+    {
+        $quiz = $this->poll('draft', 'single', ['options' => ['A', 'B'], 'correct' => [1], 'explanations' => ['Ei', 'Salainen selitys']]);
+        self::assertSame(401, $this->request('GET', '/admin/esikatselu?poll=' . $quiz)->status);
+        $this->loginAdmin();
+        $r = $this->request('GET', '/admin/esikatselu?poll=' . $quiz);
+        self::assertSame(200, $r->status);
+        self::assertStringContainsString('data-preview=', $r->body);
+        self::assertStringContainsString('Kysymys?', $r->body);
+        self::assertStringNotContainsString('Salainen selitys', $r->body);
+        self::assertStringNotContainsString('correct', $r->body);
+        self::assertSame(404, $this->request('GET', '/admin/esikatselu?poll=999999')->status);
+        self::assertSame(404, $this->request('GET', '/admin/esikatselu?poll=<script>')->status);
+        self::assertStringContainsString("script-src 'self'", $r->headers['Content-Security-Policy'] ?? '');
     }
 
     public function testEventLanguageIsDefaultForParticipants(): void

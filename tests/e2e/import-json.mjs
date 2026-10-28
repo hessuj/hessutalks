@@ -31,7 +31,7 @@ await admin.click('Tuo');
 await admin.waitFor(admin.hasText('Tuotu 9 sarjaa ja 22 kysymystä.'), 'tuonti');
 const slugs = await admin.js(`[...document.querySelectorAll('section.set-card .set-head .code')].map((e) => e.textContent)`);
 if (slugs.join(',') !== 'OPEN,M1,M2,M3,M4,M5,M6,WRAP-FRI,CLOSE-SAT') throw new Error('Sarjat: ' + slugs);
-const m3 = await admin.js(`[...document.querySelectorAll('section.set-card')].find((s) => s.innerText.includes('M3 Rules of the game')).innerText`);
+const m3 = await admin.js(`[...document.querySelectorAll('section.set-card')].find((s) => s.querySelector('.set-head h3').textContent === 'M3 Rules of the game').innerText`);
 if (!m3.includes('Oikea: 1, 2, 3, 4 · selitykset')) throw new Error('M3:n oikeat vastaukset puuttuvat:\n' + m3);
 step('H14: tuonti loi sarjat oikeassa järjestyksessä; M3:n oikeat vastaukset ja selitykset tallessa');
 

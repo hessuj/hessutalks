@@ -89,7 +89,7 @@ await admin.waitFor(admin.hasText('Ei enempää kysymyksiä.'), 'ohitettu sarja 
 await admin.click('Palauta', 'M2 Attacker');
 await admin.waitFor(`!document.body.innerText.includes('Ohitettu')`, 'palautus');
 await admin.click('↑', 'M2 Attacker');
-await admin.waitFor(`document.querySelectorAll('section.set-card')[0].innerText.includes('M2 Attacker')`, 'M2 ensimmäiseksi');
+await admin.waitFor(`document.querySelector('section.set-card .set-head h3').textContent === 'M2 Attacker'`, 'M2 ensimmäiseksi');
 await admin.click('← Edellinen');
 await admin.waitFor(`document.querySelector('.live-control').innerText.includes('Cybersecurity in one word?')`, 'edellinen = M2 uudessa järjestyksessä');
 step('H12: ohitettu sarja jää pois Seuraava-järjestyksestä; palautus ja sarjan siirto muuttavat järjestystä');

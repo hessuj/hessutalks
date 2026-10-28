@@ -43,6 +43,16 @@ Kyselyyn vastataan ilman nimimerkkiä. Vastaukset salataan selaimessa kuten kysy
 lasketaan luennoitsijan selaimessa, joten hallinnan pitää olla auki ja avattuna. Saman selaimen uusi vastaus
 korvaa aiemman, kunnes kysely suljetaan.
 
+#### Esikatselu, monistus, siirto ja CSV
+
+- **Esikatsele** avaa kysymyksen osallistujan ulkoasussa (puhelimen kokoinen ikkuna, vastausta ei lähetetä) ja
+  **Esikatsele projektorilla** esitysnäkymässä ennen avaamista.
+- **Monista** kopioi sarjan kysymyksineen ilman vastauksia (tunniste saa jatkeen `-2`). Kysymyksen voi siirtää toiseen sarjaan
+  valikosta *Siirrä sarjaan…*. Vastaukset säilyvät.
+- **Vie CSV** (koko luento) ja sarjan **CSV**: kysymys, vaihtoehto tai teksti, vastausmäärä ja aikaleima, ei osallistujatunnisteita.
+  Vastaukset puretaan selaimessasi, joten palvelin ei näe tiedoston sisältöä. Erotin `;` ja UTF-8-BOM, jolloin Excel avaa tiedoston suoraan.
+  Kaavana alkavat tekstit (`=`, `+`, `-`, `@`) saavat eteensä heittomerkin (CSV-injektion esto).
+
 #### Tuonti ja vienti JSON-tiedostona
 
 *Tuo JSON* lukee sarjat tiedostosta, ja kysymykset voi pitää versionhallinnassa ja kopioida tulevia
@@ -248,10 +258,11 @@ hallinnan ja osallistujan rinnakkain omissa ikkunoissaan ja todentavat hyväksym
 Ne haetaan suoraan lähderepoista komennolla `scripts/update-vendor.sh`, ja niiden SHA-256-summat lukitaan tiedostoon `VENDOR.lock`.
 Kirjastoja ei ladata CDN:stä.
 
-## Tulossa
+## Tila
 
-MMoIT 2026 -kurssin vaatimukset (13.–14.11.2026), tilanne: [docs/hyvaksymistestit.md](docs/hyvaksymistestit.md).
-
+MMoIT 2026 -kurssin vaatimukset (13.–14.11.2026) on toteutettu, kuormitustestiä lukuun ottamatta.
+Hyväksymistestit ja niiden todennus: [docs/hyvaksymistestit.md](docs/hyvaksymistestit.md).
+Tulossa: kuormitustesti 150–200 osallistujalla. Kysymysten tykkäykset (Q&A, COULD) on jätetty pois.
 
 ## Lisenssi
 
