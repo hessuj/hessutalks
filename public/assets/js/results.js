@@ -153,8 +153,13 @@
   }
   function pct(n, total) { return total ? Math.round(100 * n / total) : 0; }
 
-  /** Vaakapalkit monivalinnoille. Rivit säilytetään, jotta leveydet animoituvat. */
-  function renderBars(el, poll, data) {
+  /**
+   * Vaakapalkit monivalinnoille. Rivit säilytetään, jotta leveydet animoituvat.
+   * opts.hidden: tulokset piilossa (vain vaihtoehdot), opts.reveal: { correct, explanations } korostaa oikeat.
+   */
+  function renderBars(el, poll, data, opts) {
+    var hidden = !!(opts && opts.hidden);
+    var reveal = opts && opts.reveal && Array.isArray(opts.reveal.correct) ? opts.reveal : null;
     var rows = el.querySelectorAll('.res-row');
     if (rows.length !== data.counts.length) {
       el.replaceChildren();
@@ -165,20 +170,30 @@
         track.appendChild(h('span', 'res-bar'));
         row.appendChild(track);
         row.appendChild(h('span', 'res-value'));
+        row.appendChild(h('span', 'res-explanation'));
         el.appendChild(row);
       });
       rows = el.querySelectorAll('.res-row');
     }
     var max = Math.max.apply(null, data.counts.concat([1]));
+    el.classList.toggle('res-hidden', hidden);
     data.counts.forEach(function (n, i) {
-      rows[i].querySelector('.res-label').textContent = poll.config.options[i];
-      rows[i].querySelector('.res-bar').style.width = (100 * n / max) + '%';
-      rows[i].querySelector('.res-value').textContent = pct(n, data.voters) + ' % (' + n + ')';
+      var correct = !!reveal && reveal.correct.indexOf(i) !== -1;
+      var expl = reveal && Array.isArray(reveal.explanations) && typeof reveal.explanations[i] === 'string' ? reveal.explanations[i] : '';
+      rows[i].classList.toggle('correct', correct);
+      rows[i].classList.toggle('wrong', !!reveal && !correct);
+      rows[i].querySelector('.res-label').textContent = (correct ? '✓ ' : '') + poll.config.options[i];
+      rows[i].querySelector('.res-bar').style.width = hidden ? '0' : (100 * n / max) + '%';
+      rows[i].querySelector('.res-value').textContent = hidden ? '' : pct(n, data.voters) + ' % (' + n + ')';
+      var ex = rows[i].querySelector('.res-explanation');
+      ex.textContent = expl;
+      ex.hidden = !expl;
     });
   }
 
   /** Pystypylväät Likertille ja asteikolle sekä keskiarvo ja mediaani. */
-  function renderColumns(el, poll, data) {
+  function renderColumns(el, poll, data, opts) {
+    var hidden = !!(opts && opts.hidden);
     var cols = el.querySelectorAll('.res-col');
     if (cols.length !== data.counts.length) {
       el.replaceChildren();
@@ -205,11 +220,12 @@
     }
     var max = Math.max.apply(null, data.counts.concat([1]));
     data.counts.forEach(function (n, i) {
-      cols[i].querySelector('.res-col-bar').style.height = (100 * n / max) + '%';
-      cols[i].querySelector('.res-col-value').textContent = n ? String(n) : '';
+      cols[i].querySelector('.res-col-bar').style.height = hidden ? '0' : (100 * n / max) + '%';
+      cols[i].querySelector('.res-col-value').textContent = n && !hidden ? String(n) : '';
     });
-    el.querySelector('.res-stats').textContent = data.mean === undefined ? '' :
-      'Keskiarvo ' + fmt(data.mean, 1) + ' · mediaani ' + fmt(data.median, data.median % 1 ? 1 : 0);
+    var stats = (opts && opts.labels) || { mean: 'Keskiarvo', median: 'mediaani' };
+    el.querySelector('.res-stats').textContent = hidden || typeof data.mean !== 'number' ? '' :
+      stats.mean + ' ' + fmt(data.mean, 1) + (typeof data.median === 'number' ? ' · ' + stats.median + ' ' + fmt(data.median, data.median % 1 ? 1 : 0) : '');
   }
 
   // ---------------------------------------------------------------- sanapilvi
@@ -323,8 +339,9 @@
     var key = poll.id + '|' + poll.type;
     if (el.dataset.key !== key) { el.replaceChildren(); el.dataset.key = key; }
     el.classList.add('results');
-    if (poll.type === 'single' || poll.type === 'multi') renderBars(el, poll, data);
-    else if (poll.type === 'likert' || poll.type === 'scale') renderColumns(el, poll, data);
+    if (poll.type === 'single' || poll.type === 'multi') renderBars(el, poll, data, opts);
+    else if (poll.type === 'likert' || poll.type === 'scale') renderColumns(el, poll, data, opts);
+    else if (opts && opts.hidden) { el.replaceChildren(h('p', 'res-empty', opts.hiddenText || 'Tulokset näytetään myöhemmin.')); el.dataset.key = ''; }
     else if (poll.type === 'open') renderOpen(el, poll, data, opts);
     else renderCloud(el, poll, data, opts);
   }

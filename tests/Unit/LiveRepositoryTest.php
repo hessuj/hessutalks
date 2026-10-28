@@ -127,7 +127,9 @@ final class LiveRepositoryTest extends TestCase
         $this->live->open($this->eventId, $a);
         $poll = $this->live->participantPoll($this->event());
         self::assertIsArray($poll);
-        self::assertSame(['id', 'type', 'prompt', 'config', 'generation', 'status'], array_keys($poll));
+        self::assertSame(['id', 'type', 'prompt', 'config', 'generation', 'status', 'results', 'reveal'], array_keys($poll));
+        self::assertNull($poll['results']);
+        self::assertNull($poll['reveal']);
         self::assertSame('open', $poll['status']);
 
         $this->polls->setStatus($a, 'closed');

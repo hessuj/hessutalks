@@ -123,9 +123,12 @@
       var multi = poll.type === 'multi';
       if (multi) body.appendChild(h('p', 'hint', t('poll_multi_hint')));
       var list = h('div', 'poll-choices');
+      form.choiceLabels = [];
       (cfg.options || []).forEach(function (opt, i) {
         var checked = multi ? Array.isArray(own) && own.indexOf(i) !== -1 : own === i;
-        list.appendChild(choice(multi ? 'checkbox' : 'radio', name, i, opt, checked));
+        var label = choice(multi ? 'checkbox' : 'radio', name, i, opt, checked);
+        form.choiceLabels.push(label);
+        list.appendChild(label);
       });
       body.appendChild(list);
       getAnswer = function () {
@@ -196,6 +199,13 @@
     }
 
     form.appendChild(body);
+    // Paljastus ja tuloskooste päivitetään erikseen (updateExtras), jotta keskeneräinen valinta säilyy.
+    form.resultsBox = h('div', 'poll-results-box');
+    form.resultsBox.hidden = true;
+    form.resultsBox.appendChild(h('p', 'eyebrow', t('poll_results')));
+    form.resultsEl = h('div');
+    form.resultsBox.appendChild(form.resultsEl);
+    form.appendChild(form.resultsBox);
     var manyOpen = poll.type === 'open' && !!cfg.multiple;
     var btn = h('button', 'btn', t(own !== null && !manyOpen ? 'poll_change' : 'poll_submit'));
     btn.type = 'submit';
@@ -269,13 +279,36 @@
     return el;
   }
 
+  /** Oikean vastauksen paljastus ja tuloskooste (kun luennoitsija näyttää ne). */
+  function updateExtras(form, poll) {
+    var reveal = poll.reveal && Array.isArray(poll.reveal.correct) ? poll.reveal : null;
+    (form.choiceLabels || []).forEach(function (label, i) {
+      var correct = !!reveal && reveal.correct.indexOf(i) !== -1;
+      label.classList.toggle('correct', correct);
+      label.classList.toggle('wrong', !!reveal && !correct);
+      var old = label.querySelector('.poll-explanation');
+      if (old) old.remove();
+      var expl = reveal && Array.isArray(reveal.explanations) ? reveal.explanations[i] : '';
+      if (typeof expl === 'string' && expl) label.appendChild(h('span', 'poll-explanation', expl));
+    });
+    var res = poll.results && typeof poll.results === 'object' && Array.isArray(poll.results.counts) ? poll.results : null;
+    form.resultsBox.hidden = !res || !window.HessuResults;
+    if (res && window.HessuResults) {
+      window.HessuResults.render(form.resultsEl, poll, res, {
+        reveal: reveal, labels: { mean: t('poll_mean'), median: t('poll_median') }
+      });
+    }
+  }
+
   /** Näyttää aktiivisen kysymyksen tai odotusnäkymän. Keskeneräinen vastaus säilyy, jos mikään ei muuttunut. */
   function render(poll) {
     var sig = poll ? JSON.stringify([poll.id, poll.type, poll.prompt, poll.config, poll.generation, poll.status]) : 'waiting';
-    if (current && current.sig === sig) return;
-    var el = poll ? buildCard(poll) : waitingView();
-    if (current) current.el.replaceWith(el); else box.appendChild(el);
-    current = { sig: sig, el: el };
+    if (!current || current.sig !== sig) {
+      var el = poll ? buildCard(poll) : waitingView();
+      if (current) current.el.replaceWith(el); else box.appendChild(el);
+      current = { sig: sig, el: el };
+    }
+    if (poll && current.el.resultsBox) updateExtras(current.el, poll);
     box.hidden = false;
   }
 

@@ -63,6 +63,7 @@ Lisää jokaiselle uudelle ominaisuudelle testit, myös tietoturvatestit (`tests
 ## Tulossa
 MMoIT 2026 -kurssin vaatimukset (tapahtuma 13.–14.11.2026, ei julkaisuja tapahtuman aikana).
 Tila ja hyväksymistestit: docs/hyvaksymistestit.md. Valmiina: passkey-avaus (PRF), sarjat ja aktiivinen kysymys, JSON-tuonti/vienti (src/Import/SetFormat.php),
-avoin teksti + salattu moderointi + kirosanasuodatin (results.js).
-Seuraavaksi: oikea vastaus/paljastus, esitysnäkymä + pikanäppäimet,
+avoin teksti + salattu moderointi + kirosanasuodatin (results.js),
+tulosten näyttö/piilotus, oikean vastauksen paljastus ja tuloskooste osallistujille (P2).
+Seuraavaksi: esitysnäkymä + pikanäppäimet,
 nopeusrajat + julkaisujäädytys.

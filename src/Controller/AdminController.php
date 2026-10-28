@@ -110,7 +110,7 @@ final class AdminController
         if (preg_match('#^events/(\d{1,10})/(polls|poll-answers|sets|live|import|export)$#', $route, $m) === 1) {
             return $this->eventPolls($req, (int) $m[1], $m[2], $in, $client);
         }
-        if (preg_match('#^polls/(\d{1,10})/(update|status|delete|reset|move|moderation)$#', $route, $m) === 1 && $req->method === 'POST') {
+        if (preg_match('#^polls/(\d{1,10})/(update|status|delete|reset|move|moderation|results|reveal|summary)$#', $route, $m) === 1 && $req->method === 'POST') {
             return $this->pollAction((int) $m[1], $m[2], $in, $client);
         }
         if (preg_match('#^sets/(\d{1,10})/(update|move|skip|delete)$#', $route, $m) === 1 && $req->method === 'POST') {
@@ -457,6 +457,35 @@ final class AdminController
                     return Response::error('Kyselyä ei voi siirtää.', 409);
                 }
                 return $this->pollsState($event);
+            case 'results':
+                if (!is_bool($in['visible'] ?? null)) {
+                    return Response::error('Virheellinen arvo.', 422);
+                }
+                $this->polls->setResultsVisible($id, $in['visible']);
+                $this->live->bump((int) $event['id']);
+                break;
+            case 'reveal':
+                if (!is_bool($in['revealed'] ?? null)) {
+                    return Response::error('Virheellinen arvo.', 422);
+                }
+                if ($in['revealed'] && !isset($poll['config']['correct'])) {
+                    return Response::error('Kysymyksellä ei ole oikeaa vastausta.', 409);
+                }
+                $this->polls->setRevealed($id, $in['revealed']);
+                $this->live->bump((int) $event['id']);
+                break;
+            case 'summary':
+                // Kooste julkaistaan osallistujille vain, kun tulokset ovat näkyvissä (P2).
+                if ($poll['results_visible'] !== true) {
+                    return Response::error('Tulokset eivät ole näkyvissä.', 409);
+                }
+                $summary = PollRepository::validSummary($poll, $in['summary'] ?? null);
+                if ($summary === null) {
+                    return Response::error('Virheellinen tuloskooste.', 422);
+                }
+                $this->polls->setSummary($id, $summary);
+                $this->live->bump((int) $event['id']);
+                return Response::json(['ok' => true]);
             case 'moderation':
                 // Salattu luennoitsijan omalla julkisella avaimella: palvelin ei näe piilotettuja sanoja.
                 $ct = $in['ciphertext'] ?? null;
@@ -496,6 +525,8 @@ final class AdminController
             'answer_count' => $this->polls->countAnswers((int) ($poll['id'] ?? 0)),
             'set_id' => (int) ($poll['set_id'] ?? 0),
             'moderation' => is_string($poll['moderation'] ?? null) ? $poll['moderation'] : null,
+            'results_visible' => ($poll['results_visible'] ?? false) === true,
+            'revealed' => ($poll['revealed'] ?? false) === true,
             'position' => (int) ($poll['position'] ?? 0),
             'url' => $this->config->publicOrigin . $this->config->url('/k/' . (string) ($event['code'] ?? '')),
         ];

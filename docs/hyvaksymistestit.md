@@ -34,8 +34,8 @@ Todennustavat:
 | 1 | Admin-kirjautuminen: avaus passkeylla (PRF) | ✅ PR #8–#10. Safari + 1Password: odottaa Hessun testiä. |
 | 2 | Sarjat, aktiivinen kysymys, odotusnäkymä, osallistujan kieli | ✅ PR #11 |
 | 3 | JSON-tuonti ja -vienti | ✅ PR #12 |
-| 4 | T3 avoin teksti, pysyvä moderointi, kirosanasuodatin, T4 30 merkkiä | ✅ tämä PR |
-| 5 | Oikea vastaus, selitykset, paljastus, tulosten näyttö/piilotus | ⏳ |
+| 4 | T3 avoin teksti, pysyvä moderointi, kirosanasuodatin, T4 30 merkkiä | ✅ PR #13 |
+| 5 | Oikea vastaus, selitykset, paljastus, tulosten näyttö/piilotus, tulokset osallistujille (SHOULD 4.8) | ✅ tämä PR (`reveal.mjs`) |
 | 6 | Esitysnäkymä ja pikanäppäimet | ⏳ |
 | 7 | Nopeusrajat (myös osoitekohtainen tiiviste), julkaisujäädytys | ⏳ |
 | 8 | SHOULD: tulokset osallistujille, CSV, monistus/siirto, teemat, kirosanasuodatin, puhelinohjain, esikatselu | ⏳ |

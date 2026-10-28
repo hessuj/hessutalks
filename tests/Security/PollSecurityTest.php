@@ -83,7 +83,7 @@ final class PollSecurityTest extends AppTestCase
         $data = $this->json($r);
         self::assertSame($open, $data['poll']['id']);
         self::assertSame('open', $data['poll']['status']);
-        self::assertSame(['id', 'type', 'prompt', 'config', 'generation', 'status'], array_keys($data['poll']));
+        self::assertSame(['id', 'type', 'prompt', 'config', 'generation', 'status', 'results', 'reveal'], array_keys($data['poll']));
         self::assertStringNotContainsString('ciphertext', $r->body);
         self::assertStringNotContainsString('voter', $r->body);
         self::assertStringNotContainsString('answer', $r->body);
@@ -180,6 +180,9 @@ final class PollSecurityTest extends AppTestCase
         yield ['POST', '/admin/api/polls/1/delete'];
         yield ['POST', '/admin/api/polls/1/move'];
         yield ['POST', '/admin/api/polls/1/moderation'];
+        yield ['POST', '/admin/api/polls/1/results'];
+        yield ['POST', '/admin/api/polls/1/reveal'];
+        yield ['POST', '/admin/api/polls/1/summary'];
         yield ['POST', '/admin/api/events/1/sets'];
         yield ['POST', '/admin/api/events/1/live'];
         yield ['POST', '/admin/api/events/1/lang'];
@@ -361,6 +364,56 @@ final class PollSecurityTest extends AppTestCase
         $this->request('POST', '/admin/api/polls/' . $poll . '/reset', [], $h);
         self::assertNull($this->json($this->request('GET', '/admin/api/events/' . $this->eventId . '/polls'))['polls'][0]['moderation']);
         self::assertSame(200, $this->request('POST', $url, ['ciphertext' => null], $h)->status, 'Tyhjennys');
+    }
+
+    // ------------------------------------------------------------ tulokset ja paljastus (vaihe 5)
+
+    public function testRevealSendsAnswerKeyOnlyAfterReveal(): void
+    {
+        $h = ['X-CSRF-Token' => $this->loginAdmin()];
+        $plain = $this->poll('open', 'single', ['options' => ['A', 'B']]);
+        self::assertSame(409, $this->request('POST', '/admin/api/polls/' . $plain . '/reveal', ['revealed' => true], $h)->status, 'Ei oikeaa vastausta');
+
+        $quiz = $this->poll('open', 'single', ['options' => ['A', 'B', 'C'], 'correct' => [1], 'explanations' => ['Ei', 'Kyllä – oikein', 'Ei']]);
+        $live = fn (): array => $this->json($this->request('GET', '/api/live?code=' . $this->code))['poll'];
+        self::assertNull($live()['reveal']);
+        self::assertStringNotContainsString('Kyllä – oikein', $this->request('GET', '/api/live?code=' . $this->code)->body);
+        self::assertSame(422, $this->request('POST', '/admin/api/polls/' . $quiz . '/reveal', ['revealed' => 1], $h)->status);
+        self::assertSame(200, $this->request('POST', '/admin/api/polls/' . $quiz . '/reveal', ['revealed' => true], $h)->status);
+        self::assertSame(['correct' => [1], 'explanations' => ['Ei', 'Kyllä – oikein', 'Ei']], $live()['reveal']);
+        self::assertSame(['options'], array_keys($live()['config']), 'config pysyy julkisena myös paljastuksen jälkeen');
+        self::assertSame(200, $this->request('POST', '/admin/api/polls/' . $quiz . '/reveal', ['revealed' => false], $h)->status);
+        self::assertNull($live()['reveal']);
+    }
+
+    public function testSummaryIsPublishedOnlyWhenResultsVisibleAndValidated(): void
+    {
+        $h = ['X-CSRF-Token' => $this->loginAdmin()];
+        $poll = $this->poll('open', 'likert', ['points' => 5]);
+        $url = '/admin/api/polls/' . $poll;
+        $ok = ['voters' => 4, 'counts' => [0, 1, 1, 2, 0], 'mean' => 3.25, 'median' => 3.5];
+        self::assertSame(409, $this->request('POST', $url . '/summary', ['summary' => $ok], $h)->status, 'Tulokset piilossa');
+        self::assertSame(200, $this->request('POST', $url . '/results', ['visible' => true], $h)->status);
+        foreach ([
+            'väärä pituus' => ['voters' => 4, 'counts' => [1, 1, 2]],
+            'negatiivinen' => ['voters' => 4, 'counts' => [0, -1, 1, 2, 0]],
+            'keskiarvo yli asteikon' => ['voters' => 4, 'counts' => [0, 1, 1, 2, 0], 'mean' => 9],
+            'teksti mukana' => ['voters' => 1, 'counts' => ['vittu', 0, 0, 0, 0]],
+            'liikaa vastaajia' => ['voters' => PollRepository::MAX_ANSWERS + 1, 'counts' => [0, 0, 0, 0, 0]],
+        ] as $name => $bad) {
+            self::assertSame(422, $this->request('POST', $url . '/summary', ['summary' => $bad], $h)->status, $name);
+        }
+        self::assertSame(200, $this->request('POST', $url . '/summary', ['summary' => $ok + ['extra' => 'x']], $h)->status);
+        $results = $this->json($this->request('GET', '/api/live?code=' . $this->code))['poll']['results'];
+        self::assertSame(['voters' => 4, 'counts' => [0, 1, 1, 2, 0], 'from' => 1, 'mean' => 3.25, 'median' => 3.5], $results, 'Vain tunnetut kentät');
+
+        self::assertSame(200, $this->request('POST', $url . '/results', ['visible' => false], $h)->status);
+        self::assertNull($this->json($this->request('GET', '/api/live?code=' . $this->code))['poll']['results'], 'Piilotus poistaa koosteen');
+
+        // Avoimille vastauksille ja sanapilvelle ei julkaista koostetta (P2).
+        $words = $this->poll('open', 'words', []);
+        $this->request('POST', '/admin/api/polls/' . $words . '/results', ['visible' => true], $h);
+        self::assertSame(422, $this->request('POST', '/admin/api/polls/' . $words . '/summary', ['summary' => ['voters' => 1, 'counts' => [1]]], $h)->status);
     }
 
     // ------------------------------------------------------------ JSON-tuonti ja -vienti (H14)

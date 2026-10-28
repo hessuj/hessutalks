@@ -358,3 +358,19 @@ label.check { display: flex; gap: .5rem; align-items: center; margin: .6rem 0; }
 label.check input { width: auto; }
 .poll textarea { width: 100%; }
 .poll .counter { text-align: right; margin: .2rem 0 .6rem; }
+
+/* ---- paljastus ja tuloskooste ---- */
+.res-explanation { grid-column: 1 / -1; color: var(--ink-dim); font-size: .85em; margin: -.2rem 0 .3rem; overflow-wrap: anywhere; }
+.res-row.correct .res-label { color: var(--ok); font-weight: 700; }
+.res-row.correct .res-bar { background: var(--ok); }
+.res-row.wrong { opacity: .6; }
+.results.res-hidden .res-value, .results.res-hidden .res-track { visibility: hidden; }
+.poll-choice.correct { border-color: var(--ok); background: rgba(166, 230, 160, .14); }
+.poll-choice.correct > span:first-of-type::before { content: '✓ '; color: var(--ok); font-weight: 700; }
+.poll-choice.wrong { opacity: .7; }
+.poll-choice { flex-wrap: wrap; }
+.poll-explanation { flex-basis: 100%; font-size: .85rem; color: var(--ink-dim); padding-left: 1.8rem; }
+.poll-results-box { margin-top: 1rem; padding-top: .6rem; border-top: 1px solid var(--frame); }
+.poll-results-box .res-columns { height: 8rem; }
+.poll-results-box .res-row { grid-template-columns: minmax(5rem, 2fr) 2fr 5.5em; }
+.poll-stage-results .res-explanation { font-size: .7em; }

@@ -29,9 +29,13 @@ Kysymystyypit: monivalinta (yksi tai useita vastauksia), avoin teksti (280 merkk
    (*Waiting for the next question…*), kunnes avaat sen. Vain aktiivinen kysymys voi olla auki.
 3. Osallistujat käyttävät koko ajan samaa luennon QR-koodia tai linkkiä. Näkymä vaihtuu itsestään noin
    sekunnin viiveellä ilman sivun päivitystä. Yhteyskatkon jälkeen sivu yhdistää uudelleen, ja oma vastaus säilyy myös uudelleenlatauksessa.
-4. *Aktiivinen projektorille* avaa ikkunan, joka seuraa aktiivista kysymystä ja sen tuloksia (ilman aktiivista kysymystä
+4. **Tulokset ja paljastus:** tulokset ovat aluksi piilossa (projektorilla kysymys, vaihtoehdot ja vastausmäärä).
+   *Näytä tulokset* tuo ne projektorille ja tuloskoosteena myös osallistujien puhelimiin (monivalinnat ja asteikot).
+   *Paljasta oikea vastaus* korostaa oikeat vaihtoehdot ja näyttää selitykset, jos kysymykselle on määritelty oikea vastaus.
+   Oikeat vastaukset ja selitykset annetaan kysymyslomakkeella tai JSON-tiedostossa, eikä niitä lähetetä osallistujille ennen paljastusta.
+5. *Aktiivinen projektorille* avaa ikkunan, joka seuraa aktiivista kysymystä ja sen tuloksia (ilman aktiivista kysymystä
    siinä näkyy luennon QR-koodi). *Tulokset projektorille* näyttää yksittäisen kysymyksen tulokset omassa ikkunassaan.
-5. **Moderointi:** avoimen vastauksen voi piilottaa *Piilota*-napilla ja sanapilven sanan klikkaamalla sitä. Piilotus katoaa projektorilta heti.
+6. **Moderointi:** avoimen vastauksen voi piilottaa *Piilota*-napilla ja sanapilven sanan klikkaamalla sitä. Piilotus katoaa projektorilta heti.
    Kirosanasuodatin (englanti ja suomi) piilottaa osumat automaattisesti, ja ne odottavat hyväksyntää (⚠ … ✓).
    Piilotukset tallennetaan palvelimelle salattuina luennoitsijan avaimella, joten ne säilyvät uudelleenlatauksen yli.
 
@@ -221,7 +225,6 @@ Kirjastoja ei ladata CDN:stä.
 
 MMoIT 2026 -kurssin vaatimukset (13.–14.11.2026), tilanne: [docs/hyvaksymistestit.md](docs/hyvaksymistestit.md).
 
-- Oikea vastaus, selitykset ja paljastus; tulosten näyttö ja piilotus
 - Yksi esitysnäkymä pikanäppäimineen (QR kulmassa, vastausmäärä, Teams-luettavuus)
 - Nopeusrajat osoitteen mukaan (vain tiiviste, 10 min) ja julkaisujäädytys tapahtuman ajaksi
 

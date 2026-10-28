@@ -332,6 +332,74 @@ final class PollRepository
             && strlen((string) base64_decode((string) $value, true)) <= self::MODERATION_MAX_BYTES;
     }
 
+    public function setResultsVisible(int $id, bool $visible): bool
+    {
+        // Piilotettaessa kooste poistetaan: osallistujat eivät näe vanhentunutta lukua seuraavalla näytöllä.
+        return $this->db->exec(
+            'UPDATE polls SET results_visible = ?, summary = CASE WHEN ? = 1 THEN summary ELSE NULL END WHERE id = ?',
+            [$visible ? 1 : 0, $visible ? 1 : 0, $id],
+        ) === 1;
+    }
+
+    public function setRevealed(int $id, bool $revealed): bool
+    {
+        return $this->db->exec('UPDATE polls SET revealed = ? WHERE id = ?', [$revealed ? 1 : 0, $id]) === 1;
+    }
+
+    /**
+     * Tuloskooste osallistujille (päätös P2): vain monivalinnat ja asteikot, vain määrät ja tunnusluvut.
+     * Luennoitsijan selain laskee sen puretuista vastauksista; palvelin tarkistaa muodon ja rajat.
+     * @param array<string, mixed> $poll
+     * @return array{voters: int, counts: list<int>, from?: int, mean?: float, median?: float}|null
+     */
+    public static function validSummary(array $poll, mixed $in): ?array
+    {
+        if (!is_array($in) || !is_int($in['voters'] ?? null) || $in['voters'] < 0 || $in['voters'] > self::MAX_ANSWERS) {
+            return null;
+        }
+        $counts = $in['counts'] ?? null;
+        $config = is_array($poll['config'] ?? null) ? $poll['config'] : [];
+        $size = match ($poll['type'] ?? '') {
+            'single', 'multi' => count(is_array($config['options'] ?? null) ? $config['options'] : []),
+            'likert' => ($config['points'] ?? 5) === 7 ? 7 : 5,
+            'scale' => 11,
+            default => 0,
+        };
+        if ($size === 0 || !is_array($counts) || !array_is_list($counts) || count($counts) !== $size) {
+            return null;
+        }
+        foreach ($counts as $n) {
+            if (!is_int($n) || $n < 0 || $n > self::MAX_ANSWERS) {
+                return null;
+            }
+        }
+        $out = ['voters' => $in['voters'], 'counts' => $counts];
+        if ($poll['type'] === 'likert' || $poll['type'] === 'scale') {
+            $from = $poll['type'] === 'scale' ? 0 : 1;
+            $out['from'] = $from;
+            foreach (['mean', 'median'] as $k) {
+                $v = $in[$k] ?? null;
+                if ($v === null) {
+                    continue;
+                }
+                if ((!is_int($v) && !is_float($v)) || $v < $from || $v > $from + $size - 1) {
+                    return null;
+                }
+                $out[$k] = round((float) $v, 2);
+            }
+        }
+        return $out;
+    }
+
+    /** @param array<string, mixed>|null $summary */
+    public function setSummary(int $id, ?array $summary): bool
+    {
+        return $this->db->exec(
+            'UPDATE polls SET summary = ? WHERE id = ? AND results_visible = 1',
+            [$summary === null ? null : self::encode($summary), $id],
+        ) === 1;
+    }
+
     /** Tallentaa luennoitsijan salatun moderointitiedon (null = ei piilotuksia). */
     public function setModeration(int $id, ?string $ciphertext): bool
     {
@@ -398,8 +466,10 @@ final class PollRepository
                 $row[$k] = (int) $row[$k];
             }
         }
-        if (isset($row['skipped'])) {
-            $row['skipped'] = (bool) $row['skipped'];
+        foreach (['skipped', 'results_visible', 'revealed'] as $k) {
+            if (isset($row[$k])) {
+                $row[$k] = (bool) $row[$k];
+            }
         }
         return $row;
     }

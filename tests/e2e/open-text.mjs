@@ -49,7 +49,8 @@ if (await admin.js(`[...document.querySelectorAll('.res-open-text')].some((e) =>
 await admin.waitFor(admin.hasText('⚠ This is fucking hard'), 'suodattimen tarkistettava');
 step('H6 (hallinta): <script> ja <img onerror> näkyvät tekstinä; kirosanasuodatin piilotti vastauksen tarkistettavaksi');
 
-// Projektori
+// Projektori (tulokset ovat oletuksena piilossa: luennoitsija näyttää ne)
+await admin.click('Näytä tulokset');
 await admin.click('Aktiivinen projektorille');
 const stage = await attach(port, '/admin/esitys');
 await stage.waitFor(`[...document.querySelectorAll('.res-open-text')].some((e) => e.textContent === ${JSON.stringify(XSS)})`, 'XSS-teksti projektorilla');

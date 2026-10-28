@@ -77,6 +77,16 @@
     });
   }
 
+  /** Paljastus: oikeiden vaihtoehtojen indeksit ja valinnaiset selitykset (tarkistetaan kuten muukin sisältö). */
+  function validReveal(m) {
+    var r = m.reveal;
+    var n = m.poll.config && Array.isArray(m.poll.config.options) ? m.poll.config.options.length : 0;
+    if (!r || typeof r !== 'object' || !Array.isArray(r.correct) || !r.correct.every(function (i) { return isCount(i) && i < n; })) return null;
+    var ex = r.explanations;
+    if (ex !== null && ex !== undefined && (!Array.isArray(ex) || ex.length !== n || !ex.every(function (e) { return str(e, 300) !== null; }))) return null;
+    return { correct: r.correct, explanations: ex || null };
+  }
+
   function renderPoll(m) {
     var p = m.poll;
     lastPoll = m;
@@ -102,7 +112,9 @@
     }
     pollView.prompt.textContent = p.prompt;
     pollView.count.textContent = m.data.voters + ' vastausta' + (m.status === 'closed' ? ' · kysely on suljettu' : '');
-    window.HessuResults.render(pollView.results, p, m.data, p.type === 'open' ? { max: OPEN_ON_STAGE } : null);
+    window.HessuResults.render(pollView.results, p, m.data, {
+      max: OPEN_ON_STAGE, hidden: m.results !== true, reveal: validReveal(m), hiddenText: 'Tulokset näytetään myöhemmin.'
+    });
   }
 
   // Sanapilvi asetellaan ikkunan koon mukaan: piirretään uudelleen, kun koko muuttuu.

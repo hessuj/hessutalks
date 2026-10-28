@@ -97,7 +97,7 @@ final class ParticipantController
             'jsStrings' => (string) json_encode(I18n::jsStrings($lang), JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR),
             'liveEndpoint' => $this->config->url('/api/live'),
             'answerEndpoint' => $this->config->url('/api/polls/answer'),
-            'scripts' => ['vendor/sodium.js', 'js/lang.js', 'js/participant.js', 'js/polls.js'],
+            'scripts' => ['vendor/sodium.js', 'js/lang.js', 'js/participant.js', 'js/results.js', 'js/polls.js'],
         ]);
     }
 

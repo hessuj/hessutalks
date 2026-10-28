@@ -51,22 +51,32 @@ php -r '
 (cd "$ROOT" && PHP_CLI_SERVER_WORKERS=4 HESSUTALKS_CONFIG="$TMP/config.php" exec php -S "localhost:$PORT" -t public bin/dev-router.php >"$TMP/server.log" 2>&1) &
 SERVER=$!
 # Automaatiossa ikkunat eivät saa jäädä "taustalle": muuten Chrome hidastaa ajastimia ja sivu luulee olevansa piilossa.
-"$CHROME" --headless=new --remote-debugging-port="$CDP" --user-data-dir="$TMP/chrome" --no-first-run --no-default-browser-check \
-  --disable-background-timer-throttling --disable-backgrounding-occluded-windows --disable-renderer-backgrounding about:blank >"$TMP/chrome.log" 2>&1 &
-BROWSER=$!
-for _ in $(seq 1 50); do
-  curl -sf "http://127.0.0.1:$CDP/json/version" >/dev/null && curl -sf -o /dev/null "http://localhost:$PORT/healthz" && break
-  sleep 0.2
-done
+# Jokainen testi saa oman, puhtaan selaimen (ei edellisen testin ikkunoita, evästeitä eikä passkeyta).
+start_browser() {
+  rm -rf "$TMP/chrome"
+  "$CHROME" --headless=new --remote-debugging-port="$CDP" --user-data-dir="$TMP/chrome" --no-first-run --no-default-browser-check \
+    --disable-background-timer-throttling --disable-backgrounding-occluded-windows --disable-renderer-backgrounding about:blank >"$TMP/chrome.log" 2>&1 &
+  BROWSER=$!
+  for _ in $(seq 1 50); do
+    curl -sf "http://127.0.0.1:$CDP/json/version" >/dev/null && curl -sf -o /dev/null "http://localhost:$PORT/healthz" && return
+    sleep 0.2
+  done
+}
+stop_browser() {
+  [ -n "$BROWSER" ] && kill "$BROWSER" 2>/dev/null && wait "$BROWSER" 2>/dev/null || true
+  BROWSER=""
+}
 
-if [ $# -gt 0 ]; then TESTS=("$@"); else TESTS=("passkey-prf.mjs" "passkey-prf.mjs noprf" "live-polls.mjs" "import-json.mjs" "open-text.mjs"); fi
+if [ $# -gt 0 ]; then TESTS=("$@"); else TESTS=("passkey-prf.mjs" "passkey-prf.mjs noprf" "live-polls.mjs" "import-json.mjs" "open-text.mjs" "reveal.mjs"); fi
 status=0
 for t in "${TESTS[@]}"; do
   echo "== $t"
   rm -rf "$TMP/data/hessutalks.sqlite"* "$TMP/data/sessions"   # jokainen testi aloittaa tyhjästä
   read -r file extra <<<"$t"
+  start_browser
   # shellcheck disable=SC2086
   if ! node "$ROOT/tests/e2e/$file" "$CDP" "http://localhost:$PORT" $extra; then status=1; fi
+  stop_browser
 done
 if grep -iE "fatal|warning|error" "$TMP/server.log" | grep -v "Accepted\|Closing" >/dev/null; then
   echo "Palvelinlokissa virheitä:" >&2

@@ -118,7 +118,7 @@ final class LiveRepository
             return null;
         }
         $row = $this->db->one(
-            "SELECT id, type, prompt, config, generation, status FROM polls
+            "SELECT id, type, prompt, config, generation, status, results_visible, revealed, summary FROM polls
              WHERE id = ? AND event_id = ? AND status IN ('open', 'closed')",
             [(int) $event['active_poll_id'], (int) $event['id']],
         );
@@ -126,14 +126,19 @@ final class LiveRepository
             return null;
         }
         $config = json_decode((string) $row['config'], true);
+        $config = is_array($config) ? $config : [];
+        $summary = (int) $row['results_visible'] === 1 && is_string($row['summary']) ? json_decode($row['summary'], true) : null;
+        $revealed = (int) $row['revealed'] === 1 && isset($config['correct']);
         return [
             'id' => (int) $row['id'],
             'type' => (string) $row['type'],
             'prompt' => (string) $row['prompt'],
-            // Oikeat vastaukset ja selitykset eivät lähde osallistujalle.
-            'config' => (object) PollRepository::publicConfig(is_array($config) ? $config : []),
+            // Oikeat vastaukset ja selitykset eivät lähde osallistujalle ennen paljastusta.
+            'config' => (object) PollRepository::publicConfig($config),
             'generation' => (int) $row['generation'],
             'status' => (string) $row['status'],
+            'results' => is_array($summary) ? $summary : null,
+            'reveal' => $revealed ? ['correct' => $config['correct'], 'explanations' => $config['explanations'] ?? null] : null,
         ];
     }
 }
