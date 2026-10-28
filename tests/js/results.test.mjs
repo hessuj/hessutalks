@@ -66,5 +66,47 @@ test('jakaumat ja tunnusluvut', () => {
 test('sanapilvi: yleisimmät ensin, piilotetut pois', () => {
   const t = R.tally(words, ['vpn', 'mfa', 'vpn', 'salasana', 'mfa', 'vpn']);
   assert.deepEqual(t.words, [['vpn', 3], ['mfa', 2], ['salasana', 1]]);
-  assert.deepEqual(R.tally(words, ['vpn', 'mfa'], { vpn: true }).words, [['mfa', 1]]);
+  const mod = R.emptyModeration();
+  mod.words.vpn = true;
+  assert.deepEqual(R.tally(words, ['vpn', 'mfa'], mod).words, [['mfa', 1]]);
+});
+
+const open = { id: 7, type: 'open', config: { multiple: true } };
+
+test('avoin teksti: 1–280 merkkiä, ohjausmerkit pois, rivinvaihdot säilyvät', () => {
+  assert.equal(R.validAnswer(open, '  Hei\r\nmaailma\u0007  '), 'Hei\nmaailma');
+  assert.equal(R.validAnswer(open, '<script>alert(1)</script>'), '<script>alert(1)</script>', 'Teksti säilyy tekstinä; DOMiin vain textContentilla');
+  assert.equal(R.validAnswer(open, 'ä'.repeat(280)), 'ä'.repeat(280));
+  assert.equal(R.validAnswer(open, '😀'.repeat(280)), '😀'.repeat(280), 'Merkit lasketaan, ei UTF-16-yksiköitä');
+  for (const bad of ['x'.repeat(281), '   ', '', 5, null, ['a']]) assert.equal(R.validAnswer(open, bad), null, String(bad));
+  assert.equal(R.validAnswer(open, 'a\u202Eb'), 'ab', 'Tekstin suunnan ohjausmerkit pois');
+});
+
+test('avoin teksti: uusin ensin, piilotetut ja suodattimen osumat pois', () => {
+  const items = [
+    { id: 1, text: 'Ensimmäinen', ts: 100 },
+    { id: 2, text: 'Toinen', ts: 200 },
+    { id: 3, text: 'Paskaa koko luento', ts: 300 },
+    { id: 4, text: 'Kolmas', ts: 300 },
+  ];
+  const mod = R.emptyModeration();
+  let t = R.tally(open, items, mod);
+  assert.deepEqual(t.items.map((i) => i.id), [4, 2, 1], 'Kirosana piilossa automaattisesti');
+  assert.equal(t.voters, 4);
+  assert.equal(t.hidden, 1);
+  mod.answers[2] = true;
+  mod.approved[3] = true;
+  t = R.tally(open, items, mod);
+  assert.deepEqual(t.items.map((i) => i.id), [4, 3, 1], 'Piilotettu pois, hyväksytty näkyviin');
+});
+
+test('kirosanasuodatin: englanti ja suomi, taivutukset, ei vääriä osumia', () => {
+  for (const bad of ['fuck this', 'Bullshit!', 'vittu', 'Vittujen kevät', 'perkeleen hyvä', 'saatanan', 'PASKA']) assert.equal(R.isProfane(bad), true, bad);
+  for (const ok of ['assessment', 'class assignment', 'summa cum laude', 'Scunthorpe', 'Cocktail', 'perseverance', 'tit for tat', 'security', '']) {
+    assert.equal(R.isProfane(ok), false, ok);
+  }
+  const mod = R.emptyModeration();
+  assert.deepEqual(R.tally(words, ['vittu', 'mfa'], mod).words, [['mfa', 1]]);
+  mod.approvedWords.vittu = true;
+  assert.deepEqual(R.tally(words, ['vittu', 'mfa'], mod).words.map((w) => w[0]).sort(), ['mfa', 'vittu']);
 });

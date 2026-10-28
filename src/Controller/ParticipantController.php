@@ -199,7 +199,8 @@ final class ParticipantController
         if (!$this->limiter->hit($bucket, self::VOTE_LIMIT_PER_VOTER, self::WINDOW)) {
             return Response::error(I18n::t($lang, 'err.vote_rate'), 429);
         }
-        if (!$this->polls->answer((int) $poll['id'], (string) $in['voter'], (string) $in['ciphertext'])) {
+        $multiple = $poll['type'] === 'open' && ($poll['config']['multiple'] ?? false) === true;
+        if (!$this->polls->answer((int) $poll['id'], (string) $in['voter'], (string) $in['ciphertext'], $multiple)) {
             return Response::error(I18n::t($lang, 'err.poll_quota'), 429);
         }
         return Response::json(['ok' => true], 201);

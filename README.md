@@ -17,7 +17,7 @@ Osoite: <https://hessujarvinen.com/hessutalks/>
 ### Kyselyt ja kysymyssarjat
 
 Luento koostuu **kysymyssarjoista** (esim. moduulit `M1`, `M4`), joissa on kysymykset järjestyksessä.
-Kysymystyypit: monivalinta (yksi tai useita vastauksia), sanapilvi, Likert-asteikko (5 tai 7 kohtaa) ja asteikko 0–10.
+Kysymystyypit: monivalinta (yksi tai useita vastauksia), avoin teksti (280 merkkiä, valinnaisesti useita vastauksia), sanapilvi (1–3 sanaa, 30 merkkiä), Likert-asteikko (5 tai 7 kohtaa) ja asteikko 0–10.
 
 1. Luo luennon sivulla sarjat (*Uusi sarja*) ja niihin kysymykset (*Uusi kysymys*) valmiiksi ennen luentoa.
    Sarjoja ja kysymyksiä voi siirtää nuolilla, ja sarjan voi **ohittaa** kesken luennon. Ohitetun sarjan
@@ -31,7 +31,9 @@ Kysymystyypit: monivalinta (yksi tai useita vastauksia), sanapilvi, Likert-astei
    sekunnin viiveellä ilman sivun päivitystä. Yhteyskatkon jälkeen sivu yhdistää uudelleen, ja oma vastaus säilyy myös uudelleenlatauksessa.
 4. *Aktiivinen projektorille* avaa ikkunan, joka seuraa aktiivista kysymystä ja sen tuloksia (ilman aktiivista kysymystä
    siinä näkyy luennon QR-koodi). *Tulokset projektorille* näyttää yksittäisen kysymyksen tulokset omassa ikkunassaan.
-5. Sanapilvessä sopimattoman sanan voi piilottaa klikkaamalla sitä hallinnan tuloksissa.
+5. **Moderointi:** avoimen vastauksen voi piilottaa *Piilota*-napilla ja sanapilven sanan klikkaamalla sitä. Piilotus katoaa projektorilta heti.
+   Kirosanasuodatin (englanti ja suomi) piilottaa osumat automaattisesti, ja ne odottavat hyväksyntää (⚠ … ✓).
+   Piilotukset tallennetaan palvelimelle salattuina luennoitsijan avaimella, joten ne säilyvät uudelleenlatauksen yli.
 
 Kyselyyn vastataan ilman nimimerkkiä. Vastaukset salataan selaimessa kuten kysymyksetkin, ja tulokset
 lasketaan luennoitsijan selaimessa, joten hallinnan pitää olla auki ja avattuna. Saman selaimen uusi vastaus
@@ -57,7 +59,7 @@ Tuonti on kaikki tai ei mitään. Virhe (myös luennolla jo oleva sarjan tunnist
 | `single`, `multi` | Monivalinta. `correct` = oikeiden vaihtoehtojen indeksit (0-pohjainen), `explanations` = selitys per vaihtoehto. Molemmat valinnaisia, eikä niitä näytetä osallistujille. |
 | `scale` | `min`–`max` 1–5 tai 1–7 = Likert, 0–10 = asteikko |
 | `wordcloud` | Sanapilvi, `maxWords` 1–3 |
-| `open` | Avoin teksti (tulossa, ohitetaan toistaiseksi varoituksella) |
+| `open` | Avoin teksti, `multipleAnswers` = useita vastauksia |
 | `qa` | Ei käytössä; tuodaan `fallbackType`-kentän tyyppinä, jos se on annettu |
 
 **Osallistujien kieli** valitaan luennolle (luontilomake tai luennon sivu): *English*, *Suomi* tai selaimen kielen mukaan.
@@ -219,7 +221,6 @@ Kirjastoja ei ladata CDN:stä.
 
 MMoIT 2026 -kurssin vaatimukset (13.–14.11.2026), tilanne: [docs/hyvaksymistestit.md](docs/hyvaksymistestit.md).
 
-- Avoin teksti (280 merkkiä) ja pysyvä moderointi, myös sanapilvelle
 - Oikea vastaus, selitykset ja paljastus; tulosten näyttö ja piilotus
 - Yksi esitysnäkymä pikanäppäimineen (QR kulmassa, vastausmäärä, Teams-luettavuus)
 - Nopeusrajat osoitteen mukaan (vain tiiviste, 10 min) ja julkaisujäädytys tapahtuman ajaksi

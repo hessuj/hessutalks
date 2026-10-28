@@ -23,7 +23,8 @@ Katso README.md (käyttö, käyttöönotto) ja SECURITY.md (uhkamalli). Älä he
 public/            index.php (front controller), .htaccess, assets/ (css, js, vendor)
 src/               PHP 8.4, PSR-4 HessuTalks\ – App (reititys), I18n (fi/en), Controller/, Repository/, Auth/, Security/, Http/
 templates/         PHP-templatet, escapoi aina $e():llä
-migrations/        SQL-migraatiot (ajetaan automaattisesti), numeroidaan juoksevasti (001_, 002_ …)
+migrations/        SQL-migraatiot (ajetaan automaattisesti), numeroidaan juoksevasti (001_, 002_ …).
+                   Taulun uudelleenrakennus: rivi `-- hessutalks:foreign-keys-off` (ks. 005)
 tests/Unit, tests/Security   PHPUnit; tests/js  Node-testit (krypto, kyselytulokset, PRF)
 tests/e2e          selaintestit (headless Chrome, virtuaalinen passkey), ajo scripts/e2e.sh
 bin/init.php       asetustiedoston luonti; bin/dev-router.php kehityspalvelin; bin/seed-demo.php testiluento (dev/CI)
@@ -61,6 +62,7 @@ Lisää jokaiselle uudelle ominaisuudelle testit, myös tietoturvatestit (`tests
 
 ## Tulossa
 MMoIT 2026 -kurssin vaatimukset (tapahtuma 13.–14.11.2026, ei julkaisuja tapahtuman aikana).
-Tila ja hyväksymistestit: docs/hyvaksymistestit.md. Valmiina: passkey-avaus (PRF), sarjat ja aktiivinen kysymys, JSON-tuonti/vienti (src/Import/SetFormat.php).
-Seuraavaksi: avoin teksti + moderointi (lisää myös SetFormatiin type open), oikea vastaus/paljastus, esitysnäkymä + pikanäppäimet,
+Tila ja hyväksymistestit: docs/hyvaksymistestit.md. Valmiina: passkey-avaus (PRF), sarjat ja aktiivinen kysymys, JSON-tuonti/vienti (src/Import/SetFormat.php),
+avoin teksti + salattu moderointi + kirosanasuodatin (results.js).
+Seuraavaksi: oikea vastaus/paljastus, esitysnäkymä + pikanäppäimet,
 nopeusrajat + julkaisujäädytys.

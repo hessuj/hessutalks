@@ -346,3 +346,15 @@ body.presenter { padding: 0; min-height: 0; height: 100vh; overflow: hidden; }
 .poll-stage-url { font: 600 min(2.2vw, 3.2vh)/1.2 var(--sans); color: var(--accent); margin: 0; word-break: break-all; }
 .poll-stage-count { font: 600 min(2vw, 3vh)/1.2 var(--mono); margin: .5vh 0 0; }
 .set-head .code, .live-now .code, .poll-card-head .code { font: 700 .95rem var(--mono); letter-spacing: .06em; color: var(--accent); }
+
+/* ---- avoin teksti ---- */
+.res-open { list-style: none; margin: 0; padding: 0; display: grid; gap: .45rem; }
+.res-open li { display: flex; gap: .6rem; align-items: flex-start; justify-content: space-between; border-left: 4px solid var(--accent); padding: .35rem .7rem; background: rgba(0, 0, 0, .15); }
+.res-open-text { white-space: pre-wrap; overflow-wrap: anywhere; font-size: var(--res-text); }
+.res-empty { color: var(--ink-dim); margin: 0; }
+.poll-stage-results .res-open { gap: 1.2vh; align-content: start; overflow: hidden; }
+.poll-stage-results .res-open li { border-left-width: .5vw; padding: .8vh 1.2vw; }
+label.check { display: flex; gap: .5rem; align-items: center; margin: .6rem 0; }
+label.check input { width: auto; }
+.poll textarea { width: 100%; }
+.poll .counter { text-align: right; margin: .2rem 0 .6rem; }

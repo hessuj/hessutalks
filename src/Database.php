@@ -95,14 +95,28 @@ final class Database
                 continue;
             }
             $sql = (string) file_get_contents($file);
+            // Taulun uudelleenrakennus (SQLite ei osaa muuttaa CHECK-ehtoja): viiteavaimet pois ajon ajaksi,
+            // muuten vanhan taulun DROP poistaisi viittaavat rivit (ON DELETE CASCADE). Eheys tarkistetaan lopuksi.
+            // PRAGMA foreign_keys ei vaikuta transaktion sisällä, joten se asetetaan ennen transaktiota.
+            $fkOff = str_contains($sql, '-- hessutalks:foreign-keys-off');
+            if ($fkOff) {
+                $this->pdo->exec('PRAGMA foreign_keys = OFF');
+            }
             $this->pdo->beginTransaction();
             try {
                 $this->pdo->exec($sql);
+                if ($fkOff && $this->all('PRAGMA foreign_key_check') !== []) {
+                    throw new \RuntimeException('Migraatio ' . $name . ' rikkoi viite-eheyden.');
+                }
                 $this->exec('INSERT INTO schema_migrations (name, applied_at) VALUES (?, ?)', [$name, time()]);
                 $this->pdo->commit();
             } catch (\Throwable $e) {
                 $this->pdo->rollBack();
                 throw $e;
+            } finally {
+                if ($fkOff) {
+                    $this->pdo->exec('PRAGMA foreign_keys = ON');
+                }
             }
         }
     }

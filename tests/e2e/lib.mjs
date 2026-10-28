@@ -9,8 +9,11 @@ export async function tab(port) {
     browser.send(JSON.stringify({ id: 1, method: 'Target.createTarget', params: { url: 'about:blank', newWindow: true } }));
   });
   const list = await (await fetch(`http://127.0.0.1:${port}/json/list`)).json();
-  const target = list.find((x) => x.id === targetId);
-  const ws = new WebSocket(target.webSocketDebuggerUrl);
+  return connect(list.find((x) => x.id === targetId).webSocketDebuggerUrl);
+}
+
+async function connect(wsUrl) {
+  const ws = new WebSocket(wsUrl);
   await new Promise((r) => ws.addEventListener('open', r, { once: true }));
   let seq = 0;
   const pending = new Map();
@@ -19,7 +22,11 @@ export async function tab(port) {
     const m = JSON.parse(ev.data);
     if (m.id && pending.has(m.id)) { pending.get(m.id)(m); pending.delete(m.id); }
     if (m.method === 'Runtime.exceptionThrown') logs.push('EXC ' + (m.params.exceptionDetails.exception?.description || m.params.exceptionDetails.text));
-    if (m.method === 'Page.javascriptDialogOpening') cdp('Page.handleJavaScriptDialog', { accept: true });
+    if (m.method === 'Page.javascriptDialogOpening') {
+      // confirm() on sovelluksen omaa käyttöä (vahvistukset); alert() tarkoittaisi suoritettua skriptiä (XSS).
+      if (m.params.type === 'alert') logs.push('ALERT ' + m.params.message);
+      cdp('Page.handleJavaScriptDialog', { accept: true });
+    }
   });
   const cdp = (method, params = {}) => new Promise((resolve, reject) => {
     const id = ++seq;
@@ -62,6 +69,18 @@ export async function tab(port) {
   return t;
 }
 export const step = (s) => console.log('✓ ' + s);
+
+/** Liittyy jo avattuun ikkunaan (esim. hallinnan avaama esitysikkuna) osoitteen perusteella. */
+export async function attach(port, urlPart, ms = 10000) {
+  const end = Date.now() + ms;
+  while (Date.now() < end) {
+    const list = await (await fetch(`http://127.0.0.1:${port}/json/list`)).json();
+    const target = list.find((x) => x.type === 'page' && x.url.includes(urlPart));
+    if (target) return connect(target.webSocketDebuggerUrl);
+    await new Promise((r) => setTimeout(r, 200));
+  }
+  throw new Error('Ikkunaa ei löytynyt: ' + urlPart);
+}
 
 /** Ylläpitäjän käyttöönotto virtuaalisella passkeylla (PRF) ja salausavaimet. Palauttaa luentolistan näkymässä. */
 export async function setupAdmin(admin, app) {

@@ -16,15 +16,15 @@ Todennustavat:
 | H3 | Vastauksen vaihto T1:ssä: vain viimeisin lasketaan | ✅ | Selain: vastaus ja muutos → hallinnassa 1 vastaus. PHPUnit `testSameBrowserReplacesItsAnswer`. |
 | H4 | Sulkeminen estää vastaamisen ja osallistuja näkee tilan | ✅ | Selain: *Sulje vastaukset* → "This poll is closed", kentät pois käytöstä. PHPUnit `testAnswerRequiresOpenPollOfThisEvent` (myös: auki mutta ei aktiivinen → 409). |
 | H5 | T2-asteikko: jakauma ja keskiarvo oikein | ✅ | Node `results.test.mjs` (jakaumat ja tunnusluvut). T2 = Likert 5 selitteineen. |
-| H6 | T3: `<script>alert(1)</script>` näkyy tekstinä | ⏳ | Vaihe 4 (avoin teksti). Nykyiset sisällöt: PHPUnit `testBrowserScriptsNeverUseHtmlInjectionSinks`, `testPollPromptIsNotRenderedAsHtmlOnServer`. |
-| H7 | Moderointi T3:ssa: piilotettu katoaa heti | ⏳ | Vaihe 4. |
+| H6 | T3: `<script>alert(1)</script>` näkyy tekstinä | ✅ | Selain `open-text.mjs`: osallistuja lähettää `<script>alert(1)</script><img src=x onerror=alert(2)>`, ja se näkyy tekstinä hallinnassa ja projektorilla. Yhtään elementtiä tai alert-dialogia ei synny (testi epäonnistuisi alertista). Node `results.test.mjs` (teksti säilyy tekstinä), PHPUnit `testBrowserScriptsNeverUseHtmlInjectionSinks` (ei innerHTML:ää missään skriptissä). |
+| H7 | Moderointi T3:ssa: piilotettu katoaa heti | ✅ | Selain `open-text.mjs`: *Piilota* → vastaus katosi projektorilta muutamassa millisekunnissa. Piilotus säilyy uudelleenlatauksen yli (salattuna palvelimella). Kirosanasuodatin piilottaa osumat tarkistettavaksi; hyväksyntä tuo ne näkyviin. |
 | H8 | Osallistuja kutsuu esittäjän rajapintaa → 401/403 | ✅ | PHPUnit `testAdminPollRoutesRequireLogin` (kaikki kysely-, sarja- ja ohjausreitit → 401), `testProtectedRoutesRequireLogin`, CSRF → 403. |
 | H9 | Sama laite vastaa 50 kertaa skriptillä | 🟡 | Yksi vastaus per laite: PHPUnit `testSameBrowserReplacesItsAnswer`. Nopeusraja 30 / 10 min / laite / kysely: `testAnswerRateLimitPerVoter`. Kiristys ja osoitekohtainen raja vaiheessa 7. |
 | H10 | Yhteyskatko ja palautus | ✅ | Selain: verkko pois → "Connection lost. Reconnecting…", verkko takaisin → tila päivittyy. Uudelleenlataus näyttää aktiivisen kysymyksen ja oman vastauksen. |
 | H11 | Suljetaan perjantaina, avataan lauantaina | ✅ | PHPUnit `testEventCanBeClosedAndReopenedWithAnswersKept`: suljettu → 410, avattu → sama koodi toimii, vastaukset tallessa. Ylläpidon istunto vanhenee yön yli (8 h), joten lauantaina kirjaudutaan uudelleen passkeylla. |
 | H12 | Sarjojen järjestyksen muutos ja ohitus kesken tapahtuman | ✅ | Selain: ohitus, palautus ja sarjan siirto muuttavat Seuraava/Edellinen-järjestystä. PHPUnit `LiveRepositoryTest`, `testAdminControlsSetsAndActiveQuestion`. Vastaukset säilyvät (ohitus ei poista mitään). |
 | H13 | Kuorma: 150 osallistujaa | ⏳ | Siirretty myöhemmäksi (Hessun päätös 27.10.). Osallistujan tilakysely tekee yhden tietokantahaun, kun mikään ei muutu. |
-| H14 | JSON-tuonti luvun 10 tiedostolla | 🟡 | PHPUnit `SetFormatTest::testCourseFileIsImportedWithOpenQuestionsSkipped`, `testImportCourseFileWithDryRunFirst` ja selain `import-json.mjs`: kurssin tiedosto sellaisenaan tuottaa 9 sarjaa ja 17 kysymystä oikeassa järjestyksessä, oikeat vastaukset ja selitykset tallessa. Viisi avointa tekstiä (M1/6, M6 Q&A → open, WRAP-FRI ×2, CLOSE-SAT/1) ohitetaan varoituksella vaiheeseen 4 asti. Vienti ja uudelleentuonti tuottavat samat kysymykset (`testExportRoundTrips`). |
+| H14 | JSON-tuonti luvun 10 tiedostolla | ✅ | PHPUnit `SetFormatTest::testCourseFileIsImportedCompletely`, `testImportCourseFileWithDryRunFirst` ja selain `import-json.mjs`: kurssin tiedosto sellaisenaan tuottaa 9 sarjaa ja kaikki 22 kysymystä oikeassa järjestyksessä. Oikeat vastaukset ja selitykset ovat tallessa, ja M6:n Q&A tuodaan avoimena tekstinä (`fallbackType`). Vienti ja uudelleentuonti tuottavat samat kysymykset (`testExportRoundTrips`). |
 | H15 | Esitysnäkymä Teams-jaossa luettavissa | 🧪 | Vaihe 6 (esitysnäkymä), sitten koeajo Teamsissa. |
 
 ## Vaiheiden tila
@@ -33,8 +33,8 @@ Todennustavat:
 |---|---|---|
 | 1 | Admin-kirjautuminen: avaus passkeylla (PRF) | ✅ PR #8–#10. Safari + 1Password: odottaa Hessun testiä. |
 | 2 | Sarjat, aktiivinen kysymys, odotusnäkymä, osallistujan kieli | ✅ PR #11 |
-| 3 | JSON-tuonti ja -vienti | ✅ tämä PR |
-| 4 | T3 avoin teksti, pysyvä moderointi, T4 30 merkkiä | ⏳ |
+| 3 | JSON-tuonti ja -vienti | ✅ PR #12 |
+| 4 | T3 avoin teksti, pysyvä moderointi, kirosanasuodatin, T4 30 merkkiä | ✅ tämä PR |
 | 5 | Oikea vastaus, selitykset, paljastus, tulosten näyttö/piilotus | ⏳ |
 | 6 | Esitysnäkymä ja pikanäppäimet | ⏳ |
 | 7 | Nopeusrajat (myös osoitekohtainen tiiviste), julkaisujäädytys | ⏳ |

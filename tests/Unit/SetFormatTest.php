@@ -26,16 +26,17 @@ final class SetFormatTest extends TestCase
         return (string) json_encode(['sets' => $sets]);
     }
 
-    public function testCourseFileIsImportedWithOpenQuestionsSkipped(): void
+    public function testCourseFileIsImportedCompletely(): void
     {
         $r = SetFormat::parse(self::fixture());
         self::assertSame([], $r['errors']);
         self::assertSame('Cybersecurity Fundamentals – MMoIT 2026', $r['title']);
         self::assertSame(['OPEN', 'M1', 'M2', 'M3', 'M4', 'M5', 'M6', 'WRAP-FRI', 'CLOSE-SAT'], array_column($r['sets'], 'slug'));
-        self::assertSame([1, 5, 2, 1, 4, 3, 0, 0, 1], array_map(static fn (array $s): int => count($s['polls']), $r['sets']));
-        // Avoin teksti (vaihe 4) ohitetaan varoituksella; M6:n Q&A käyttää varatyyppiä open.
-        self::assertCount(5, $r['warnings']);
-        self::assertStringContainsString('Sarja M6, kysymys 1', $r['warnings'][1]);
+        self::assertSame([1, 6, 2, 1, 4, 3, 1, 2, 2], array_map(static fn (array $s): int => count($s['polls']), $r['sets']));
+        self::assertSame([], $r['warnings'], 'Kaikki 22 kysymystä tuodaan');
+        // M6:n Q&A (tykkäykset, COULD) tuodaan varatyyppinä open.
+        self::assertSame(['type' => 'open', 'prompt' => 'Questions about secure development or your group work?', 'config' => ['multiple' => false]], $r['sets'][6]['polls'][0]);
+        self::assertSame('open', $r['sets'][1]['polls'][5]['type']);
 
         $open = $r['sets'][0]['polls'][0];
         self::assertSame(['type' => 'words', 'prompt' => 'Cybersecurity in one word?', 'config' => []], $open);
@@ -98,6 +99,7 @@ final class SetFormatTest extends TestCase
         yield 'liian pitkä kysymys' => [self::file($q(['type' => 'wordcloud', 'text' => str_repeat('x', 301)])), 'kysymyksessä pitää olla'];
         yield 'liian suuri' => [str_repeat(' ', SetFormat::MAX_BYTES + 1), 'liian suuri'];
         yield 'liian syvä' => [str_repeat('[', 50) . str_repeat(']', 50), 'kelvollista JSONia'];
+        yield 'qa ilman tuettua varatyyppiä' => [self::file($q(['type' => 'qa', 'text' => 'X', 'fallbackType' => 'ranking'])), 'tuntematon type'];
     }
 
     #[DataProvider('invalidFiles')]

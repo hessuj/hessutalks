@@ -621,7 +621,7 @@
 
   // ================================================================ kyselyt (luennon näkymässä)
 
-  var TYPE_LABEL = { single: 'Monivalinta, yksi vastaus', multi: 'Monivalinta, useita vastauksia', words: 'Sanapilvi', likert: 'Likert-asteikko', scale: 'Asteikko 0–10' };
+  var TYPE_LABEL = { single: 'Monivalinta, yksi vastaus', multi: 'Monivalinta, useita vastauksia', open: 'Avoin teksti', words: 'Sanapilvi', likert: 'Likert-asteikko', scale: 'Asteikko 0–10' };
   var POLL_STATUS_LABEL = { draft: 'Luonnos', open: 'Auki', closed: 'Suljettu' };
   var LABEL_DEFAULTS = {
     likert: ['Täysin eri mieltä', 'Täysin samaa mieltä'],
@@ -667,7 +667,7 @@
     var answers = {};       // kyselyn id -> { vastaaja: vastaus }
     var invalid = {};       // kyselyn id -> hylättyjen vastausten määrä
     var generations = {};   // kyselyn id -> sukupolvi (kasvaa, kun vastaukset tyhjennetään)
-    var hidden = {};        // kyselyn id -> { sana: true } (sanapilven moderointi, vain muistissa)
+    var mods = {};          // kyselyn id -> moderointi (piilotetut/hyväksytyt), tallennetaan salattuna palvelimelle
     var expanded = {};      // kyselyn id -> tulokset auki
     var lastAnswerId = 0;
     var views = {};         // kyselyn id -> tuloselementti (säilyy, jotta kaaviot animoituvat)
@@ -701,9 +701,40 @@
 
     function applyState(r) {
       sets = r.sets; polls = r.polls; active = r.active;
+      polls.forEach(function (p) { mods[p.id] = readModeration(p.moderation); });
       outEl.replaceChildren();
       renderAll();
     }
+
+    // ---------------------------------------------------------------- moderointi
+    // Piilotukset salataan omalla julkisella avaimella (sealed box): palvelin ei näe piilotettuja sanoja.
+
+    function toSet(list, numeric) {
+      var out = {};
+      (Array.isArray(list) ? list : []).forEach(function (v) {
+        if (numeric ? Number.isInteger(v) : typeof v === 'string' && v.length <= 100) out[v] = true;
+      });
+      return out;
+    }
+    function readModeration(ct) {
+      var m = ct ? decrypt(ct) : null;
+      var mod = HessuResults.emptyModeration();
+      if (!m || m.v !== 1) return mod;
+      mod.words = toSet(m.words); mod.answers = toSet(m.answers, true);
+      mod.approved = toSet(m.approved, true); mod.approvedWords = toSet(m.approvedWords);
+      return mod;
+    }
+    function keys(o, numeric) { return Object.keys(o).map(function (k) { return numeric ? parseInt(k, 10) : k; }); }
+    function saveModeration(poll) {
+      var m = mods[poll.id];
+      var empty = !Object.keys(m.words).length && !Object.keys(m.answers).length && !Object.keys(m.approved).length && !Object.keys(m.approvedWords).length;
+      var ct = empty ? null : b64(sodium.crypto_box_seal(sodium.from_string(JSON.stringify({
+        v: 1, words: keys(m.words), answers: keys(m.answers, true), approved: keys(m.approved, true), approvedWords: keys(m.approvedWords)
+      })), publicKey));
+      updateResults();
+      api('POST', 'polls/' + poll.id + '/moderation', { ciphertext: ct }).catch(fail);
+    }
+    function modFor(poll) { return mods[poll.id] || (mods[poll.id] = HessuResults.emptyModeration()); }
     function load() {
       return api('GET', 'events/' + eventId + '/polls').then(applyState);
     }
@@ -713,16 +744,19 @@
 
     function tallyFor(poll) {
       var map = answers[poll.id] || {};
-      return HessuResults.tally(poll, Object.keys(map).map(function (k) { return map[k]; }), hidden[poll.id]);
+      return HessuResults.tally(poll, Object.keys(map).map(function (k) { return map[k]; }), modFor(poll));
     }
 
     function pollMessage(pid) {
       var poll = findPoll(pid);
       if (!poll) return { type: 'blank' };
+      var data = tallyFor(poll);
+      // Projektorille vain näkyvien avoimien vastausten tekstit (uusimmat), ei tunnisteita.
+      if (poll.type === 'open') data = { voters: data.voters, items: data.items.slice(0, 30).map(function (it) { return it.text; }) };
       return {
         type: 'poll', code: getEvent().code, url: poll.url, status: poll.status,
-        poll: { id: poll.id, type: poll.type, prompt: poll.prompt, config: poll.config },
-        data: tallyFor(poll)
+        poll: { id: poll.id, type: poll.type, prompt: poll.prompt, config: HessuResults.publicConfig(poll.config) },
+        data: data
       };
     }
     /** Projektorin "aktiivinen kysymys" -ikkuna: aktiivinen kysymys tai luennon QR-koodi. */
@@ -751,7 +785,7 @@
           var value = m && m.e === code && m.p === a.poll_id ? HessuResults.validAnswer(poll, m.a) : null;
           var map = answers[a.poll_id] || (answers[a.poll_id] = {});
           if (value === null) { invalid[a.poll_id] = (invalid[a.poll_id] || 0) + 1; delete map[a.voter]; }
-          else map[a.voter] = value;
+          else map[a.voter] = poll.type === 'open' ? { id: a.id, text: value, ts: a.ts } : value;
           changed = true;
         });
         if (changed) updateResults();
@@ -766,7 +800,9 @@
         view.count.textContent = data.voters + ' vastausta' +
           (invalid[poll.id] ? ', ' + invalid[poll.id] + ' hylätty (virheellinen tai toiselle kyselylle salattu)' : '');
         if (view.details.open) {
-          HessuResults.render(view.el, poll, data, poll.type === 'words' ? { onWord: function (word) { hideWord(poll, word); } } : null);
+          var opts = poll.type === 'words' ? { onWord: function (word) { hideWord(poll, word); } }
+            : poll.type === 'open' ? { onAnswer: function (it) { hideAnswer(poll, it); } } : null;
+          HessuResults.render(view.el, poll, data, opts);
           renderHidden(poll);
         }
       });
@@ -776,20 +812,42 @@
 
     function hideWord(poll, word) {
       if (!window.confirm('Piilotetaanko "' + word + '" tuloksista ja projektorilta?')) return;
-      (hidden[poll.id] || (hidden[poll.id] = {}))[word] = true;
-      updateResults();
+      modFor(poll).words[word] = true;
+      delete modFor(poll).approvedWords[word];
+      saveModeration(poll);
     }
+    function hideAnswer(poll, it) {
+      modFor(poll).answers[it.id] = true;
+      delete modFor(poll).approved[it.id];
+      saveModeration(poll);
+    }
+
+    /** Piilotetut ja suodattimen piilottamat (tarkistettavat) vastaukset ja sanat, palautus- ja hyväksyntänapein. */
     function renderHidden(poll) {
       var view = views[poll.id];
-      var words = Object.keys(hidden[poll.id] || {});
+      var mod = modFor(poll);
+      var map = answers[poll.id] || {};
+      var all = Object.keys(map).map(function (k) { return map[k]; });
       view.hidden.replaceChildren();
-      if (!words.length) return;
-      view.hidden.appendChild(h('span.hint', { text: 'Piilotetut: ' }));
-      words.forEach(function (word) {
-        view.hidden.appendChild(h('button.btn.ghost.small', { type: 'button', text: word + ' ↺', title: 'Palauta näkyviin', onclick: function () {
-          delete hidden[poll.id][word]; updateResults();
-        } }));
-      });
+      var chip = function (label, title, onclick) { return h('button.btn.ghost.small', { type: 'button', text: label, title: title, onclick: onclick }); };
+      var rows = [];
+      if (poll.type === 'words') {
+        var uniq = {};
+        all.forEach(function (w) { uniq[w] = true; });
+        Object.keys(uniq).forEach(function (w) {
+          if (mod.words[w]) rows.push(chip(w + ' ↺', 'Palauta näkyviin', function () { delete mod.words[w]; saveModeration(poll); }));
+          else if (HessuResults.isProfane(w) && !mod.approvedWords[w]) rows.push(chip('⚠ ' + w + ' ✓', 'Kirosanasuodatin piilotti. Hyväksy näkyviin', function () { mod.approvedWords[w] = true; saveModeration(poll); }));
+        });
+        Object.keys(mod.words).forEach(function (w) { if (!uniq[w]) rows.push(chip(w + ' ↺', 'Palauta näkyviin', function () { delete mod.words[w]; saveModeration(poll); })); });
+      } else if (poll.type === 'open') {
+        all.forEach(function (it) {
+          if (mod.answers[it.id]) rows.push(chip(it.text.slice(0, 60) + ' ↺', 'Palauta näkyviin', function () { delete mod.answers[it.id]; saveModeration(poll); }));
+          else if (HessuResults.isProfane(it.text) && !mod.approved[it.id]) rows.push(chip('⚠ ' + it.text.slice(0, 60) + ' ✓', 'Kirosanasuodatin piilotti. Hyväksy näkyviin', function () { mod.approved[it.id] = true; saveModeration(poll); }));
+        });
+      }
+      if (!rows.length) return;
+      view.hidden.appendChild(h('span.hint', { text: 'Piilotetut (↺ palauta, ⚠ suodatin: ✓ hyväksy): ' }));
+      rows.forEach(function (r) { view.hidden.appendChild(r); });
     }
 
     function act(poll, action, body, confirmText) {
@@ -1038,6 +1096,10 @@
           fields.append(
             h('label', { for: 'poll-min', text: t === 'scale' ? 'Selite arvolle 0' : 'Selite arvolle 1' }), inputs.min,
             h('label', { for: 'poll-max', text: t === 'scale' ? 'Selite arvolle 10' : 'Selite suurimmalle arvolle' }), inputs.max);
+        } else if (t === 'open') {
+          inputs.multiple = h('input', { type: 'checkbox', id: 'poll-multiple', checked: !!cfg.multiple });
+          fields.append(h('label.check', null, inputs.multiple, ' Salli useita vastauksia samalta osallistujalta'),
+            h('p.hint', { text: 'Enintään 280 merkkiä. Vastaukset näkyvät listana uusin ensin. Kirosanasuodatin piilottaa osumat tarkistettavaksi, ja voit piilottaa minkä tahansa vastauksen.' }));
         } else {
           fields.append(h('p.hint', { text: 'Kuulijat vastaavat 1–3 sanalla. Samat vastaukset kasvattavat sanaa pilvessä. Voit piilottaa sopimattoman sanan klikkaamalla sitä tuloksissa.' }));
         }
@@ -1057,6 +1119,7 @@
         }
         if (t === 'likert') return { points: parseInt(inputs.points.value, 10), min_label: inputs.min.value, max_label: inputs.max.value };
         if (t === 'scale') return { min_label: inputs.min.value, max_label: inputs.max.value };
+        if (t === 'open') return { multiple: inputs.multiple.checked };
         return {};
       }
 

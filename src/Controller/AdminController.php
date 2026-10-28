@@ -110,7 +110,7 @@ final class AdminController
         if (preg_match('#^events/(\d{1,10})/(polls|poll-answers|sets|live|import|export)$#', $route, $m) === 1) {
             return $this->eventPolls($req, (int) $m[1], $m[2], $in, $client);
         }
-        if (preg_match('#^polls/(\d{1,10})/(update|status|delete|reset|move)$#', $route, $m) === 1 && $req->method === 'POST') {
+        if (preg_match('#^polls/(\d{1,10})/(update|status|delete|reset|move|moderation)$#', $route, $m) === 1 && $req->method === 'POST') {
             return $this->pollAction((int) $m[1], $m[2], $in, $client);
         }
         if (preg_match('#^sets/(\d{1,10})/(update|move|skip|delete)$#', $route, $m) === 1 && $req->method === 'POST') {
@@ -457,6 +457,14 @@ final class AdminController
                     return Response::error('Kyselyä ei voi siirtää.', 409);
                 }
                 return $this->pollsState($event);
+            case 'moderation':
+                // Salattu luennoitsijan omalla julkisella avaimella: palvelin ei näe piilotettuja sanoja.
+                $ct = $in['ciphertext'] ?? null;
+                if ($ct !== null && !PollRepository::isValidModeration($ct)) {
+                    return Response::error('Virheellinen moderointitieto.', 422);
+                }
+                $this->polls->setModeration($id, $ct);
+                return Response::json(['ok' => true]);
             case 'reset':
                 $this->polls->reset($id);
                 $this->live->bump((int) $event['id']);
@@ -487,6 +495,7 @@ final class AdminController
             'generation' => (int) ($poll['generation'] ?? 1),
             'answer_count' => $this->polls->countAnswers((int) ($poll['id'] ?? 0)),
             'set_id' => (int) ($poll['set_id'] ?? 0),
+            'moderation' => is_string($poll['moderation'] ?? null) ? $poll['moderation'] : null,
             'position' => (int) ($poll['position'] ?? 0),
             'url' => $this->config->publicOrigin . $this->config->url('/k/' . (string) ($event['code'] ?? '')),
         ];

@@ -47,7 +47,8 @@
 
   // ---------------------------------------------------------------- kyselyn tulokset
 
-  var POLL_TYPES = ['single', 'multi', 'words', 'likert', 'scale'];
+  var POLL_TYPES = ['single', 'multi', 'words', 'likert', 'scale', 'open'];
+  var OPEN_ON_STAGE = 10;
   var pollView = null;   // { id, prompt, results, count } – sama näkymä päivitetään, jotta kaaviot animoituvat
   var lastPoll = null;
 
@@ -67,6 +68,9 @@
           (p.config.max_label !== undefined && str(p.config.max_label, 40) === null)) return false;
       return Array.isArray(d.counts) && d.counts.length <= 11 && d.counts.every(isCount) && isCount(d.from) &&
         (d.mean === undefined || typeof d.mean === 'number') && (d.median === undefined || typeof d.median === 'number');
+    }
+    if (p.type === 'open') {
+      return Array.isArray(d.items) && d.items.length <= 50 && d.items.every(function (t) { return str(t, 600) !== null; });
     }
     return Array.isArray(d.words) && d.words.length <= 500 && d.words.every(function (w) {
       return Array.isArray(w) && w.length === 2 && str(w[0], 40) !== null && isCount(w[1]);
@@ -98,7 +102,7 @@
     }
     pollView.prompt.textContent = p.prompt;
     pollView.count.textContent = m.data.voters + ' vastausta' + (m.status === 'closed' ? ' · kysely on suljettu' : '');
-    window.HessuResults.render(pollView.results, p, m.data);
+    window.HessuResults.render(pollView.results, p, m.data, p.type === 'open' ? { max: OPEN_ON_STAGE } : null);
   }
 
   // Sanapilvi asetellaan ikkunan koon mukaan: piirretään uudelleen, kun koko muuttuu.

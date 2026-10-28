@@ -59,7 +59,7 @@ for _ in $(seq 1 50); do
   sleep 0.2
 done
 
-if [ $# -gt 0 ]; then TESTS=("$@"); else TESTS=("passkey-prf.mjs" "passkey-prf.mjs noprf" "live-polls.mjs" "import-json.mjs"); fi
+if [ $# -gt 0 ]; then TESTS=("$@"); else TESTS=("passkey-prf.mjs" "passkey-prf.mjs noprf" "live-polls.mjs" "import-json.mjs" "open-text.mjs"); fi
 status=0
 for t in "${TESTS[@]}"; do
   echo "== $t"

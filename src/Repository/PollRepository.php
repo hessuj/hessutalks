@@ -17,7 +17,7 @@ use HessuTalks\Security\Clock;
  */
 final class PollRepository
 {
-    public const TYPES = ['single', 'multi', 'words', 'likert', 'scale'];
+    public const TYPES = ['single', 'multi', 'words', 'likert', 'scale', 'open'];
     public const STATUSES = ['draft', 'open', 'closed'];
     public const MAX_PER_EVENT = 100;
     public const MAX_ANSWERS = 3000;
@@ -29,8 +29,12 @@ final class PollRepository
     public const EXPLANATION_MAX = 300;
     /** Asetukset, joita ei näytetä osallistujalle ennen paljastusta (oikeat vastaukset ja selitykset). */
     public const PRIVATE_CONFIG = ['correct', 'explanations'];
-    /** Vastaukset ovat lyhyitä; salattu JSON mahtuu tähän reilusti. */
+    /** Avoimen vastauksen enimmäispituus merkkeinä (tarkistetaan selaimissa, palvelin ei näe tekstiä). */
+    public const OPEN_MAX = 280;
+    /** Vastaukset ovat lyhyitä; 280 merkin avoin vastaus (enintään 4 tavua/merkki) mahtuu salattuna reilusti. */
     public const CIPHERTEXT_MAX_BYTES = 2048;
+    /** Salattu moderointitieto (piilotetut vastaukset ja sanat). */
+    public const MODERATION_MAX_BYTES = 32768;
 
     public function __construct(
         private readonly Database $db,
@@ -81,6 +85,9 @@ final class PollRepository
             case 'scale':
                 $labels = self::labels($c);
                 return is_string($labels) ? $labels : [$p, ['min' => 0, 'max' => 10] + $labels];
+            case 'open':
+                // multiple: osallistuja voi lähettää useita vastauksia (muuten uusi korvaa vanhan).
+                return [$p, ['multiple' => ($c['multiple'] ?? false) === true]];
             default: // words
                 return [$p, []];
         }
@@ -305,20 +312,40 @@ final class PollRepository
         return $this->db->exec('DELETE FROM polls WHERE id = ?', [$id]) === 1;
     }
 
-    /** Poistaa vastaukset ja kasvattaa sukupolvea, jotta ylläpitäjän selain lataa tulokset alusta. */
+    /**
+     * Poistaa vastaukset, moderoinnin ja tuloskoosteen ja kasvattaa sukupolvea, jotta ylläpitäjän selain
+     * lataa tulokset alusta. Tulokset piilotetaan ja paljastus perutaan (koeajon jälkeen puhdas aloitus).
+     */
     public function reset(int $id): void
     {
         $this->db->exec('DELETE FROM poll_answers WHERE poll_id = ?', [$id]);
         $this->db->exec(
-            'UPDATE polls SET generation = generation + 1, updated_at = ? WHERE id = ?',
+            'UPDATE polls SET generation = generation + 1, moderation = NULL, summary = NULL, results_visible = 0, revealed = 0,
+             updated_at = ? WHERE id = ?',
             [$this->clock->now(), $id],
         );
     }
 
-    /** Tallentaa vastauksen; saman vastaajan aiempi vastaus korvataan. false = kiintiö täynnä. */
-    public function answer(int $pollId, string $voter, string $ciphertext): bool
+    public static function isValidModeration(mixed $value): bool
     {
-        $hash = $this->voterHash($pollId, $voter);
+        return QuestionRepository::isValidCiphertext($value)
+            && strlen((string) base64_decode((string) $value, true)) <= self::MODERATION_MAX_BYTES;
+    }
+
+    /** Tallentaa luennoitsijan salatun moderointitiedon (null = ei piilotuksia). */
+    public function setModeration(int $id, ?string $ciphertext): bool
+    {
+        return $this->db->exec('UPDATE polls SET moderation = ? WHERE id = ?', [$ciphertext, $id]) === 1;
+    }
+
+    /**
+     * Tallentaa vastauksen. Saman vastaajan aiempi vastaus korvataan, paitsi jos kysely sallii useita
+     * vastauksia (avoin teksti, multiple): silloin jokainen vastaus on oma rivinsä, eikä niitä voi
+     * tietokannasta yhdistää samaan vastaajaan. false = kiintiö täynnä.
+     */
+    public function answer(int $pollId, string $voter, string $ciphertext, bool $multiple = false): bool
+    {
+        $hash = $multiple ? $this->voterHash($pollId, $voter . '|' . bin2hex(random_bytes(16))) : $this->voterHash($pollId, $voter);
         $existing = $this->db->one('SELECT id FROM poll_answers WHERE poll_id = ? AND voter_hash = ?', [$pollId, $hash]);
         if ($existing === null && $this->countAnswers($pollId) >= self::MAX_ANSWERS) {
             return false;
@@ -333,12 +360,12 @@ final class PollRepository
     /**
      * Luennon kyselyjen vastaukset id:n jälkeen (ylläpitäjän selain päivittää tulokset tästä).
      * voter on lyhennetty tiiviste, jolla korvaava vastaus tunnistetaan.
-     * @return list<array{id: int, poll_id: int, voter: string, ciphertext: string}>
+     * @return list<array{id: int, poll_id: int, voter: string, ciphertext: string, ts: int}>
      */
     public function answersForEvent(int $eventId, int $afterId = 0): array
     {
         $rows = $this->db->all(
-            'SELECT a.id, a.poll_id, a.voter_hash, a.ciphertext FROM poll_answers a
+            'SELECT a.id, a.poll_id, a.voter_hash, a.ciphertext, a.created_at FROM poll_answers a
              JOIN polls p ON p.id = a.poll_id
              WHERE p.event_id = ? AND a.id > ? ORDER BY a.id ASC LIMIT 2000',
             [$eventId, $afterId],
@@ -348,6 +375,7 @@ final class PollRepository
             'poll_id' => (int) $r['poll_id'],
             'voter' => substr((string) $r['voter_hash'], 0, 16),
             'ciphertext' => (string) $r['ciphertext'],
+            'ts' => (int) $r['created_at'],
         ], $rows);
     }
 

@@ -182,6 +182,36 @@ final class LiveRepositoryTest extends TestCase
         self::assertIsString($this->sets->create($this->eventId, 'M1', 'Toinen'), 'Sama tunniste kahdesti');
     }
 
+    /** Migraatio 005 rakentaa polls-taulun uudelleen: kyselyt ja vastaukset säilyvät, viiteavaimet pysyvät päällä. */
+    public function testRebuildMigrationKeepsAnswersAndForeignKeys(): void
+    {
+        $dir = sys_get_temp_dir() . '/hessutalks-migr-' . bin2hex(random_bytes(4));
+        mkdir($dir);
+        $all = glob(dirname(__DIR__, 2) . '/migrations/*.sql') ?: [];
+        foreach ($all as $f) {
+            if (basename($f) < '005') {
+                copy($f, $dir . '/' . basename($f));
+            }
+        }
+        $file = $dir . '/test.sqlite';
+        $old = new Database($file, $dir);
+        $old->exec("INSERT INTO events (code, title, status, created_at) VALUES ('ABCDEF', 'Vanha', 'open', 1)");
+        $old->exec("INSERT INTO poll_sets (event_id, slug, title, position, created_at) VALUES (1, 'M1', 'M1', 1, 1)");
+        $old->exec("INSERT INTO polls (event_id, set_id, position, type, prompt, status, created_at, updated_at) VALUES (1, 1, 1, 'single', 'Q', 'open', 1, 1)");
+        $old->exec("INSERT INTO poll_answers (poll_id, voter_hash, ciphertext, created_at) VALUES (1, 'h1', 'x', 1), (1, 'h2', 'y', 1)");
+        unset($old);
+
+        $new = new Database($file, dirname(__DIR__, 2) . '/migrations');
+        self::assertSame(2, (int) ($new->one('SELECT COUNT(*) AS n FROM poll_answers')['n'] ?? 0), 'Vastaukset säilyvät');
+        self::assertSame('Q', $new->one('SELECT prompt FROM polls WHERE id = 1')['prompt'] ?? null);
+        self::assertSame(1, (int) ($new->one('PRAGMA foreign_keys')['foreign_keys'] ?? 0), 'Viiteavaimet takaisin päällä');
+        $new->exec("INSERT INTO polls (event_id, set_id, type, prompt, created_at, updated_at) VALUES (1, 1, 'open', 'Avoin?', 1, 1)");
+        $new->exec('DELETE FROM polls WHERE id = 1');
+        self::assertSame(0, (int) ($new->one('SELECT COUNT(*) AS n FROM poll_answers')['n'] ?? -1), 'ON DELETE CASCADE toimii uudessa taulussa');
+        array_map('unlink', glob($dir . '/*') ?: []);
+        rmdir($dir);
+    }
+
     /** Migraatio 004 siirtää aiemmat kyselyt oletussarjaan ja sulkee monta yhtä aikaa auki ollutta. */
     public function testMigrationMovesExistingPollsToDefaultSet(): void
     {
