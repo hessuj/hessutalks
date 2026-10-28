@@ -1466,6 +1466,8 @@
         var first = event === null;
         event = r.event;
         r.questions.forEach(function (q) {
+          // Päällekkäiset haut (ajastin ja esitysikkunan tahdistus) voivat palauttaa saman viestin.
+          if (q.id <= lastId) return;
           items.push({ id: q.id, status: q.status, created_at: q.created_at, nickname_id: q.nickname_id, msg: decrypt(q.ciphertext) });
           if (q.id > lastId) lastId = q.id;
         });
