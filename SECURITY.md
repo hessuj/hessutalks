@@ -35,6 +35,7 @@ Ilmoita haavoittuvuuksista yksityisesti GitHubin *Security → Report a vulnerab
 | Kyselyvastaajan tunnistaminen | Ei nimimerkkiä. Selaimen satunnaisesta tunnisteesta tallennetaan vain kyselykohtainen HMAC, joten saman selaimen vastauksia eri kyselyissä ei voi yhdistää tietokannasta. |
 | Viestin siirto toiselle luennolle | Luennon koodi on salatun viestin sisällä. Ylläpitonäkymä varoittaa ristiriidasta. |
 | Roskapostitus | Nimimerkki- ja luentokohtaiset rajat sekä luentokohtaiset enimmäismäärät |
+| Kyselyvastausten massalähetys (H9) | Enintään 10 vastausta minuutissa laitetta ja kysymystä kohden (ylitys 429). Lisäksi 600 vastausta minuutissa osoitetta kohden (P3). Osoiteraja hylkää ylimääräiset **hiljaa** (skripti näkee onnistumisen, mitään ei tallenneta), jotta skripti ei voi säätää tahtiaan. Osoitteesta tallennetaan vain avaimellinen tiiviste, ja rivit poistetaan heti minuutin ikkunan jälkeen. Raja on reilu, koska luentosali voi näkyä yhtenä osoitteena (NAT). |
 | Luentokoodien arvailu | Avaruus 31⁶ ≈ 887 milj. Epäonnistuneita hakuja rajoitetaan palvelun tasolla. |
 | Toimitusketju | Selainkirjastot vendoroitu SHA-256-lukituksella, ei CDN:ää. Actionit kiinnitetty commit-SHA:han. Dependabot, composer audit. |
 
@@ -46,14 +47,16 @@ Ilmoita haavoittuvuuksista yksityisesti GitHubin *Security → Report a vulnerab
   Riskiä pienentävät: julkaisu vain CI/CD:n kautta, FTPS-tunnuksen suojaus ja tuotannon savutesti.
 - **Tunnuslauseen menetys.** Viestejä ei voi palauttaa ilman tunnuslausetta. Tämä on tarkoituksellista.
 - **Webhotellin lokit.** Apache voi kirjata IP-osoitteita palvelinlokeihin sovelluksen ulkopuolella.
-  Lokien säilytystä voi rajoittaa cPanelin *Raw Access* -asetuksista.
+  Vaatimuksen 7.7 mukainen enintään 7 päivän säilytys asetetaan cPanelissa: *Raw Access* → poista
+  *Archive logs in your home directory* käytöstä tai rajaa arkistointi, jolloin lokit kiertävät webhotellin oletuksen mukaan.
+  Sovellus itse ei tallenna IP-osoitteita.
 - **Osallistujan oma tieto.** Jos osallistuja kirjoittaa nimimerkkiin tai viestiin henkilötietoja,
   ne tallentuvat salattuina. Lomake ohjeistaa olemaan tekemättä niin.
 - **Saman verkon käyttäjät.** Rajoitukset eivät perustu IP-osoitteisiin, joten luentosali voi olla NAT:n takana ilman haittaa.
   Tämä tarkoittaa myös, että yksittäistä häiriköijää voi rajoittaa vain nimimerkin perusteella.
 - **Kyselyjen äänten monistaminen.** Koska vastaajia ei tunnisteta, muokattu asiakasohjelma voi luoda
-  uusia satunnaisia tunnisteita ja vastata useasti. Rajoja: lomaketoken, vastaajakohtainen nopeusraja ja
-  kyselykohtainen enimmäismäärä (3000). Kyselyt sopivat mielipiteiden ja osaamisen kartoitukseen, eivät äänestyksiin,
+  uusia satunnaisia tunnisteita ja vastata useasti. Rajoja: lomaketoken, laitekohtainen nopeusraja,
+  osoitekohtainen nopeusraja ja kyselykohtainen enimmäismäärä (3000). Kyselyt sopivat mielipiteiden ja osaamisen kartoitukseen, eivät äänestyksiin,
   joiden tuloksella on seurauksia.
 
 ## Ylläpitäjän muistilista

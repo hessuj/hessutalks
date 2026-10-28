@@ -1,0 +1,4 @@
+# Julkaisujäädytys: näinä aikoina CI ei julkaise tuotantoon (Suomen aika, Europe/Helsinki).
+# Muoto: alku  loppu  # kuvaus. Hätätapauksessa: Actions → CI/CD → Run workflow → "Ohita julkaisujäädytys".
+2026-11-13 14:00  2026-11-13 20:30  # MMoIT 2026 perjantai (luento 15–20)
+2026-11-14 08:30  2026-11-14 15:30  # MMoIT 2026 lauantai (luento 9–15)

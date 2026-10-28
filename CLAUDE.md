@@ -54,6 +54,7 @@ Lisää jokaiselle uudelle ominaisuudelle testit, myös tietoturvatestit (`tests
   vanhan PR:n ja avata uuden, jos ryhmään on tullut päivityksiä. Seuraa silloin uutta PR:ää.
 
 ## Julkaisu (GitHub Actions → cPanel)
+- Julkaisujäädytys tapahtuman aikana: .github/deploy-freeze.txt. Älä ehdota julkaisua jäädytysikkunassa.
 - FTPS-tunnus on rajattu kansioon `~/public_html/hessutalks/`. Sovelluskoodi menee `app/`-alikansioon (pääsy estetty).
 - Asetukset, tietokanta ja istunnot: `~/hessutalks-data/` webrootin ulkopuolella – deploy ei koske niihin.
 - Secretit `production`-ympäristössä: FTP_SERVER, FTP_USERNAME, FTP_PASSWORD. Muuttuja APP_URL.
@@ -65,6 +66,6 @@ MMoIT 2026 -kurssin vaatimukset (tapahtuma 13.–14.11.2026, ei julkaisuja tapah
 Tila ja hyväksymistestit: docs/hyvaksymistestit.md. Valmiina: passkey-avaus (PRF), sarjat ja aktiivinen kysymys, JSON-tuonti/vienti (src/Import/SetFormat.php),
 avoin teksti + salattu moderointi + kirosanasuodatin (results.js),
 tulosten näyttö/piilotus, oikean vastauksen paljastus ja tuloskooste osallistujille (P2),
-esitysnäkymä + pikanäppäimet + puhelinohjain.
-Seuraavaksi:
-nopeusrajat + julkaisujäädytys.
+esitysnäkymä + pikanäppäimet + puhelinohjain, nopeusrajat (laite + osoitetiiviste) ja julkaisujäädytys
+(.github/deploy-freeze.txt, bin/deploy-freeze.php).
+Seuraavaksi: SHOULD-kohdat (CSV, monistus/siirto, esikatselu).

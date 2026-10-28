@@ -12,6 +12,11 @@ on:
     branches: [main]
   pull_request:
   workflow_dispatch:
+    inputs:
+      ohita_jaadytys:
+        description: 'Ohita julkaisujäädytys (vain hätätapauksessa tapahtuman aikana)'
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -188,6 +193,12 @@ jobs:
           extensions: sodium, pdo_sqlite, mbstring, openssl, intl
           coverage: none
           tools: composer:v2
+
+      # Tapahtuman aikana ei julkaisuja (vaatimus 8). Ikkunat: .github/deploy-freeze.txt
+      - name: Julkaisujäädytys
+        env:
+          DEPLOY_FREEZE_OVERRIDE: ${{ github.event_name == 'workflow_dispatch' && inputs.ohita_jaadytys && '1' || '' }}
+        run: php bin/deploy-freeze.php
 
       - name: Rakenna julkaisupaketti
         run: |

@@ -151,6 +151,10 @@ Jokainen push ja pull request ajaa:
 
 Kun kaikki menevät läpi `main`-haarassa, sovellus julkaistaan FTPS:llä webhotelliin ja tuotanto savutestataan.
 
+**Julkaisujäädytys:** tiedoston `.github/deploy-freeze.txt` aikaikkunoina (Suomen aikaa) deploy-job pysähtyy, eikä
+tuotantoon julkaista. Tämä koskee esimerkiksi luentoa pe 13.11. 14:00–20:30 ja la 14.11. 08:30–15:30. Hätätapauksessa
+*Actions → CI/CD → Run workflow* ja valinta *Ohita julkaisujäädytys*. Tiedoston muoto tarkistetaan PHPUnitissa jokaisessa PR:ssä.
+
 ZAP-säännöt ovat tiedostossa `.zap/rules.tsv`: FAIL kaataa CI:n, WARN raportoidaan ja IGNORE ohitetaan perustellusti.
 
 ### Riippuvuuspäivitykset (Dependabot)
@@ -248,7 +252,6 @@ Kirjastoja ei ladata CDN:stä.
 
 MMoIT 2026 -kurssin vaatimukset (13.–14.11.2026), tilanne: [docs/hyvaksymistestit.md](docs/hyvaksymistestit.md).
 
-- Nopeusrajat osoitteen mukaan (vain tiiviste, 10 min) ja julkaisujäädytys tapahtuman ajaksi
 
 ## Lisenssi
 

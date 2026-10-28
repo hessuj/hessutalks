@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace HessuTalks\Tests\Security;
 
+use HessuTalks\Controller\ParticipantController;
 use HessuTalks\Repository\LiveRepository;
 use HessuTalks\Repository\PollRepository;
 use HessuTalks\Repository\SetRepository;
@@ -149,14 +150,43 @@ final class PollSecurityTest extends AppTestCase
         self::assertSame(405, $this->request('GET', '/api/polls/answer')->status);
     }
 
-    public function testAnswerRateLimitPerVoter(): void
+    /** H9: sama laite vastaa 50 kertaa skriptillä: yksi vastaus lasketaan, ja nopeusraja aktivoituu. */
+    public function testScriptedRepeatAnswersCountOnceAndAreRateLimited(): void
     {
         $poll = $this->poll();
-        for ($i = 0; $i < 30; $i++) {
-            self::assertSame(201, $this->answer($poll)->status);
+        $codes = [];
+        for ($i = 0; $i < 50; $i++) {
+            $codes[] = $this->answer($poll)->status;
         }
-        self::assertSame(429, $this->answer($poll)->status);
-        self::assertSame(201, $this->answer($poll, ['voter' => self::voter('toinen')])->status);
+        self::assertSame(array_fill(0, 10, 201), array_slice($codes, 0, 10), '10 / minuutti sallitaan');
+        self::assertSame(array_fill(0, 40, 429), array_slice($codes, 10), 'loput hylätään');
+        self::assertSame(1, (int) ($this->db->one('SELECT COUNT(*) AS n FROM poll_answers')['n'] ?? 0), 'Lasketaan yhtenä vastauksena');
+        self::assertSame(201, $this->answer($poll, ['voter' => self::voter('toinen')])->status, 'Toinen laite ei kärsi');
+        $this->clock->freeze($this->clock->now() + ParticipantController::VOTE_WINDOW + 1);
+        self::assertSame(201, $this->answer($poll)->status, 'Minuutin jälkeen sallitaan taas');
+    }
+
+    /** Osoitekohtainen raja (P3): hiljainen hylkäys, vain tiiviste, joka poistuu ikkunan jälkeen. */
+    public function testAddressRateLimitDropsSilentlyAndForgetsAddress(): void
+    {
+        $poll = $this->poll();
+        for ($i = 0; $i < ParticipantController::VOTE_LIMIT_PER_ADDRESS; $i++) {
+            $this->db->exec('INSERT INTO rate_limits (bucket, ts) VALUES (?, ?)', [
+                ParticipantController::ADDRESS_BUCKET . substr(hash_hmac('sha256', 'ratelimit|203.0.113.7', $this->config->appSecret), 0, 32),
+                $this->clock->now(),
+            ]);
+        }
+        $r = $this->answer($poll, ['voter' => self::voter('skripti')]);
+        self::assertSame(201, $r->status, 'Hylkäys on hiljainen: skripti näkee onnistumisen');
+        self::assertSame(0, (int) ($this->db->one('SELECT COUNT(*) AS n FROM poll_answers')['n'] ?? -1), '... mutta mitään ei tallennettu');
+        $dump = (string) json_encode($this->db->all('SELECT * FROM rate_limits'));
+        self::assertStringNotContainsString('203.0.113.7', $dump, 'IP-osoitetta ei tallenneta');
+
+        $this->clock->freeze($this->clock->now() + ParticipantController::VOTE_WINDOW + 1);
+        self::assertSame(201, $this->answer($poll, ['voter' => self::voter('ihminen')])->status);
+        self::assertSame(1, (int) ($this->db->one('SELECT COUNT(*) AS n FROM poll_answers')['n'] ?? 0));
+        $left = $this->db->one("SELECT COUNT(*) AS n FROM rate_limits WHERE bucket LIKE 'ipvote|%' AND ts < ?", [$this->clock->now()]);
+        self::assertSame(0, (int) ($left['n'] ?? -1), 'Vanhat osoitetiivisteet poistettiin heti ikkunan jälkeen');
     }
 
     public function testPollEndpointsSetNoCookies(): void
