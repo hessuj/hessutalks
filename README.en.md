@@ -83,7 +83,8 @@ Import is all or nothing. An error (including a set identifier already used in t
 | `qa` | Not supported; imported as the type in `fallbackType`, if given |
 
 **Participant language** is chosen per lecture (creation form or lecture page): *English*, *Suomi* or by browser language.
-Participants can still switch language with the FI/EN toggle.
+Participants can still switch language with the FI/EN toggle. The projector's own texts (e.g. the answer count and "Results will
+be shown later") follow the same choice: *English* → English, *Suomi* and *by browser language* → Finnish. The admin view is always in Finnish.
 
 ### Presenter view, keyboard shortcuts and phone remote
 

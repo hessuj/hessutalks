@@ -83,7 +83,8 @@ Tuonti on kaikki tai ei mitään. Virhe (myös luennolla jo oleva sarjan tunnist
 | `qa` | Ei käytössä; tuodaan `fallbackType`-kentän tyyppinä, jos se on annettu |
 
 **Osallistujien kieli** valitaan luennolle (luontilomake tai luennon sivu): *English*, *Suomi* tai selaimen kielen mukaan.
-Osallistuja voi silti vaihtaa kieltä FI/EN-kytkimestä.
+Osallistuja voi silti vaihtaa kieltä FI/EN-kytkimestä. Projektorin omat tekstit (esim. vastausmäärä ja "Tulokset näytetään
+myöhemmin") seuraavat samaa valintaa: *English* → englanti, *Suomi* ja *selaimen kielen mukaan* → suomi. Hallinta on aina suomeksi.
 
 ### Esitysnäkymä, pikanäppäimet ja puhelinohjain
 

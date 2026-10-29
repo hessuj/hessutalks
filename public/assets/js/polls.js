@@ -305,7 +305,7 @@
     form.resultsBox.hidden = !res || !window.HessuResults;
     if (res && window.HessuResults) {
       window.HessuResults.render(form.resultsEl, poll, res, {
-        reveal: reveal, labels: { mean: t('poll_mean'), median: t('poll_median') }
+        reveal: reveal, labels: { mean: t('poll_mean'), median: t('poll_median') }, locale: document.documentElement.lang === 'en' ? 'en-GB' : 'fi-FI'
       });
     }
   }
