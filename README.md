@@ -19,7 +19,7 @@ Osoite: <https://hessujarvinen.com/hessutalks/>
 ### Kyselyt ja kysymyssarjat
 
 Luento koostuu **kysymyssarjoista** (esim. moduulit `M1`, `M4`), joissa on kysymykset järjestyksessä.
-Kysymystyypit: monivalinta (yksi tai useita vastauksia), avoin teksti (280 merkkiä, valinnaisesti useita vastauksia), sanapilvi (1–3 sanaa, 30 merkkiä), Likert-asteikko (5 tai 7 kohtaa) ja asteikko 0–10.
+Kysymystyypit: monivalinta (yksi tai useita vastauksia), avoin teksti (oletus 280 merkkiä, pohdintatehtäviin enintään 3 500 eli noin 500 sanaa, valinnaisesti useita vastauksia), sanapilvi (1–3 sanaa, 30 merkkiä), Likert-asteikko (5 tai 7 kohtaa) ja asteikko 0–10.
 
 Yksi luento voi kattaa koko kurssin tai luentosarjan: sarjat jakavat sen luentoihin (esim. `L1`–`L4`), ja osallistujat
 käyttävät samaa koodia ja nimimerkkiä koko kurssin ajan. Hallinnan luentosivulla on kaksi välilehteä, *Kyselyt* ja
@@ -79,7 +79,7 @@ Tuonti on kaikki tai ei mitään. Virhe (myös luennolla jo oleva sarjan tunnist
 | `single`, `multi` | Monivalinta. `correct` = oikeiden vaihtoehtojen indeksit (0-pohjainen), `explanations` = selitys per vaihtoehto. Molemmat valinnaisia, eikä niitä näytetä osallistujille. |
 | `scale` | `min`–`max` 1–5 tai 1–7 = Likert, 0–10 = asteikko |
 | `wordcloud` | Sanapilvi, `maxWords` 1–3 |
-| `open` | Avoin teksti, `multipleAnswers` = useita vastauksia |
+| `open` | Avoin teksti, `multipleAnswers` = useita vastauksia, `maxLength` = enimmäispituus merkkeinä 280–3500 (oletus 280). Osallistuja näkee laskurin, esim. `240/3500`. Projektori näyttää pitkistä vastauksista 280 ensimmäistä merkkiä, hallinta ja CSV koko tekstin. |
 | `qa` | Ei käytössä; tuodaan `fallbackType`-kentän tyyppinä, jos se on annettu |
 
 **Osallistujien kieli** valitaan luennolle (luontilomake tai luennon sivu): *English*, *Suomi* tai selaimen kielen mukaan.

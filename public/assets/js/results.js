@@ -11,7 +11,9 @@
   var WORDS_MAX_CHARS = 40;   // osallistujan kenttä sallii 30; vanhat vastaukset 40 merkkiin asti kelpaavat
   var WORDS_MAX_WORDS = 3;
   var CLOUD_MAX_WORDS = 60;
-  var OPEN_MAX = 280;
+  var OPEN_MAX = 280;      // oletus; kysymyskohtainen config.max enintään OPEN_LIMIT (noin 500 sanaa)
+  var OPEN_LIMIT = 3500;
+  var OPEN_CLIP = 280;     // projektori näyttää pitkistä vastauksista alun
 
   // ---------------------------------------------------------------- kirosanasuodatin
   //
@@ -80,18 +82,31 @@
         var w = normalizeWords(a);
         return w && w.split(' ').length <= WORDS_MAX_WORDS ? w : null;
       case 'open':
-        return cleanOpen(a);
+        return cleanOpen(a, openMax(poll));
     }
     return null;
   }
 
-  /** Avoin vastaus: ohjausmerkit pois (rivinvaihdot säilyvät), reunat siistitään, 1–280 merkkiä. */
-  function cleanOpen(a) {
+  /** Pitkän vastauksen alku projektorille: enintään n merkkiä (oletus OPEN_CLIP) ja "…". */
+  function clip(text, n) {
+    var chars = Array.from(text);
+    var max = n || OPEN_CLIP;
+    return chars.length > max ? chars.slice(0, max).join('').trimEnd() + '…' : text;
+  }
+
+  /** Kysymyksen enimmäispituus merkkeinä (vanhoissa kysymyksissä ei asetusta: 280). */
+  function openMax(poll) {
+    var max = poll && poll.config ? poll.config.max : null;
+    return Number.isInteger(max) && max >= OPEN_MAX && max <= OPEN_LIMIT ? max : OPEN_MAX;
+  }
+
+  /** Avoin vastaus: ohjausmerkit pois (rivinvaihdot säilyvät), reunat siistitään, 1–max merkkiä. */
+  function cleanOpen(a, max) {
     if (typeof a !== 'string') return null;
     var text = a.normalize('NFC').replace(/\r\n?/g, '\n').replace(/[\u0000-\u0009\u000B-\u001F\u007F-\u009F\u200B-\u200F\u202A-\u202E\u2066-\u2069]/g, '')
       .replace(/\n{3,}/g, '\n\n').trim();
     var len = Array.from(text).length;
-    return len >= 1 && len <= OPEN_MAX ? text : null;
+    return len >= 1 && len <= (max || OPEN_MAX) ? text : null;
   }
 
   /**
@@ -329,14 +344,15 @@
 
   /**
    * Avoimet vastaukset listana, uusin ensin. opts.onAnswer(item): hallinnan Piilota-nappi.
-   * opts.max: näytettävien enimmäismäärä (projektori).
+   * opts.max: näytettävien enimmäismäärä (projektori), opts.clip: pitkistä vastauksista näytetään alku (projektori).
    */
   function renderOpen(el, poll, data, opts) {
     var items = opts && opts.max ? data.items.slice(0, opts.max) : data.items;
     var list = h('ol', 'res-open');
     items.forEach(function (it) {
       var li = h('li');
-      li.appendChild(h('span', 'res-open-text', typeof it === 'string' ? it : it.text));
+      var text = typeof it === 'string' ? it : it.text;
+      li.appendChild(h('span', 'res-open-text', opts && opts.clip ? clip(text, opts.clip) : text));
       if (opts && typeof opts.onAnswer === 'function' && typeof it === 'object') {
         var b = h('button', 'btn ghost small', 'Piilota');
         b.type = 'button';
@@ -365,7 +381,7 @@
 
   var api = {
     validAnswer: validAnswer, normalizeWords: normalizeWords, tally: tally, render: render,
-    isProfane: isProfane, emptyModeration: emptyModeration, publicConfig: publicConfig, OPEN_MAX: OPEN_MAX,
+    isProfane: isProfane, emptyModeration: emptyModeration, publicConfig: publicConfig, OPEN_MAX: OPEN_MAX, OPEN_LIMIT: OPEN_LIMIT, OPEN_CLIP: OPEN_CLIP, openMax: openMax, clip: clip,
     isHiddenWord: isHiddenWord, isHiddenAnswer: isHiddenAnswer, csv: csv, csvCell: csvCell
   };
   if (typeof module === 'object' && module.exports) module.exports = api;

@@ -782,8 +782,9 @@
       var poll = findPoll(pid);
       if (!poll) return { type: 'blank' };
       var data = tallyFor(poll);
-      // Projektorille vain näkyvien avoimien vastausten tekstit (uusimmat), ei tunnisteita.
-      if (poll.type === 'open') data = { voters: data.voters, items: data.items.slice(0, 30).map(function (it) { return it.text; }) };
+      // Projektorille vain näkyvien avoimien vastausten tekstit (uusimmat), ei tunnisteita. Pitkistä
+      // pohdintavastauksista vain alku: koko teksti jää hallintaan ja CSV:hen.
+      if (poll.type === 'open') data = { voters: data.voters, items: data.items.slice(0, 30).map(function (it) { return HessuResults.clip(it.text); }) };
       return {
         type: 'poll', code: getEvent().code, url: poll.url, status: poll.status,
         poll: { id: poll.id, type: poll.type, prompt: poll.prompt, config: HessuResults.publicConfig(poll.config) },
@@ -1079,7 +1080,7 @@
           isActive ? h('span.badge.live', { text: 'Aktiivinen' }) : null,
           poll.results_visible ? h('span.badge.open', { text: 'Tulokset näkyvissä' }) : null,
           poll.revealed ? h('span.badge.open', { text: 'Paljastettu' }) : null,
-          h('span.hint', { text: TYPE_LABEL[poll.type] || poll.type }),
+          h('span.hint', { text: (TYPE_LABEL[poll.type] || poll.type) + (poll.type === 'open' && HessuResults.openMax(poll) !== HessuResults.OPEN_MAX ? ' · enintään ' + HessuResults.openMax(poll) + ' merkkiä' : '') }),
           correctHint(poll)),
         h('p.poll-card-prompt', { text: poll.prompt }),
         h('div.q-actions', null,
@@ -1267,8 +1268,10 @@
             h('label', { for: 'poll-max', text: t === 'scale' ? 'Selite arvolle 10' : 'Selite suurimmalle arvolle' }), inputs.max);
         } else if (t === 'open') {
           inputs.multiple = h('input', { type: 'checkbox', id: 'poll-multiple', checked: !!cfg.multiple });
+          inputs.openMax = h('input', { type: 'number', id: 'poll-open-max', min: HessuResults.OPEN_MAX, max: HessuResults.OPEN_LIMIT, step: 10, value: HessuResults.openMax({ config: cfg }) });
           fields.append(h('label.check', null, inputs.multiple, ' Salli useita vastauksia samalta osallistujalta'),
-            h('p.hint', { text: 'Enintään 280 merkkiä. Vastaukset näkyvät listana uusin ensin. Kirosanasuodatin piilottaa osumat tarkistettavaksi, ja voit piilottaa minkä tahansa vastauksen.' }));
+            h('label', { for: 'poll-open-max', text: 'Enimmäispituus (merkkiä)' }), inputs.openMax,
+            h('p.hint', { text: 'Oletus 280 merkkiä. Pohdintatehtäviin enintään ' + HessuResults.OPEN_LIMIT + ' (noin 500 sanaa); osallistuja näkee laskurin. Projektori näyttää pitkistä vastauksista ' + HessuResults.OPEN_CLIP + ' ensimmäistä merkkiä, hallinta ja CSV koko tekstin. Vastaukset näkyvät listana uusin ensin. Kirosanasuodatin piilottaa osumat tarkistettavaksi, ja voit piilottaa minkä tahansa vastauksen.' }));
         } else {
           fields.append(h('p.hint', { text: 'Kuulijat vastaavat 1–3 sanalla. Samat vastaukset kasvattavat sanaa pilvessä. Voit piilottaa sopimattoman sanan klikkaamalla sitä tuloksissa.' }));
         }
@@ -1293,7 +1296,7 @@
         }
         if (t === 'likert') return { points: parseInt(inputs.points.value, 10), min_label: inputs.min.value, max_label: inputs.max.value };
         if (t === 'scale') return { min_label: inputs.min.value, max_label: inputs.max.value };
-        if (t === 'open') return { multiple: inputs.multiple.checked };
+        if (t === 'open') return { multiple: inputs.multiple.checked, max: parseInt(inputs.openMax.value, 10) || HessuResults.OPEN_MAX };
         return {};
       }
 

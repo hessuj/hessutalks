@@ -19,7 +19,7 @@ Address: <https://hessujarvinen.com/hessutalks/>
 ### Polls and question sets
 
 A lecture consists of **question sets** (e.g. modules `M1`, `M4`) containing questions in order.
-Question types: multiple choice (one or several answers), open text (280 characters, optionally several answers), word cloud (1–3 words, 30 characters), Likert scale (5 or 7 points) and a 0–10 scale.
+Question types: multiple choice (one or several answers), open text (default 280 characters, up to 3,500 or about 500 words for reflection tasks, optionally several answers), word cloud (1–3 words, 30 characters), Likert scale (5 or 7 points) and a 0–10 scale.
 
 One lecture can cover a whole course or lecture series: the sets divide it into lectures (e.g. `L1`–`L4`), and participants
 use the same code and nickname throughout the course. The admin lecture page has two tabs, *Kyselyt* (polls) and
@@ -79,7 +79,7 @@ Import is all or nothing. An error (including a set identifier already used in t
 | `single`, `multi` | Multiple choice. `correct` = indexes of the correct options (0-based), `explanations` = one explanation per option. Both optional, and neither is shown to participants. |
 | `scale` | `min`–`max` 1–5 or 1–7 = Likert, 0–10 = scale |
 | `wordcloud` | Word cloud, `maxWords` 1–3 |
-| `open` | Open text, `multipleAnswers` = several answers |
+| `open` | Open text, `multipleAnswers` = several answers, `maxLength` = maximum length in characters 280–3500 (default 280). Participants see a counter, e.g. `240/3500`. The projector shows the first 280 characters of long answers, the admin view and CSV the full text. |
 | `qa` | Not supported; imported as the type in `fallbackType`, if given |
 
 **Participant language** is chosen per lecture (creation form or lecture page): *English*, *Suomi* or by browser language.

@@ -82,6 +82,21 @@ test('avoin teksti: 1–280 merkkiä, ohjausmerkit pois, rivinvaihdot säilyvät
   assert.equal(R.validAnswer(open, 'a\u202Eb'), 'ab', 'Tekstin suunnan ohjausmerkit pois');
 });
 
+test('avoin teksti: kysymyskohtainen enimmäispituus 280–3500 merkkiä (noin 500 sanaa)', () => {
+  const essay = { id: 40, type: 'open', config: { multiple: false, max: 3500 } };
+  assert.equal(R.openMax(essay), 3500);
+  assert.equal(R.validAnswer(essay, 'ä'.repeat(3500)), 'ä'.repeat(3500));
+  assert.equal(R.validAnswer(essay, 'x'.repeat(3501)), null);
+  assert.equal(R.validAnswer(open, 'x'.repeat(281)), null, 'Ilman asetusta oletus 280');
+  // Muokattu asetus ei avaa rajaa: vain 280–3500 kelpaa, muuten oletus.
+  assert.equal(R.clip('x'.repeat(280)), 'x'.repeat(280), 'Lyhyt vastaus ennallaan');
+  assert.equal(R.clip('x'.repeat(279) + '  yz'), 'x'.repeat(279) + '…', 'Projektorille alku ja "…"');
+  assert.equal([...R.clip('😀'.repeat(400))].length, 281, 'Merkit, ei UTF-16-yksiköitä');
+  for (const max of [100000, 100, '3500', 3500.5, null]) {
+    assert.equal(R.openMax({ type: 'open', config: { max } }), 280, String(max));
+  }
+});
+
 test('avoin teksti: uusin ensin, piilotetut ja suodattimen osumat pois', () => {
   const items = [
     { id: 1, text: 'Ensimmäinen', ts: 100 },

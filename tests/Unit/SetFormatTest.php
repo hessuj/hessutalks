@@ -76,6 +76,25 @@ final class SetFormatTest extends TestCase
         self::assertSame($first['sets'], $second['sets'], 'Vienti ja uudelleentuonti tuottavat samat kysymykset');
     }
 
+    public function testOpenAnswerLengthIsImportedAndExported(): void
+    {
+        $r = SetFormat::parse(self::file(['id' => 'L4', 'title' => 'L4', 'questions' => [
+            ['type' => 'open', 'text' => 'Riskit kolmella tasolla?', 'maxLength' => 3500, 'multipleAnswers' => true],
+            ['type' => 'open', 'text' => 'Lyhyt', 'maxLength' => 280],
+            ['type' => 'open', 'text' => 'Oletus'],
+        ]]));
+        self::assertSame([], $r['errors']);
+        $configs = array_column($r['sets'][0]['polls'], 'config');
+        self::assertSame([['multiple' => true, 'max' => 3500], ['multiple' => false], ['multiple' => false]], $configs, 'Oletusta (280) ei tallenneta');
+
+        $polls = array_map(static fn (array $p): array => ['set_id' => 1] + $p, $r['sets'][0]['polls']);
+        $exported = SetFormat::export('Kurssi', [['id' => 1, 'slug' => 'L4', 'title' => 'L4']], $polls);
+        $questions = $exported['sets'][0]['questions'];
+        self::assertSame(3500, $questions[0]['maxLength']);
+        self::assertArrayNotHasKey('maxLength', $questions[1]);
+        self::assertSame($r['sets'], SetFormat::parse((string) json_encode($exported))['sets'], 'Vienti ja uudelleentuonti säilyttävät pituuden');
+    }
+
     /** @return iterable<string, array{string, string}> */
     public static function invalidFiles(): iterable
     {
@@ -99,6 +118,9 @@ final class SetFormatTest extends TestCase
         yield 'liian pitkä kysymys' => [self::file($q(['type' => 'wordcloud', 'text' => str_repeat('x', 301)])), 'kysymyksessä pitää olla'];
         yield 'liian suuri' => [str_repeat(' ', SetFormat::MAX_BYTES + 1), 'liian suuri'];
         yield 'liian syvä' => [str_repeat('[', 50) . str_repeat(']', 50), 'kelvollista JSONia'];
+        yield 'avoin vastaus liian pitkä' => [self::file($q(['type' => 'open', 'text' => 'X', 'maxLength' => 3501])), '280–3500 merkkiä'];
+        yield 'avoin vastaus alle oletuksen' => [self::file($q(['type' => 'open', 'text' => 'X', 'maxLength' => 100])), '280–3500 merkkiä'];
+        yield 'avoin vastaus merkkijonona' => [self::file($q(['type' => 'open', 'text' => 'X', 'maxLength' => '500'])), '280–3500 merkkiä'];
         yield 'qa ilman tuettua varatyyppiä' => [self::file($q(['type' => 'qa', 'text' => 'X', 'fallbackType' => 'ranking'])), 'tuntematon type'];
     }
 
