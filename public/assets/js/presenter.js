@@ -35,6 +35,22 @@
     show(h('p', 'stage-url', msg));
   }
 
+  // Kieli tulee hallinnan viestistä (luennon osallistujien kieli). Vain fi ja en.
+  var lang = 'fi';
+  var TEXT = {
+    fi: {
+      answers: function (n) { return n === 1 ? '1 vastaus' : n + ' vastausta'; }, closed: ' · kysely on suljettu',
+      later: 'Tulokset näytetään myöhemmin.', none: 'Ei vastauksia.', noQuestions: 'Ei kysymyksiä.',
+      mean: 'Keskiarvo', median: 'mediaani', locale: 'fi-FI', ended: 'Hallintanäkymä suljettiin.'
+    },
+    en: {
+      answers: function (n) { return n === 1 ? '1 answer' : n + ' answers'; }, closed: ' · poll closed',
+      later: 'Results will be shown later.', none: 'No answers yet.', noQuestions: 'No questions yet.',
+      mean: 'Average', median: 'median', locale: 'en-GB', ended: 'The admin view was closed.'
+    }
+  };
+  function tx() { return TEXT[lang]; }
+
   function renderQr(code, url) {
     var qr = window.qrcode(0, 'M');
     qr.addData(url);
@@ -113,9 +129,10 @@
       pollView = { id: p.id, prompt: prompt, results: results, count: count };
     }
     pollView.prompt.textContent = p.prompt;
-    pollView.count.textContent = m.data.voters + ' vastausta' + (m.status === 'closed' ? ' · kysely on suljettu' : '');
+    pollView.count.textContent = tx().answers(m.data.voters) + (m.status === 'closed' ? tx().closed : '');
     window.HessuResults.render(pollView.results, p, m.data, {
-      max: OPEN_ON_STAGE, clip: window.HessuResults.OPEN_CLIP, hidden: m.results !== true, reveal: validReveal(m), hiddenText: 'Tulokset näytetään myöhemmin.'
+      max: OPEN_ON_STAGE, clip: window.HessuResults.OPEN_CLIP, hidden: m.results !== true, reveal: validReveal(m),
+      hiddenText: tx().later, emptyText: tx().none, labels: { mean: tx().mean, median: tx().median }, locale: tx().locale
     });
   }
 
@@ -130,7 +147,7 @@
       li.appendChild(h('span', 'stage-list-text', it.text));
       ol.appendChild(li);
     });
-    show(h('p', 'stage-url', title), items.length ? ol : h('p', 'stage-q', 'Ei kysymyksiä.'));
+    show(h('p', 'stage-url', title), items.length ? ol : h('p', 'stage-q', tx().noQuestions));
     trimList();
   }
 
@@ -172,6 +189,7 @@
     if (ev.origin !== window.location.origin || !window.opener || ev.source !== window.opener) return;
     var m = ev.data;
     if (!m || typeof m !== 'object') return;
+    lang = m.lang === 'en' ? 'en' : 'fi';
     // Iso QR-koodi kulkee jokaisen viestin mukana (tila on hallinnassa ja palvelimella).
     if (m.type !== 'end') setBigQr(m.bigQr === true && str(m.code, 20) && str(m.url, 500) ? m.code : null, m.url);
     switch (m.type) {
@@ -194,7 +212,7 @@
         show();
         break;
       case 'end':
-        waiting('Hallintanäkymä suljettiin.');
+        waiting(tx().ended);
         break;
     }
   }
@@ -258,6 +276,6 @@
   var watch = setInterval(function () {
     if (window.opener && !window.opener.closed) return;
     clearInterval(watch);
-    waiting('Hallintanäkymä suljettiin.');
+    waiting(tx().ended);
   }, 2000);
 })();

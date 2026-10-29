@@ -521,8 +521,17 @@
 
   function screenOpen(sc) { return !!sc && !!sc.win && !sc.win.closed; }
 
+  // Projektorin kieli = luennon osallistujien kieli (yleisö on sama). "Selaimen mukaan" → suomi.
+  var screenLang = 'fi';
+  function setScreenLang(eventLang) {
+    var next = eventLang === 'en' ? 'en' : 'fi';
+    if (next === screenLang) return;
+    screenLang = next;
+    Object.keys(screens).forEach(function (k) { var sc = screens[k]; if (sc.msg) screenPost(sc, sc.live ? (sc.msg = sc.live()) : sc.msg); });
+  }
+
   function screenPost(sc, msg) {
-    if (screenOpen(sc)) sc.win.postMessage(msg, ORIGIN);
+    if (screenOpen(sc)) sc.win.postMessage(Object.assign({}, msg, { lang: screenLang }), ORIGIN);
   }
 
   /** Valitsee näytön, joka ei ole tämän ikkunan näyttö (Window Management API, Chrome/Edge). */
@@ -1368,7 +1377,7 @@
             h('p.row-inline', null, h('label', { for: 'event-lang', text: 'Osallistujien kieli ' }), (function () {
               var sel = langSelect('event-lang', event.lang);
               sel.addEventListener('change', function () {
-                api('POST', 'events/' + id + '/lang', { lang: sel.value || null }).then(function (r) { event = r.event; renderHead(); });
+                api('POST', 'events/' + id + '/lang', { lang: sel.value || null }).then(function (r) { event = r.event; setScreenLang(event.lang); renderHead(); });
               });
               return sel;
             })()),
@@ -1387,7 +1396,7 @@
           typeof m.n === 'string' && !bad[it.nickname_id] && (it.status === 'new' || it.status === 'answered');
       }).slice(-LIST_MAX).reverse();
       return {
-        type: 'list', title: event.title + ' · ' + (kind === 'feedback' ? 'Palautteet' : 'Kysymykset'),
+        type: 'list', title: event.title + ' · ' + (kind === 'feedback' ? (screenLang === 'en' ? 'Feedback' : 'Palautteet') : (screenLang === 'en' ? 'Questions' : 'Kysymykset')),
         items: shown.map(function (it) { return { nick: it.msg.n, text: it.msg.t }; })
       };
     }
@@ -1501,6 +1510,7 @@
       return api('GET', 'events/' + id + '/questions?after=' + known).then(function (r) {
         var first = event === null;
         event = r.event;
+        setScreenLang(event.lang);
         r.questions.forEach(function (q) {
           // Päällekkäiset haut (ajastin ja esitysikkunan tahdistus) voivat palauttaa saman viestin.
           if (q.id <= lastId) return;

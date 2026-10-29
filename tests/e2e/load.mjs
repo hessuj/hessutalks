@@ -53,7 +53,7 @@ const watchEnd = Date.now() + 30000;
 while (Date.now() < watchEnd) {
   const acceptedTimes = run.stats.acceptedAt.get(pollId()) || [];
   const text = await stage.js(`document.querySelector('.poll-stage-count')?.textContent || ''`);
-  const n = Number((text.match(/^(\d+) vastausta/) || [])[1] || 0);
+  const n = Number((text.match(/^(\d+) (?:vastaus|answer)/) || [])[1] || 0);
   for (let i = shown; i < Math.min(n, acceptedTimes.length); i++) lags.push(Date.now() - acceptedTimes[i]);
   shown = Math.max(shown, n);
   if (shown >= CLIENTS) break;

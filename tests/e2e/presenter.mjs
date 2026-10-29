@@ -50,8 +50,19 @@ step('Esitysikkunan näppäimet: → seuraava, välilyönti avaa, R tulokset, A 
 
 // Koodi ja QR kulmassa, vastausmäärä, fonttikoko 1080p:llä
 const corner = await stage.js(`({ code: document.querySelector('.poll-stage-code')?.textContent, qr: !!document.querySelector('.poll-stage-foot img'), count: document.querySelector('.poll-stage-count')?.textContent, size: parseFloat(getComputedStyle(document.querySelector('.poll-stage-prompt')).fontSize) })`);
-if (corner.code !== code || !corner.qr || !/^0 vastausta/.test(corner.count) || corner.size < 40) throw new Error('Esitysnäkymä: ' + JSON.stringify(corner));
+if (corner.code !== code || !corner.qr || corner.count !== '0 answers' || corner.size < 40) throw new Error('Esitysnäkymä: ' + JSON.stringify(corner));
 step(`Kulmassa koodi ${code} ja QR, vastausmäärä näkyy; kysymyksen fontti ${corner.size}px (1920×1080)`);
+
+// Projektorin kieli seuraa luennon osallistujien kieltä (hallinta pysyy suomeksi).
+const setLang = (v) => admin.js(`(() => { const s = document.getElementById('event-lang'); s.value = ${JSON.stringify(v)}; s.dispatchEvent(new Event('change')); return true; })()`);
+await setLang('fi');
+await stage.waitFor(`document.querySelector('.poll-stage-count')?.textContent === '0 vastausta'`, 'projektori suomeksi', 5000);
+await setLang('');
+await stage.waitFor(`document.querySelector('.poll-stage-count')?.textContent === '0 vastausta'`, 'selaimen mukaan → suomi', 5000);
+await setLang('en');
+await stage.waitFor(`document.querySelector('.poll-stage-count')?.textContent === '0 answers'`, 'projektori englanniksi', 5000);
+if (!(await admin.js(admin.hasText('Piilota tulokset')))) throw new Error('Hallinta ei pysynyt suomeksi');
+step('Projektorin kieli luennon mukaan: English → "0 answers", Suomi ja selaimen mukaan → "0 vastausta"; hallinta suomeksi');
 
 // Iso QR ja teema
 await key(stage, 'q', 'KeyQ');

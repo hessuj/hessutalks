@@ -180,8 +180,8 @@
     if (text !== undefined && text !== null) el.textContent = text;
     return el;
   }
-  function fmt(n, digits) {
-    return n.toLocaleString('fi-FI', { minimumFractionDigits: digits, maximumFractionDigits: digits });
+  function fmt(n, digits, locale) {
+    return n.toLocaleString(locale || 'fi-FI', { minimumFractionDigits: digits, maximumFractionDigits: digits });
   }
   function pct(n, total) { return total ? Math.round(100 * n / total) : 0; }
 
@@ -257,7 +257,7 @@
     });
     var stats = (opts && opts.labels) || { mean: 'Keskiarvo', median: 'mediaani' };
     el.querySelector('.res-stats').textContent = hidden || typeof data.mean !== 'number' ? '' :
-      stats.mean + ' ' + fmt(data.mean, 1) + (typeof data.median === 'number' ? ' · ' + stats.median + ' ' + fmt(data.median, data.median % 1 ? 1 : 0) : '');
+      stats.mean + ' ' + fmt(data.mean, 1, opts && opts.locale) + (typeof data.median === 'number' ? ' · ' + stats.median + ' ' + fmt(data.median, data.median % 1 ? 1 : 0, opts && opts.locale) : '');
   }
 
   // ---------------------------------------------------------------- sanapilvi
@@ -361,7 +361,7 @@
       }
       list.appendChild(li);
     });
-    el.replaceChildren(items.length ? list : h('p', 'res-empty', 'Ei vastauksia.'));
+    el.replaceChildren(items.length ? list : h('p', 'res-empty', (opts && opts.emptyText) || 'Ei vastauksia.'));
   }
 
   /**

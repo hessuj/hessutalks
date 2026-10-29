@@ -40,7 +40,7 @@ await part.waitFor(`document.querySelector('form.poll .notice.ok')`, 'kuittaus')
 
 await admin.click('Aktiivinen projektorille');
 const stage = await attach(port, '/admin/esitys');
-await stage.waitFor(`document.querySelector('.poll-stage-count')?.textContent.startsWith('1 vastausta')`, 'vastausmäärä projektorilla', 8000);
+await stage.waitFor(`document.querySelector('.poll-stage-count')?.textContent.startsWith('1 answer')`, 'vastausmäärä projektorilla', 8000);
 if (!(await stage.js(`!!document.querySelector('.results.res-hidden') && [...document.querySelectorAll('.res-value')].every((e) => e.textContent === '')`))) {
   throw new Error('Tulokset näkyivät ennen Näytä tulokset -painiketta');
 }
