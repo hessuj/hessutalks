@@ -64,6 +64,9 @@ const r = report(run.stats);
 console.log(JSON.stringify({ ...r, viewMs, presenterLagMs: { p50: lags.sort((a, b) => a - b)[Math.floor(lags.length / 2)], max: Math.max(...lags) } }, null, 2));
 if (shown < CLIENTS) throw new Error(`Esitysnäkymässä ${shown}/${CLIENTS} vastausta`);
 if (r.errors > 0) throw new Error('Virheellisiä pyyntöjä: ' + JSON.stringify(r.statuses));
+// Tilakyselyt staattisesta tiedostosta (Apache), ei PHP:stä: jaetun palvelimen prosessiraja (28.10.).
+if (r.liveMs.n > CLIENTS) throw new Error(`PHP-tilakyselyjä ${r.liveMs.n} (tiedostosta ${r.fileMs.n}): tilatiedosto ei ole käytössä`);
+step(`Tilakyselyt: tiedostosta ${r.fileMs.n}, PHP:stä ${r.liveMs.n}`);
 const maxLag = Math.max(...lags);
 step(`Kaikki ${CLIENTS} vastausta esitysnäkymässä; viive vastauksesta esitysnäkymään enintään ${maxLag} ms`);
 if (viewMs > 2000) throw new Error(`Näkymän vaihto ${viewMs} ms > 2000 ms`);

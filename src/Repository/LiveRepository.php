@@ -14,11 +14,14 @@ use HessuTalks\Database;
  * - Seuraava/Edellinen kulkee sarjojen ja kysymysten järjestyksessä ja ohittaa ohitetut sarjat.
  * - live_version kasvaa jokaisesta osallistujille näkyvästä muutoksesta. Osallistujan selain
  *   kysyy tilaa sekunnin välein ja saa lyhyen vastauksen, kun mikään ei ole muuttunut.
+ * - Jokainen muutos kirjoittaa osallistujan tilan myös staattiseen tiedostoon (LiveFile), jota selain
+ *   lukee ilman PHP:tä. Siksi kaikki osallistujille näkyvät muutokset kulkevat bump()-metodin kautta.
  */
 final class LiveRepository
 {
     public function __construct(
         private readonly Database $db,
+        private readonly ?LiveFile $file = null,
     ) {
     }
 
@@ -26,6 +29,62 @@ final class LiveRepository
     public function bump(int $eventId): void
     {
         $this->db->exec('UPDATE events SET live_version = live_version + 1 WHERE id = ?', [$eventId]);
+        $this->publish($eventId);
+    }
+
+    /**
+     * Kirjoittaa osallistujan tilan staattiseen tiedostoon. Suljetun luennon tiedostossa ei ole kysymystä:
+     * selain kysyy silloin PHP:ltä, joka vastaa 410 ja kertoo syyn osallistujan kielellä.
+     */
+    public function publish(int $eventId): void
+    {
+        if ($this->file === null) {
+            return;
+        }
+        $event = $this->db->one('SELECT id, live_version, active_poll_id, status, closes_at FROM events WHERE id = ?', [$eventId]);
+        if ($event === null) {
+            $this->file->remove($eventId);
+            return;
+        }
+        $closed = $event['status'] !== 'open';
+        $ok = $this->file->write($eventId, [
+            'v' => (int) $event['live_version'],
+            'poll' => $closed ? null : $this->participantPoll($event),
+            'closed' => $closed,
+            'closes_at' => isset($event['closes_at']) ? (int) $event['closes_at'] : null,
+        ]);
+        if (!$ok) {
+            // Selain käyttää silloin /api/live-reittiä: palvelu toimii, mutta kuormittaa PHP:tä.
+            error_log('[hessutalks] tilatiedoston kirjoitus epäonnistui (luento ' . $eventId . ')');
+        }
+    }
+
+    /**
+     * Tilatiedoston nimi luennon sivua varten. Sivu kirjoittaa tiedoston aina uudelleen: jos tietokanta on
+     * palautettu tai luennon id käytetty uudelleen, samannimisessä tiedostossa voi olla vanha tila.
+     * null = ei käytössä tai kirjoitus epäonnistui: selain käyttää silloin suoraan /api/live-reittiä.
+     */
+    public function fileName(int $eventId): ?string
+    {
+        if ($this->file === null) {
+            return null;
+        }
+        $this->publish($eventId);
+        return $this->file->exists($eventId) ? $this->file->name($eventId) : null;
+    }
+
+    /** Kirjoittaa tilatiedoston, jos se puuttuu (/api/live: seuraavat kyselyt menevät taas tiedostoon). */
+    public function ensureFile(int $eventId): void
+    {
+        if ($this->file !== null && !$this->file->exists($eventId)) {
+            $this->publish($eventId);
+        }
+    }
+
+    /** Poistetun luennon tilatiedosto pois (vaatimus 7.8: kaikki tiedot poistuvat). */
+    public function forget(int $eventId): void
+    {
+        $this->file?->remove($eventId);
     }
 
     public function activeId(int $eventId): ?int

@@ -1,0 +1,19 @@
+# Osallistujien tilatiedostot (src/Repository/LiveFile.php). Apache palvelee ne ilman PHP:tä.
+# Ei uudelleenohjausta index.php:lle: puuttuva tiedosto on staattinen 404, ei PHP-prosessi
+# (jaetun palvelimen Entry Processes -raja täyttyi 28.10. noin 90 osallistujalla).
+RewriteEngine Off
+Options -Indexes
+
+# Vain sovelluksen kirjoittamat tiedostot (32 heksamerkkiä + .json), ei väliaikaisia pistetiedostoja.
+Require all denied
+<FilesMatch "^[0-9a-f]{32}\.json$">
+  Require all granted
+</FilesMatch>
+
+<IfModule mod_mime.c>
+  AddType application/json .json
+</IfModule>
+<IfModule mod_headers.c>
+  # Tila muuttuu sekunneissa: ei välimuistia selaimessa eikä välityspalvelimissa.
+  Header set Cache-Control "no-store"
+</IfModule>

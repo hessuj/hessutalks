@@ -18,7 +18,8 @@ use HessuTalks\Security\NativeSession;
  */
 final class Bootstrap
 {
-    public static function run(string $appRoot, string $configFile): void
+    /** $publicDir: index.php:n hakemisto (webroot), jonne kirjoitetaan osallistujien tilatiedostot (live/). */
+    public static function run(string $appRoot, string $configFile, ?string $publicDir = null): void
     {
         ini_set('display_errors', '0');
         ini_set('expose_php', '0');
@@ -27,7 +28,7 @@ final class Bootstrap
         $config = Config::fromFile($configFile);
         $db = new Database($config->dbPath, $appRoot . '/migrations');
         $session = new NativeSession($config->sessionPath, $config->basePath . '/admin', $config->cookieSecure);
-        $app = new App($config, $db, $session, new LbuchsWebAuthn('HessuTalks', $config->rpId), new Clock(), $appRoot);
+        $app = new App($config, $db, $session, new LbuchsWebAuthn('HessuTalks', $config->rpId), new Clock(), $appRoot, $publicDir === null ? null : $publicDir . '/live');
         $app->onError(static function (\Throwable $e): void {
             error_log('[hessutalks] ' . $e::class . ': ' . $e->getMessage() . ' @ ' . $e->getFile() . ':' . $e->getLine());
         });

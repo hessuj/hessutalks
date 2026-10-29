@@ -9,3 +9,7 @@ config.php
 *.sqlite-*
 .DS_Store
 .ftp-deploy-sync-state*.json
+
+# Osallistujien tilatiedostot (sovellus kirjoittaa, ks. public/live/.htaccess)
+/public/live/*.json
+/public/live/.*.json.*

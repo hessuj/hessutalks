@@ -28,6 +28,7 @@ cleanup() {
   [ -n "$BROWSER" ] && kill "$BROWSER" 2>/dev/null || true
   wait 2>/dev/null || true
   rm -rf "$TMP"
+  rm -f "$ROOT"/public/live/*.json
 }
 trap cleanup EXIT
 
@@ -72,6 +73,7 @@ status=0
 for t in "${TESTS[@]}"; do
   echo "== $t"
   rm -rf "$TMP/data/hessutalks.sqlite"* "$TMP/data/sessions"   # jokainen testi aloittaa tyhjästä
+  rm -f "$ROOT"/public/live/*.json                            # tilatiedostot (kehityspalvelin kirjoittaa public/live/)
   read -r file extra <<<"$t"
   start_browser
   # shellcheck disable=SC2086

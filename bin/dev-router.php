@@ -39,4 +39,24 @@ if (str_starts_with($path, '/assets/')) {
     exit;
 }
 
+// Osallistujien tilatiedostot kuten public/live/.htaccess: vain 32 heksamerkkiä + .json, ei välimuistia,
+// puuttuva tiedosto on 404 ilman sovellusta.
+if (str_starts_with($path, '/live/')) {
+    $file = realpath($publicDir . $path);
+    // Vain public/live-hakemiston sovelluksen kirjoittamat tiedostot (ei polkujen läpikulkua), kuten assets yllä.
+    if ($file === false || !str_starts_with($file, $publicDir . '/live/') || preg_match('/^[0-9a-f]{32}\.json$/', basename($file)) !== 1 || !is_file($file)) {
+        http_response_code(404);
+        exit;
+    }
+    header_remove('X-Powered-By');
+    header('Content-Type: application/json');
+    header('X-Content-Type-Options: nosniff');
+    header('Referrer-Policy: no-referrer');
+    header('Cross-Origin-Resource-Policy: same-origin');
+    header("Content-Security-Policy: default-src 'none'; frame-ancestors 'none'; base-uri 'none'");
+    header('Cache-Control: no-store');
+    readfile($file);
+    exit;
+}
+
 require $publicDir . '/index.php';
