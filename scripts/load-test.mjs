@@ -6,7 +6,7 @@
 // Vastaukset salataan luennon julkisella avaimella (crypto_box_seal) kuten selaimessa: palvelin ei näe sisältöä.
 //
 //   node scripts/load-test.mjs http://localhost:8080/k/ABC234 --clients 150 --duration 60
-//   node scripts/load-test.mjs https://hessujarvinen.com/hessutalks/k/KOODI --production --clients 150
+//   node scripts/load-test.mjs https://example.com/hessutalks/k/KOODI --production --clients 150
 //
 // Tuotantoon ajetaan vain erilliselle testiluennolle (--production vaaditaan https-osoitteelle).
 // Ajo keskeytyy, jos yli 20 % pyynnöistä epäonnistuu 10 sekunnin aikana (ei kuormiteta rikkinäistä palvelua).

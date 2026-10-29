@@ -1,6 +1,6 @@
 # Osallistujien tilatiedostot (src/Repository/LiveFile.php). Apache palvelee ne ilman PHP:tä.
 # Ei uudelleenohjausta index.php:lle: puuttuva tiedosto on staattinen 404, ei PHP-prosessi
-# (jaetun palvelimen Entry Processes -raja täyttyi 28.10. noin 90 osallistujalla).
+# (jaetun palvelimen prosessiraja täyttyi kuormitustestissä 28.10.).
 RewriteEngine Off
 Options -Indexes
 

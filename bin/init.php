@@ -4,7 +4,7 @@
  * Luo HessuTalksin asetustiedoston ja kertakäyttöisen käyttöönottotunnuksen.
  *
  * Tuotanto, cPanelin Terminalissa (suositeltu – asetukset syntyvät suoraan oikeaan paikkaan):
- *   php ~/public_html/hessutalks/app/bin/init.php --origin=https://hessujarvinen.com --base=/hessutalks
+ *   php ~/public_html/hessutalks/app/bin/init.php --origin=https://example.com --base=/hessutalks
  *   -> luo ~/hessutalks-data/config.php (kotihakemistoon, EI sivuston kansioon)
  *
  * Valinnaiset: --data=<hakemisto> (oletus ~/hessutalks-data), --out=<tiedosto> (oletus <data>/config.php)

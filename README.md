@@ -200,12 +200,12 @@ Hakemistorakenne webhotellissa:
 Deploy-tunnus on rajattu pelkkään sovelluksen kansioon. Vaikka tunnus vuotaisi, sillä ei pääse
 käsiksi tietokantaan eikä muihin sivuston osiin.
 
-1. **PHP-versio:** cPanel → *MultiPHP Manager* → hessujarvinen.com → **PHP 8.4** (ea-php84).
+1. **PHP-versio:** cPanel → *MultiPHP Manager* → oma domain → **PHP 8.4**.
    Varmista, että laajennukset `sodium`, `pdo_sqlite`, `mbstring` ja `intl` ovat päällä (*Select PHP Version → Extensions*).
-2. **FTP-tili:** cPanel → *FTP Accounts* → esim. `deploy-hessutalks@hessujarvinen.com`.
+2. **FTP-tili:** cPanel → *FTP Accounts* → oma tili julkaisulle. Valitse nimi, jota ei voi arvata (esim. satunnainen jatke), ja pitkä satunnainen salasana.
    Directory-kentäksi sovelluksen kansio sivuston juuren (`public_html`) alla: `public_html/hessutalks`.
 3. **GitHub:** (julkaisu käynnistyy pushista `main`-haaraan tai *Actions → CI/CD → Run workflow*) repo → *Settings → Environments* → luo ympäristö `production` ja lisää siihen secretit:
-   - `FTP_SERVER`: esim. `ftp.hessujarvinen.com`
+   - `FTP_SERVER`: webhotellin FTP-palvelin (esim. `ftp.example.com`)
    - `FTP_USERNAME`: FTP-tilin koko käyttäjätunnus
    - `FTP_PASSWORD`: FTP-tilin salasana
 
@@ -214,7 +214,7 @@ käsiksi tietokantaan eikä muihin sivuston osiin.
    Halutessasi lisää ympäristöön *Required reviewers* → itsesi, jolloin jokainen julkaisu odottaa hyväksyntääsi.
 4. **Asetustiedosto:** kun sovellus on julkaistu kerran, avaa cPanel → *Terminal* ja aja:
    ```sh
-   php ~/public_html/hessutalks/app/bin/init.php --origin=https://hessujarvinen.com --base=/hessutalks
+   php ~/public_html/hessutalks/app/bin/init.php --origin=https://example.com --base=/hessutalks
    ```
    Komento luo tiedoston `~/hessutalks-data/config.php` suoraan oikeaan paikkaan kotihakemistoon
    sivuston ulkopuolelle oikeilla tiedosto-oikeuksilla. Se tulostaa **käyttöönottotunnuksen**, joka kannattaa tallentaa hetkeksi.
@@ -222,7 +222,7 @@ käsiksi tietokantaan eikä muihin sivuston osiin.
 
    *Jos cPanelissa ei ole Terminalia:* aja sama komento omalla koneella repon juuressa (`php bin/init.php … --data=/home/CPANEL-KÄYTTÄJÄ/hessutalks-data --out=config.php`,
    vaatii PHP:n, esim. `brew install php`). Lataa sitten `config.php` File Managerilla kotihakemiston kansioon `hessutalks-data` (oikeudet `700`/`600`).
-5. **Ensimmäinen kirjautuminen:** avaa `https://hessujarvinen.com/hessutalks/admin`, syötä käyttöönottotunnus ja luo passkey.
+5. **Ensimmäinen kirjautuminen:** avaa `https://example.com/hessutalks/admin`, syötä käyttöönottotunnus ja luo passkey.
    Luo sen jälkeen salausavaimet tunnuslauseella. Tallenna tunnuslause salasanojen hallintaan
    ja talleta ladattu varmuuskopiotiedosto turvaan.
 6. **Varapasskey:** lisää *Asetukset*-sivulta toinen passkey esimerkiksi puhelimeen.
