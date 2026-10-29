@@ -66,6 +66,7 @@ Lisää jokaiselle uudelle ominaisuudelle testit, myös tietoturvatestit (`tests
 ## Tila
 MMoIT 2026 -kurssin vaatimukset (tapahtuma 13.–14.11.2026, ei julkaisuja tapahtuman aikana, .github/deploy-freeze.txt)
 on toteutettu vaiheittain PR:inä #8–#17. Tila ja hyväksymistestit: docs/hyvaksymistestit.md.
-Jäljellä: kuormitustesti tuotannossa (paikallisesti läpi 28.10.; 200 osallistujan SHOULD siirretty) ja koeajo oikeilla laitteilla ja Teamsilla (H1, H13, H15).
+Kuormitustesti (H13) läpi tuotannossa 29.10.: 150 osallistujaa, 0 virhettä, tila staattisesta tiedostosta (200 osallistujan SHOULD siirretty).
+Jäljellä: koeajo oikeilla laitteilla ja Teamsilla (H1, H15).
 Selaintestit (scripts/e2e.sh) ajetaan aina käyttöliittymämuutosten jälkeen. Sarjojen haku testeissä otsikon mukaan
 (valikot sisältävät muiden sarjojen nimiä).
