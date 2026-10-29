@@ -15,6 +15,9 @@ Katso README.md (käyttö, käyttöönotto) ja SECURITY.md (uhkamalli). Älä he
   julkaisema sisältö (kyselyn kysymys ja vaihtoehdot) on selväkielisenä. Uudet ominaisuudet on suunniteltava tämän rajoitteen mukaan.
 - Purettu sisältö DOMiin vain `textContent`illa. Ei inline-skriptejä (tiukka CSP). Ei CDN-kirjastoja.
 - Kaikki SQL parametrisoituna `Database`-luokan kautta.
+- **Julkinen repo, tietojen minimointi:** ei tilien tunnuksia (FTP-käyttäjä), FTP-palvelinta, palvelimen
+  kapasiteettirajoja eikä muuta ympäristötietoa, josta ei ole hyötyä muille. Esimerkeissä `example.com`.
+  Tarkat mittaustiedot kuuluvat yksityiseen aineistoon. `PublicRepoMinimizationTest` valvoo.
 - Oikeat vastaukset ja selitykset (`config.correct`, `config.explanations`) eivät saa päätyä osallistujalle
   ennen paljastusta: käytä `PollRepository::publicConfig()`.
 

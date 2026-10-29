@@ -7,8 +7,8 @@ namespace HessuTalks\Repository;
 /**
  * Osallistujan tilakyselyn staattinen kopio (vaatimus 8: 150 osallistujaa).
  *
- * Jaetulla palvelimella jokainen PHP-pyyntö varaa prosessin, ja tilan rajat (Entry Processes, noin 32)
- * täyttyivät noin 90 osallistujalla (tuotannon kuormitustesti 28.10.). Apache palvelee staattisen
+ * Jaetulla palvelimella jokainen PHP-pyyntö varaa prosessin, ja tilan prosessiraja täyttyi tuotannon
+ * kuormitustestissä 28.10. jo ennen 150:tä osallistujaa. Apache palvelee staattisen
  * tiedoston ilman PHP:tä, joten osallistujien sekunnin välein tekemät tilakyselyt eivät kuormita PHP:tä.
  *
  * - Tiedostossa on sama sisältö kuin /api/live-vastauksessa (ei salattuja vastauksia, ei oikeita

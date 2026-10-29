@@ -200,12 +200,12 @@ Directory layout on the web host:
 The deploy account is restricted to the application folder only. Even if the credentials leaked, they would give no
 access to the database or other parts of the site.
 
-1. **PHP version:** cPanel → *MultiPHP Manager* → hessujarvinen.com → **PHP 8.4** (ea-php84).
+1. **PHP version:** cPanel → *MultiPHP Manager* → your domain → **PHP 8.4**.
    Make sure the extensions `sodium`, `pdo_sqlite`, `mbstring` and `intl` are enabled (*Select PHP Version → Extensions*).
-2. **FTP account:** cPanel → *FTP Accounts* → e.g. `deploy-hessutalks@hessujarvinen.com`.
+2. **FTP account:** cPanel → *FTP Accounts* → a dedicated account for deploys. Choose a name that cannot be guessed (e.g. a random suffix) and a long random password.
    Set the Directory field to the application folder under the site root (`public_html`): `public_html/hessutalks`.
 3. **GitHub:** (a deploy starts from a push to `main` or *Actions → CI/CD → Run workflow*) repo → *Settings → Environments* → create the environment `production` and add the secrets:
-   - `FTP_SERVER`: e.g. `ftp.hessujarvinen.com`
+   - `FTP_SERVER`: the web host's FTP server (e.g. `ftp.example.com`)
    - `FTP_USERNAME`: the full user name of the FTP account
    - `FTP_PASSWORD`: the FTP account password
 
@@ -214,7 +214,7 @@ access to the database or other parts of the site.
    Optionally add *Required reviewers* → yourself to the environment, so every deploy waits for your approval.
 4. **Configuration file:** after the app has been deployed once, open cPanel → *Terminal* and run:
    ```sh
-   php ~/public_html/hessutalks/app/bin/init.php --origin=https://hessujarvinen.com --base=/hessutalks
+   php ~/public_html/hessutalks/app/bin/init.php --origin=https://example.com --base=/hessutalks
    ```
    The command creates `~/hessutalks-data/config.php` directly in the right place in the home directory,
    outside the site, with the correct file permissions. It prints a **setup token**, which you should save for a moment.
@@ -222,7 +222,7 @@ access to the database or other parts of the site.
 
    *If cPanel has no Terminal:* run the same command on your own machine in the repo root (`php bin/init.php … --data=/home/CPANEL-USER/hessutalks-data --out=config.php`,
    requires PHP, e.g. `brew install php`). Then upload `config.php` with File Manager to the `hessutalks-data` folder in the home directory (permissions `700`/`600`).
-5. **First sign-in:** open `https://hessujarvinen.com/hessutalks/admin`, enter the setup token and create a passkey.
+5. **First sign-in:** open `https://example.com/hessutalks/admin`, enter the setup token and create a passkey.
    Then create the encryption keys with a passphrase. Save the passphrase in a password manager
    and keep the downloaded backup file safe.
 6. **Backup passkey:** add a second passkey from the *Asetukset* (settings) page, for example on your phone.

@@ -12,8 +12,8 @@ final class Config
 {
     /**
      * @param string $basePath      Polku, jossa sovellus näkyy, esim. "/softa/hessutalks" (ei kauttaviivaa lopussa)
-     * @param string $publicOrigin  Julkinen origin, esim. "https://hessujarvinen.com"
-     * @param string $rpId          WebAuthn relying party id, esim. "hessujarvinen.com"
+     * @param string $publicOrigin  Julkinen origin, esim. "https://example.com"
+     * @param string $rpId          WebAuthn relying party id, esim. "example.com"
      * @param string $appSecret     32 tavun satunnainen salaisuus heksana (HMAC-tunnisteet ja lomaketokenit)
      * @param string $setupTokenHash password_hash() ensimmäisen passkeyn rekisteröintitokenista
      */
