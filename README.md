@@ -25,6 +25,10 @@ Yksi luento voi kattaa koko kurssin tai luentosarjan: sarjat jakavat sen luentoi
 käyttävät samaa koodia ja nimimerkkiä koko kurssin ajan. Hallinnan luentosivulla on kaksi välilehteä, *Kyselyt* ja
 *Kysymykset ja palaute*. Ohjauspalkki näkyy kummallakin, ja viestivälilehti kertoo uusien viestien määrän.
 
+Kyselyillä on kaksi tilaa: **Valmistelu** (kortit: luonti, muokkaus, järjestys, esikatselu, poisto) ja **▶ Luennolla**
+(ohjauspalkki, aktiivisen kysymyksen tulokset ja moderointi sekä tiivis numeroitu lista; rivin klikkaus tekee kysymyksestä
+aktiivisen). Luennolla-tilassa ei ole muokkaus- eikä poistonappeja.
+
 1. Luo luennon sivulla sarjat (*Uusi sarja*) ja niihin kysymykset (*Uusi kysymys*) valmiiksi ennen luentoa.
    Sarjoja ja kysymyksiä voi siirtää nuolilla, ja sarjan voi **ohittaa** kesken luennon. Ohitetun sarjan
    kysymykset jäävät pois Seuraava/Edellinen-järjestyksestä, mutta niiden vastaukset säilyvät.

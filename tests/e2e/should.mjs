@@ -4,7 +4,7 @@ import { mkdtempSync, readdirSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { tab, attach, step, setupAdmin, createEvent, openParticipant } from './lib.mjs';
+import { tab, attach, step, setupAdmin, createEvent, openParticipant, openPoll, mode } from './lib.mjs';
 
 const [port, app] = [process.argv[2], process.argv[3]];
 const fixture = fileURLToPath(new URL('../fixtures/mmoit-2026.json', import.meta.url));
@@ -23,11 +23,11 @@ await admin.waitFor(admin.hasText('Tuotu 9 sarjaa'), 'tuonti');
 // Vastauksia: M2 monivalinta ja WRAP-FRI avoin teksti (kaavainjektioyritys)
 const part = await openParticipant(port, admin);
 await part.waitFor(part.hasText('Waiting for the next question'), 'odotusnäkymä');
-await admin.click('Avaa', 'Which threat actor would most likely target');
+await openPoll(admin, 'Which threat actor would most likely target');
 await part.waitFor(part.hasText('Which threat actor would most likely target'), 'M2 osallistujalle');
 await part.js(`(() => { [...document.querySelectorAll('.poll-choice')].find((l) => l.innerText.trim() === 'Insider').querySelector('input').click(); document.querySelector('form.poll').requestSubmit(); return true; })()`);
 await part.waitFor(`document.querySelector('form.poll .notice.ok')`, 'kuittaus');
-await admin.click('Avaa', 'What surprised you today?');
+await openPoll(admin, 'What surprised you today?');
 await part.waitFor(part.hasText('What surprised you today?'), 'avoin osallistujalle');
 await part.js(`(() => { const a = document.querySelector('form.poll textarea'); a.value = ${JSON.stringify(EVIL)}; document.querySelector('form.poll').requestSubmit(); return true; })()`);
 await part.waitFor(`document.querySelector('form.poll .notice.ok')`, 'kuittaus 2');
@@ -36,6 +36,7 @@ await admin.waitFor(`document.querySelector('.live-control').innerText.includes(
 // CSV
 const dir = mkdtempSync(join(tmpdir(), 'hessutalks-csv-'));
 await admin.cdp('Page.setDownloadBehavior', { behavior: 'allow', downloadPath: dir });
+await mode(admin, 'prep');
 await admin.click('Vie CSV');
 let file = null;
 for (let i = 0; i < 50 && !file; i++) {

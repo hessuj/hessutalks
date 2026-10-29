@@ -2,7 +2,7 @@
 // Osallistuja näkee laskurin (esim. 2400/3500), liian pitkä vastaus estetään selaimessa, hallinta näyttää
 // koko tekstin ja projektori pitkistä vastauksista vain alun.
 // Ajo: scripts/e2e.sh long-open.mjs  (tai node tests/e2e/long-open.mjs <cdp-port> <app-url>)
-import { tab, attach, step, setupAdmin, createEvent, openParticipant } from './lib.mjs';
+import { tab, attach, step, setupAdmin, createEvent, openParticipant, openPoll, mode } from './lib.mjs';
 
 const [port, app] = [process.argv[2], process.argv[3]];
 const PROMPT = 'Biggest risk at the national, organisational and individual level?';
@@ -28,7 +28,7 @@ step('Avoin kysymys enimmäispituudella 3500 merkkiä; kortissa "enintään 3500
 
 const part = await openParticipant(port, admin);
 await part.waitFor(part.hasText('Waiting for the next question'), 'odotusnäkymä');
-await admin.click('Avaa', PROMPT);
+await openPoll(admin, PROMPT);
 await part.waitFor(`!!document.querySelector('form.poll textarea')`, 'tekstikenttä');
 const counter = () => part.js(`document.querySelector('form.poll .counter').textContent`);
 if ((await counter()) !== '0/3500') throw new Error('Laskuri: ' + (await counter()));

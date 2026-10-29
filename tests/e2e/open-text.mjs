@@ -1,6 +1,6 @@
 // Vaihe 4: avoin teksti (H6 XSS, H7 moderointi), kirosanasuodatin, useita vastauksia ja pysyvä moderointi.
 // Ajo: scripts/e2e.sh open-text.mjs  (tai node tests/e2e/open-text.mjs <cdp-port> <app-url>)
-import { tab, attach, step, setupAdmin, createEvent, openParticipant } from './lib.mjs';
+import { tab, attach, step, setupAdmin, createEvent, openParticipant, openPoll, mode } from './lib.mjs';
 
 const [port, app] = [process.argv[2], process.argv[3]];
 const XSS = '<script>alert(1)</script><img src=x onerror=alert(2)>';
@@ -25,7 +25,7 @@ step('Avoin kysymys (useita vastauksia) luotu');
 
 const part = await openParticipant(port, admin);
 await part.waitFor(part.hasText('Waiting for the next question'), 'odotusnäkymä');
-await admin.click('Avaa', 'What surprised you today?');
+await openPoll(admin, 'What surprised you today?');
 await part.waitFor(`!!document.querySelector('form.poll textarea')`, 'tekstikenttä');
 if (!(await part.js(part.hasText('Please do not include personal data.')))) throw new Error('Henkilötietohuomautus puuttuu');
 step('Osallistujalla tekstikenttä ja huomautus "Please do not include personal data."');

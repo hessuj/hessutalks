@@ -3,7 +3,7 @@
 // Ohjauspalkki näkyy kummallakin välilehdellä, ja viestivälilehti kertoo uusien viestien määrän.
 // Ajo: scripts/e2e.sh tabs.mjs  (tai node tests/e2e/tabs.mjs <cdp-port> <app-url>)
 import { fileURLToPath } from 'node:url';
-import { tab, step, setupAdmin, createEvent, openParticipant } from './lib.mjs';
+import { tab, step, setupAdmin, createEvent, openParticipant, mode } from './lib.mjs';
 
 const [port, app] = [process.argv[2], process.argv[3]];
 const fixture = fileURLToPath(new URL('../fixtures/mmoit-2026.json', import.meta.url));
@@ -18,6 +18,7 @@ await admin.cdp('DOM.setFileInputFiles', { nodeId, files: [fixture] });
 await admin.waitFor(admin.hasText('Tuodaan 9 sarjaa ja 22 kysymystä'), 'esikatselu');
 await admin.click('Tuo');
 await admin.waitFor(admin.hasText('Tuotu 9 sarjaa ja 22 kysymystä.'), 'tuonti');
+await mode(admin, 'live');
 
 const state = () => admin.js(`(() => {
   const shown = (sel) => { const e = document.querySelector(sel); return !!e && e.offsetParent !== null; };
@@ -88,7 +89,7 @@ step('Vastatuksi merkitseminen pienentää uusien määrää (1 uutta)');
 
 // Valinta säilyy, kun luennoitsija käy luentolistassa ja palaa luennolle.
 await admin.click('Kaikki luennot');
-await admin.waitFor(admin.hasText('E2E Tabs'), 'luentolista');
+await admin.waitFor(`!!document.querySelector('.event-list .open-btn')`, 'luentolista');
 await admin.click('Avaa');
 await admin.waitFor(`!!document.getElementById('tab-btn-messages')`, 'luento');
 s = await state();
