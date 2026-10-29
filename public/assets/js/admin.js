@@ -1462,7 +1462,8 @@
     }
 
     function poll() {
-      return api('GET', 'events/' + id + '/questions?after=' + lastId).then(function (r) {
+      var known = lastId;   // tilaluettelo kertoo vain tätä vanhemmista viesteistä
+      return api('GET', 'events/' + id + '/questions?after=' + known).then(function (r) {
         var first = event === null;
         event = r.event;
         r.questions.forEach(function (q) {
@@ -1472,8 +1473,10 @@
           if (q.id > lastId) lastId = q.id;
         });
         var statuses = r.statuses || {};
-        items = items.filter(function (it) { return statuses[it.id] !== undefined; });
-        items.forEach(function (it) { it.status = statuses[it.id]; });
+        // Poistettu viesti puuttuu tilaluettelosta. Hitaasti palannut haku ei kuitenkaan tiedä viesteistä,
+        // jotka tulivat sen jälkeen: niitä ei saa pudottaa (Hessun koeajo 28.10.: viestejä katosi).
+        items = items.filter(function (it) { return it.id > known || statuses[it.id] !== undefined; });
+        items.forEach(function (it) { if (statuses[it.id] !== undefined) it.status = statuses[it.id]; });
         if (first) renderHead();
         renderList();
       });
