@@ -29,6 +29,7 @@
   var ANSWERS_KEY = 'hessutalks.answers';
   var WORDS_MAX_CHARS = 30;
   var OPEN_MAX = 280;
+  var OPEN_LIMIT = 3500;
   var WORDS_MAX_WORDS = 3;
 
   var code = ask.dataset.code;
@@ -159,14 +160,16 @@
       };
     } else if (poll.type === 'open') {
       var many = !!cfg.multiple;
+      // Kysymyskohtainen enimmäispituus (oletus 280, pohdintatehtävissä enintään 3500 eli noin 500 sanaa).
+      var max = Number.isInteger(cfg.max) && cfg.max >= OPEN_MAX && cfg.max <= OPEN_LIMIT ? cfg.max : OPEN_MAX;
       var area = h('textarea');
-      area.rows = 4;
-      area.maxLength = OPEN_MAX * 2;   // merkit lasketaan alla (emoji = 2 UTF-16-yksikköä)
+      area.rows = max > OPEN_MAX ? 10 : 4;
+      area.maxLength = max * 2;   // merkit lasketaan alla (emoji = 2 UTF-16-yksikköä)
       area.placeholder = t('poll_open_placeholder');
       area.setAttribute('aria-label', poll.prompt);
       if (!many && typeof own === 'string') area.value = own;
       var counter = h('p', 'counter', '');
-      var count = function () { counter.textContent = Array.from(area.value).length + '/' + OPEN_MAX; };
+      var count = function () { counter.textContent = Array.from(area.value).length + '/' + max; };
       area.addEventListener('input', count);
       count();
       body.appendChild(area);
@@ -176,7 +179,7 @@
       getAnswer = function () {
         var text = area.value.trim();
         if (!text) throw new Error(t('poll_open_empty'));
-        if (Array.from(text).length > OPEN_MAX) throw new Error(t('poll_open_long'));
+        if (Array.from(text).length > max) throw new Error(t('poll_open_long', { n: max }));
         return text;
       };
       if (many) {

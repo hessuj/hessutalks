@@ -201,7 +201,8 @@ final class ParticipantController
         if ($poll === null || $poll['event_id'] !== $eventId || $poll['status'] !== 'open' || $this->live->activeId($eventId) !== $poll['id']) {
             return Response::error(I18n::t($lang, 'err.poll_closed'), 409);
         }
-        if (!PollRepository::isValidVoter($in['voter'] ?? null) || !PollRepository::isValidCiphertext($in['ciphertext'] ?? null)) {
+        $openChars = $poll['type'] === 'open' ? PollRepository::openMax($poll) : PollRepository::OPEN_MAX;
+        if (!PollRepository::isValidVoter($in['voter'] ?? null) || !PollRepository::isValidCiphertext($in['ciphertext'] ?? null, $openChars)) {
             return Response::error(I18n::t($lang, 'err.invalid_answer'), 422);
         }
         // Osoitekohtainen raja hylkää liialliset pyynnöt hiljaa (vaatimus 7.5): skripti ei näe rajaa

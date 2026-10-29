@@ -115,7 +115,7 @@
     pollView.prompt.textContent = p.prompt;
     pollView.count.textContent = m.data.voters + ' vastausta' + (m.status === 'closed' ? ' · kysely on suljettu' : '');
     window.HessuResults.render(pollView.results, p, m.data, {
-      max: OPEN_ON_STAGE, hidden: m.results !== true, reveal: validReveal(m), hiddenText: 'Tulokset näytetään myöhemmin.'
+      max: OPEN_ON_STAGE, clip: window.HessuResults.OPEN_CLIP, hidden: m.results !== true, reveal: validReveal(m), hiddenText: 'Tulokset näytetään myöhemmin.'
     });
   }
 

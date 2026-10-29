@@ -444,6 +444,29 @@ final class PollSecurityTest extends AppTestCase
         self::assertSame(['multiple' => false], $live['poll']['config']);
     }
 
+    public function testLongOpenAnswerLimitIsPerQuestion(): void
+    {
+        foreach ([279, 3501, '500', 3500.0, true] as $bad) {
+            self::assertIsString(PollRepository::validate('open', 'Kysymys?', ['max' => $bad]), var_export($bad, true));
+        }
+        // Oletuskysymys (280 merkkiä): pitkä salattu vastaus hylätään, vaikka palvelin ei näe tekstiä.
+        $short = $this->poll('open', 'open', []);
+        $long = '{"v":1,"p":' . $short . ',"a":"' . str_repeat('ä', 1500) . '"}';
+        self::assertSame(422, $this->answer($short, ['ciphertext' => $this->seal($long)])->status, 'Oletusraja koskee kaikkia vanhoja kysymyksiä');
+
+        // Pohdintakysymys (3500 merkkiä, noin 500 sanaa): täysi vastaus monitavuisilla merkeillä kelpaa.
+        $essay = $this->poll('open', 'open', ['max' => 3500]);
+        $full = '{"v":1,"p":' . $essay . ',"a":"' . str_repeat('ä', 3500) . '"}';
+        self::assertSame(201, $this->answer($essay, ['ciphertext' => $this->seal($full)])->status);
+        // Ylisuuri salattu sisältö hylätään kysymyksen rajan mukaan (ei vapaata tallennustilaa).
+        $over = '{"v":1,"p":' . $essay . ',"a":"' . str_repeat('x', 4 * 3500 + 600) . '"}';
+        self::assertSame(422, $this->answer($essay, ['ciphertext' => $this->seal($over)])->status);
+        self::assertSame(1, (int) ($this->db->one('SELECT COUNT(*) AS n FROM poll_answers WHERE poll_id = ?', [$essay])['n'] ?? 0));
+
+        $live = $this->json($this->request('GET', '/api/live?code=' . $this->code));
+        self::assertSame(['multiple' => false, 'max' => 3500], $live['poll']['config'], 'Osallistuja saa rajan laskuria varten');
+    }
+
     public function testModerationIsStoredOnlyEncryptedAndClearedOnReset(): void
     {
         $h = ['X-CSRF-Token' => $this->loginAdmin()];

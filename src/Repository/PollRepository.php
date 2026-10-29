@@ -29,8 +29,12 @@ final class PollRepository
     public const EXPLANATION_MAX = 300;
     /** Asetukset, joita ei näytetä osallistujalle ennen paljastusta (oikeat vastaukset ja selitykset). */
     public const PRIVATE_CONFIG = ['correct', 'explanations'];
-    /** Avoimen vastauksen enimmäispituus merkkeinä (tarkistetaan selaimissa, palvelin ei näe tekstiä). */
+    /**
+     * Avoimen vastauksen enimmäispituus merkkeinä (tarkistetaan selaimissa, palvelin ei näe tekstiä).
+     * Oletus 280; kysymyskohtaisesti (config.max) enintään OPEN_LIMIT, noin 500 sanaa pohdintatehtäviin.
+     */
     public const OPEN_MAX = 280;
+    public const OPEN_LIMIT = 3500;
     /** Vastaukset ovat lyhyitä; 280 merkin avoin vastaus (enintään 4 tavua/merkki) mahtuu salattuna reilusti. */
     public const CIPHERTEXT_MAX_BYTES = 2048;
     /** Salattu moderointitieto (piilotetut vastaukset ja sanat). */
@@ -87,7 +91,11 @@ final class PollRepository
                 return is_string($labels) ? $labels : [$p, ['min' => 0, 'max' => 10] + $labels];
             case 'open':
                 // multiple: osallistuja voi lähettää useita vastauksia (muuten uusi korvaa vanhan).
-                return [$p, ['multiple' => ($c['multiple'] ?? false) === true]];
+                $max = $c['max'] ?? self::OPEN_MAX;
+                if (!is_int($max) || $max < self::OPEN_MAX || $max > self::OPEN_LIMIT) {
+                    return 'Avoimen vastauksen enimmäispituus on ' . self::OPEN_MAX . '–' . self::OPEN_LIMIT . ' merkkiä.';
+                }
+                return [$p, ['multiple' => ($c['multiple'] ?? false) === true] + ($max !== self::OPEN_MAX ? ['max' => $max] : [])];
             default: // words
                 return [$p, []];
         }
@@ -172,12 +180,28 @@ final class PollRepository
         return mb_strlen($text) > $max ? null : $text;
     }
 
-    public static function isValidCiphertext(mixed $value): bool
+    /**
+     * Avoimen kysymyksen enimmäispituus merkkeinä; vanhoissa kysymyksissä ei ole asetusta (280).
+     *
+     * @param array<string, mixed> $poll
+     */
+    public static function openMax(array $poll): int
+    {
+        $max = $poll['config']['max'] ?? null;
+        return is_int($max) && $max >= self::OPEN_MAX && $max <= self::OPEN_LIMIT ? $max : self::OPEN_MAX;
+    }
+
+    /**
+     * Salatun vastauksen koko: oletuksena CIPHERTEXT_MAX_BYTES. Pidempi avoin vastaus (openChars merkkiä,
+     * enintään 4 tavua/merkki) saa vain sen verran lisätilaa, ettei kuka tahansa voi tallentaa isoja rivejä.
+     */
+    public static function isValidCiphertext(mixed $value, int $openChars = self::OPEN_MAX): bool
     {
         if (!QuestionRepository::isValidCiphertext($value)) {
             return false;
         }
-        return strlen((string) base64_decode((string) $value, true)) <= self::CIPHERTEXT_MAX_BYTES;
+        $limit = max(self::CIPHERTEXT_MAX_BYTES, 4 * min($openChars, self::OPEN_LIMIT) + 512);
+        return strlen((string) base64_decode((string) $value, true)) <= $limit;
     }
 
     /** Selaimen satunnainen vastaajatunniste (32 tavua base64url). */
