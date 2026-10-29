@@ -18,6 +18,7 @@
 
   var ask = document.getElementById('ask');
   var box = document.getElementById('polls');
+  var zone = document.getElementById('polls-zone') || box;   // osio otsikkoineen näkyviin vasta tilan tultua
   if (!ask || !box) return;
 
   var POLL_MS = 1200;        // vaatimus: näkymä vaihtuu alle 2 s:ssa
@@ -318,7 +319,7 @@
       current = { sig: sig, el: el };
     }
     if (poll && current.el.resultsBox) updateExtras(current.el, poll);
-    box.hidden = false;
+    zone.hidden = false;
   }
 
   function schedule(ms) {

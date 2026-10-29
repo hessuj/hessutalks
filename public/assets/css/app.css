@@ -233,7 +233,20 @@ body.presenter { padding: 0; min-height: 0; height: 100vh; overflow: hidden; }
 .nick-owned strong { color: var(--accent); }
 
 /* ---- kyselyt: osallistujan kortit ---- */
-.polls { display: grid; gap: 1rem; margin: 1.25rem 0 1.75rem; }
+/* Osallistujan sivun osiot: luennoitsijan kysymykset, nimimerkki ja omat viestit erillisinä kokonaisuuksina. */
+.zone { margin: 1.25rem 0; padding: 1rem 1.1rem 1.1rem; border: 2px solid var(--frame); border-top-width: 6px; }
+.zone[hidden] { display: none; }
+.zone-title { margin: 0 0 .25rem; font-size: 1.05rem; letter-spacing: .04em; text-transform: uppercase; }
+.zone-hint { margin: 0 0 .9rem; font-size: .9rem; color: var(--ink-dim); }
+.zone-live { border-color: var(--accent); background: rgba(127, 211, 219, .06); }
+.zone-live .zone-title { color: var(--accent); }
+.zone-nick { border-color: var(--ink-dim); }
+.zone-nick .zone-hint { margin: .6rem 0 0; }
+.zone-nick #nick-pick .hint { margin-bottom: 0; }
+.zone-nick .nick-owned { margin: 0; }
+.zone-ask { border-color: var(--ok); background: rgba(166, 230, 160, .05); }
+.zone-ask .zone-title { color: var(--ok); }
+.polls { display: grid; gap: 1rem; margin: 0; }
 .poll { border: 2px solid var(--accent); padding: 1rem 1.1rem; background: rgba(0, 0, 0, .12); }
 .poll .poll-prompt { font-size: 1.25rem; margin: .2rem 0 .8rem; overflow-wrap: anywhere; }
 .poll .notice { margin: .8rem 0 0; }
