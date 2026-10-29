@@ -2,7 +2,7 @@
 // Ajo: scripts/e2e.sh live-polls.mjs  (tai node tests/e2e/live-polls.mjs <cdp-port> <app-url>)
 const [port, app] = [process.argv[2], process.argv[3]];
 
-import { tab, step, setupAdmin, createEvent, openParticipant } from './lib.mjs';
+import { tab, step, setupAdmin, createEvent, openParticipant, mode } from './lib.mjs';
 
 const admin = await tab(port);
 await setupAdmin(admin, app);
@@ -38,6 +38,7 @@ await part.waitFor(part.hasText('Waiting for the next question'), 'odotusnäkym�
 if ((await part.js('document.documentElement.lang')) !== 'en') throw new Error('Osallistujan kieli ei ole en');
 step('Osallistuja (selain fi) näkee odotusnäkymän englanniksi: "Waiting for the next question…"');
 
+await mode(admin, 'live');
 // Seuraava → luonnos aktiiviseksi: osallistuja odottaa yhä
 await admin.click('Seuraava →');
 await admin.waitFor(`document.querySelector('.live-control').innerText.includes('Which threat actor?')`, 'aktiivinen M1');
@@ -88,8 +89,10 @@ await admin.click('Seuraava →');
 await admin.waitFor(admin.hasText('Ei enempää kysymyksiä.'), 'ohitettu sarja jää väliin');
 await admin.click('Palauta', 'M2 Attacker');
 await admin.waitFor(`!document.body.innerText.includes('Ohitettu')`, 'palautus');
+await mode(admin, 'prep');
 await admin.click('↑', 'M2 Attacker');
 await admin.waitFor(`document.querySelector('section.set-card .set-head h3').textContent === 'M2 Attacker'`, 'M2 ensimmäiseksi');
+await mode(admin, 'live');
 await admin.click('← Edellinen');
 await admin.waitFor(`document.querySelector('.live-control').innerText.includes('Cybersecurity in one word?')`, 'edellinen = M2 uudessa järjestyksessä');
 step('H12: ohitettu sarja jää pois Seuraava-järjestyksestä; palautus ja sarjan siirto muuttavat järjestystä');

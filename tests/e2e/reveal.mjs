@@ -1,6 +1,6 @@
 // Vaihe 5: tulosten näyttö/piilotus, oikean vastauksen paljastus ja tuloskooste osallistujille (P2).
 // Ajo: scripts/e2e.sh reveal.mjs  (tai node tests/e2e/reveal.mjs <cdp-port> <app-url>)
-import { tab, attach, step, setupAdmin, createEvent, openParticipant } from './lib.mjs';
+import { tab, attach, step, setupAdmin, createEvent, openParticipant, openPoll, mode } from './lib.mjs';
 
 const [port, app] = [process.argv[2], process.argv[3]];
 
@@ -33,7 +33,7 @@ step('Visakysymys luotu lomakkeella: oikea vastaus 2 ja selitykset');
 
 const part = await openParticipant(port, admin);
 await part.waitFor(part.hasText('Waiting for the next question'), 'odotusnäkymä');
-await admin.click('Avaa', 'What is your FIRST action?');
+await openPoll(admin, 'What is your FIRST action?');
 await part.waitFor(part.hasText('What is your FIRST action?'), 'kysymys osallistujalle');
 await part.js(`(() => { [...document.querySelectorAll('.poll-choice')].find((l) => l.innerText.trim() === 'Stop the mowers').querySelector('input').click(); document.querySelector('form.poll').requestSubmit(); return true; })()`);
 await part.waitFor(`document.querySelector('form.poll .notice.ok')`, 'kuittaus');

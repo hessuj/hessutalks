@@ -3,7 +3,7 @@
 // viestit päällekkäin. Lista näytti osan viesteistä kahdesti, ja jos hitaampi haku palasi viimeisenä,
 // sen vanha tilaluettelo pudotti juuri saapuneen viestin pysyvästi pois.
 // Ajo: scripts/e2e.sh messages.mjs  (tai node tests/e2e/messages.mjs <cdp-port> <app-url>)
-import { tab, attach, step, setupAdmin, createEvent, openParticipant } from './lib.mjs';
+import { tab, attach, step, setupAdmin, createEvent, openParticipant, mode } from './lib.mjs';
 
 const [port, app] = [process.argv[2], process.argv[3]];
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -26,6 +26,7 @@ await admin.js(`(() => {
   };
   return true;
 })()`);
+await mode(admin, 'live');
 await admin.click('Aktiivinen projektorille');
 await attach(port, '/admin/esitys');   // esitysikkunan tahdistusviestit hallinnalle
 step('Hallinta ja esitysikkuna auki, viestihaun vastaukset palaavat väärässä järjestyksessä (3 s / 0,1 s)');

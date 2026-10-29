@@ -25,6 +25,10 @@ One lecture can cover a whole course or lecture series: the sets divide it into 
 use the same code and nickname throughout the course. The admin lecture page has two tabs, *Kyselyt* (polls) and
 *Kysymykset ja palaute* (questions and feedback). The control bar is visible on both, and the messages tab shows the number of new messages.
 
+Polls have two modes: **Valmistelu** (preparation: cards for creating, editing, ordering, previewing and deleting) and
+**▶ Luennolla** (live: the control bar, the active question's results and moderation, and a compact numbered list; clicking a
+row makes that question active). The live mode has no edit or delete buttons.
+
 1. On the lecture page, create the sets (*Uusi sarja*, new set) and their questions (*Uusi kysymys*, new question) before the lecture.
    Sets and questions can be moved with the arrows, and a set can be **skipped** during the lecture. The questions of a skipped
    set are left out of the Next/Previous order, but their answers are kept.

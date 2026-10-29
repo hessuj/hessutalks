@@ -3,7 +3,7 @@
 // SCREENSHOT=<hakemisto> tallentaa kuvat (fi ja en) tarkastelua varten.
 // Ajo: scripts/e2e.sh participant-zones.mjs  (tai node tests/e2e/participant-zones.mjs <cdp-port> <app-url>)
 import { writeFileSync } from 'node:fs';
-import { tab, step, setupAdmin, createEvent, openParticipant } from './lib.mjs';
+import { tab, step, setupAdmin, createEvent, openParticipant, openPoll, mode } from './lib.mjs';
 
 const [port, app] = [process.argv[2], process.argv[3]];
 
@@ -62,7 +62,7 @@ await admin.fill('#poll-prompt', 'Which goal of the CIA triad failed?');
 await admin.fill('#poll-options', 'Confidentiality\nIntegrity\nAvailability');
 await admin.submit('#poll-prompt');
 await admin.waitFor(admin.hasText('Which goal of the CIA triad failed?'), 'kysymys');
-await admin.click('Avaa', 'Which goal of the CIA triad failed?');
+await openPoll(admin, 'Which goal of the CIA triad failed?');
 await part.waitFor(`!!document.querySelector('#polls-zone form.poll')`, 'kysymys osiossa', 8000);
 if ((await layout()).overflow > 0) throw new Error('Vaakavieritys kysymyksen kanssa');
 await shot('osallistuja-en-kysymys');

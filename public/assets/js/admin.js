@@ -498,6 +498,7 @@
   var liveRefresh = null;     // nykyisen luentonäkymän päivitysfunktio (tick kutsuu)
   var liveCommand = null;     // nykyisen luentonäkymän ohjausfunktio (pikanäppäimet ja esitysikkunan komennot)
   var eventTab = 'polls';     // luentonäkymän valittu välilehti (säilyy luentojen välillä tämän sivun ajan)
+  var pollMode = null;        // kyselyjen tila: 'prep' (valmistelu) tai 'live' (luennolla); null = valitaan tilanteen mukaan
 
   // Pikanäppäimet (hallinta ja esitysikkuna). Esitysohjaimet lähettävät yleensä PageUp/PageDown.
   var COMMAND_KEYS = {
@@ -655,6 +656,7 @@
 
   // ================================================================ kyselyt (luennon näkymässä)
 
+  var TYPE_SHORT = { single: 'Valinta', multi: 'Valinnat', open: 'Teksti', words: 'Pilvi', likert: 'Likert', scale: '0–10' };
   var TYPE_LABEL = { single: 'Monivalinta, yksi vastaus', multi: 'Monivalinta, useita vastauksia', open: 'Avoin teksti', words: 'Sanapilvi', likert: 'Likert-asteikko', scale: 'Asteikko 0–10' };
   var POLL_STATUS_LABEL = { draft: 'Luonnos', open: 'Auki', closed: 'Suljettu' };
   var LABEL_DEFAULTS = {
@@ -719,13 +721,25 @@
       if (file.size > 60000) { outEl.replaceChildren(notice('Tiedosto on liian suuri (enintään 60 kt).', 'error')); return; }
       file.text().then(previewImport).catch(fail);
     } });
+    // Kaksi tilaa (Hessun palaute 29.10.: aktivointi oli sekavaa, kun valmistelu ja esittäminen olivat samoissa korteissa):
+    // Valmistelu = kortit ja muokkaus, Luennolla = ohjauspalkki, aktiivisen tulokset ja tiivis lista (rivi = aktivoi).
+    var modeButtons = {
+      prep: h('button.btn.small.mode-btn', { type: 'button', text: 'Valmistelu', onclick: function () { setMode('prep'); } }),
+      live: h('button.btn.small.mode-btn', { type: 'button', text: '▶ Luennolla', onclick: function () { setMode('live'); } })
+    };
+    var prepTools = h('span.prep-tools.actions', null,
+      h('button.btn.ghost.small', { type: 'button', text: 'Tuo JSON', title: 'Tuo sarjat JSON-tiedostosta', onclick: function () { fileInput.click(); } }),
+      h('button.btn.ghost.small', { type: 'button', text: 'Vie JSON', title: 'Lataa kaikki sarjat JSON-tiedostona', onclick: function () { exportJson(null); } }),
+      h('button.btn.ghost.small', { type: 'button', text: 'Vie CSV', title: 'Tulokset taulukkona (puretaan tässä selaimessa)', onclick: function () { exportCsv(null); } }),
+      h('button.btn.small', { type: 'button', text: 'Uusi sarja', onclick: function () { showSetForm(null); } }));
     var el = h('section.polls-admin', null, fileInput,
-      h('div.toolbar', null, h('h2', { text: 'Kysymyssarjat' }), h('span.spacer'),
-        h('button.btn.ghost.small', { type: 'button', text: 'Tuo JSON', title: 'Tuo sarjat JSON-tiedostosta', onclick: function () { fileInput.click(); } }),
-        h('button.btn.ghost.small', { type: 'button', text: 'Vie JSON', title: 'Lataa kaikki sarjat JSON-tiedostona', onclick: function () { exportJson(null); } }),
-        h('button.btn.ghost.small', { type: 'button', text: 'Vie CSV', title: 'Tulokset taulukkona (puretaan tässä selaimessa)', onclick: function () { exportCsv(null); } }),
-        h('button.btn.small', { type: 'button', text: 'Uusi sarja', onclick: function () { showSetForm(null); } })),
+      h('div.toolbar', null, h('h2', { text: 'Kysymyssarjat' }),
+        h('span.mode-switch', { role: 'group', 'aria-label': 'Tila' }, modeButtons.prep, modeButtons.live),
+        h('span.spacer'), prepTools),
       outEl, formEl, setsEl);
+
+    function mode() { return pollMode || (active ? 'live' : 'prep'); }
+    function setMode(m) { pollMode = m; formEl.replaceChildren(); renderAll(); }
 
     function findPoll(pid) {
       for (var i = 0; i < polls.length; i++) if (polls[i].id === pid) return polls[i];
@@ -957,6 +971,10 @@
         }
       });
       renderControlCount();
+      setsEl.querySelectorAll('.run-count').forEach(function (c) {
+        var p = findPoll(parseInt(c.getAttribute('data-count'), 10));
+        if (p) c.textContent = String(tallyFor(p).voters);
+      });
       publishSummaries();
       updateScreens();
     }
@@ -1093,15 +1111,8 @@
           correctHint(poll)),
         h('p.poll-card-prompt', { text: poll.prompt }),
         h('div.q-actions', null,
-          !isActive ? h('button.btn.small', { type: 'button', text: 'Näytä', title: 'Tee aktiiviseksi', onclick: function () { liveAct({ action: 'activate', poll: poll.id }); } }) : null,
-          poll.status === 'open'
-            ? h('button.btn.small', { type: 'button', text: 'Sulje', onclick: function () { act(poll, 'status', { status: 'closed' }); } })
-            : h('button.btn.small', { type: 'button', text: 'Avaa', title: 'Avaa vastauksille ja tee aktiiviseksi', onclick: function () { act(poll, 'status', { status: 'open' }); } }),
           h('button.btn.ghost.small', { type: 'button', text: '↑', title: 'Siirrä ylös', disabled: i === 0, onclick: function () { act(poll, 'move', { dir: -1 }); } }),
           h('button.btn.ghost.small', { type: 'button', text: '↓', title: 'Siirrä alas', disabled: i === count - 1, onclick: function () { act(poll, 'move', { dir: 1 }); } }),
-          h('button.btn.ghost.small', { type: 'button', text: 'Tulokset projektorille', onclick: function () {
-            present('kysely-' + poll.id, pollMessage(poll.id), function () { return pollMessage(poll.id); });
-          } }),
           h('button.btn.ghost.small', { type: 'button', text: 'Esikatsele', title: 'Osallistujan näkymä', onclick: function () { previewParticipant(poll); } }),
           h('button.btn.ghost.small', { type: 'button', text: 'Esikatsele projektorilla', onclick: function () { previewStage(poll); } }),
           h('button.btn.ghost.small', { type: 'button', text: 'Muokkaa', onclick: function () { showForm(poll, findSet(poll.set_id)); } }),
@@ -1121,9 +1132,61 @@
         details);
     }
 
+    /** Luennolla-tila: aktiivisen kysymyksen tulokset ja moderointi sekä tiivis lista, jossa rivi tekee kysymyksestä aktiivisen. */
+    function renderRun() {
+      var poll = findPoll(active);
+      if (poll) {
+        var view = views[poll.id] || (views[poll.id] = { el: h('div'), count: h('span'), hidden: h('div.poll-hidden'), details: null });
+        var details = h('details.poll-results.run-results', null, h('summary', null, 'Tulokset · ', view.count), view.el, view.hidden);
+        details.open = true;
+        details.addEventListener('toggle', function () { updateResults(); });
+        view.details = details;
+        setsEl.appendChild(details);
+      }
+      if (!sets.length) {
+        setsEl.appendChild(h('p.empty', { text: 'Ei kysymyksiä. Lisää kysymyssarjat Valmistelu-tilassa.' }));
+        return;
+      }
+      var n = 0;
+      sets.forEach(function (set) {
+        var inSet = polls.filter(function (p) { return p.set_id === set.id; });
+        var list = h('ol.run-list', { start: String(n + 1) });
+        inSet.forEach(function (p) {
+          n++;
+          var isActive = p.id === active;
+          list.appendChild(h('li', null, h('button.run-row' + (isActive ? '.active' : ''), {
+            type: 'button', 'aria-current': isActive ? 'true' : null, 'data-poll': String(p.id),
+            title: isActive ? 'Aktiivinen kysymys' : 'Tee aktiiviseksi (näkyy projektorilla; avaa vastauksille ohjauspalkista)',
+            onclick: function () { if (!isActive) liveAct({ action: 'activate', poll: p.id }); }
+          },
+            h('span.run-num', { text: String(n) }),
+            h('span.run-type', { text: TYPE_SHORT[p.type] || p.type }),
+            h('span.run-prompt', { text: p.prompt }),
+            h('span.badge.' + p.status, { text: POLL_STATUS_LABEL[p.status] || p.status }),
+            h('span.run-count', { 'data-count': String(p.id), text: String(tallyFor(p).voters) }))));
+        });
+        setsEl.appendChild(h('section.run-set' + (set.skipped ? '.skipped' : ''), null,
+          h('div.set-head', null,
+            h('span.code', { text: set.slug }),
+            h('h3', { text: set.title }),
+            set.skipped ? h('span.badge.closed', { text: 'Ohitettu' }) : null,
+            h('span.spacer'),
+            h('button.btn.ghost.small', { type: 'button', text: set.skipped ? 'Palauta' : 'Ohita',
+              title: set.skipped ? 'Palauta sarja Seuraava/Edellinen-järjestykseen' : 'Jätä sarja pois Seuraava/Edellinen-järjestyksestä (vastaukset säilyvät)',
+              onclick: function () { setAct(set, 'skip', { skipped: !set.skipped }); } })),
+          inSet.length ? list : h('p.empty', { text: 'Ei kysymyksiä.' })));
+      });
+    }
+
     function renderAll() {
+      var m = mode();
+      modeButtons.prep.setAttribute('aria-pressed', String(m === 'prep'));
+      modeButtons.live.setAttribute('aria-pressed', String(m === 'live'));
+      prepTools.hidden = m !== 'prep';
+      controlEl.hidden = m !== 'live';
       renderControl();
       setsEl.replaceChildren();
+      if (m === 'live') { renderRun(); updateResults(); return; }
       if (!sets.length) {
         setsEl.appendChild(h('p.empty', { text: 'Ei kysymyssarjoja. Luo sarja kullekin luennon moduulille (esim. M1) ja lisää siihen kysymykset.' }));
       }

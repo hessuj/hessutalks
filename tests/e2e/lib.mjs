@@ -60,7 +60,7 @@ async function connect(wsUrl) {
         // valikot (esim. Siirrä sarjaan) sisältävät muiden sarjojen nimiä.
         const w = ${JSON.stringify(within || '')};
         const title = (e) => (e.querySelector('.set-head h3, .poll-card-prompt, .live-now strong') || e).textContent;
-        scope = [...document.querySelectorAll('article.poll-card, section.set-card, .live-control')].find((e) => title(e).includes(w));
+        scope = [...document.querySelectorAll('article.poll-card, section.set-card, section.run-set, .live-control')].find((e) => title(e).includes(w));
         if (!scope) throw new Error('alue puuttuu: ' + w);
       }
       const b = [...scope.querySelectorAll('button')].find((x) => x.textContent.trim() === ${JSON.stringify(text)});
@@ -119,4 +119,29 @@ export async function openParticipant(port, admin) {
   await part.cdp('Network.setExtraHTTPHeaders', { headers: { 'Accept-Language': 'fi-FI,fi;q=0.9' } });
   await part.cdp('Page.navigate', { url });
   return part;
+}
+
+/** Kyselyjen tila: 'live' (▶ Luennolla: ohjauspalkki ja tiivis lista) tai 'prep' (Valmistelu: kortit ja muokkaus). */
+export async function mode(admin, which) {
+  const label = which === 'live' ? '▶ Luennolla' : 'Valmistelu';
+  await admin.js(`(() => {
+    const b = [...document.querySelectorAll('.mode-btn')].find((x) => x.textContent === ${JSON.stringify(label)});
+    if (!b) throw new Error('tilanappi puuttuu: ${label}');
+    if (b.getAttribute('aria-pressed') !== 'true') b.click();
+    return true;
+  })()`);
+  await admin.waitFor(`document.querySelector('.mode-btn[aria-pressed="true"]')?.textContent === ${JSON.stringify(label)}`, 'tila ' + label);
+}
+
+/** Luennolla-tilassa: kysymyksen rivi aktiiviseksi ja ohjauspalkista auki vastauksille. */
+export async function openPoll(admin, prompt) {
+  await mode(admin, 'live');
+  await admin.js(`(() => {
+    const row = [...document.querySelectorAll('.run-row')].find((r) => r.querySelector('.run-prompt').textContent.includes(${JSON.stringify(prompt)}));
+    if (!row) throw new Error('rivi puuttuu: ' + ${JSON.stringify(prompt)});
+    row.click(); return true;
+  })()`);
+  await admin.waitFor(`document.querySelector('.live-now strong')?.textContent.includes(${JSON.stringify(prompt)})`, 'aktiivinen: ' + prompt);
+  await admin.click('Avaa vastauksille');
+  await admin.waitFor(`document.querySelector('.live-control .badge')?.textContent === 'Auki'`, 'auki: ' + prompt);
 }

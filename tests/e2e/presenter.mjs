@@ -1,7 +1,7 @@
 // Vaihe 6: esitysnäkymä (koodi ja QR kulmassa, fonttikoko 1080p:llä, iso QR, teema), pikanäppäimet
 // esitysikkunassa ja hallinnassa sekä puhelinohjain.
 // Ajo: scripts/e2e.sh presenter.mjs  (tai node tests/e2e/presenter.mjs <cdp-port> <app-url>)
-import { tab, attach, step, setupAdmin, createEvent } from './lib.mjs';
+import { tab, attach, step, setupAdmin, createEvent, mode } from './lib.mjs';
 
 const [port, app] = [process.argv[2], process.argv[3]];
 
@@ -24,6 +24,7 @@ for (const prompt of ['Is this a risk? Phishing.', 'Is this a risk? DDoS.']) {
 }
 const code = await admin.js(`document.querySelector('.big-code').textContent`);
 
+await mode(admin, 'live');
 await admin.click('Aktiivinen projektorille');
 const stage = await attach(port, '/admin/esitys');
 await stage.cdp('Emulation.setDeviceMetricsOverride', { width: 1920, height: 1080, deviceScaleFactor: 1, mobile: false });

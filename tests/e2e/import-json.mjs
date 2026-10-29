@@ -4,7 +4,7 @@ import { readFileSync, mkdtempSync, readdirSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { tab, step, setupAdmin, createEvent, openParticipant } from './lib.mjs';
+import { tab, step, setupAdmin, createEvent, openParticipant, openPoll, mode } from './lib.mjs';
 
 const [port, app] = [process.argv[2], process.argv[3]];
 const fixture = fileURLToPath(new URL('../fixtures/mmoit-2026.json', import.meta.url));
@@ -44,7 +44,7 @@ step('Sama tiedosto uudelleen: "Tiedostoa ei voi tuoda" (sarjat jo luennolla), e
 // Osallistuja ei näe oikeita vastauksia eikä selityksiä.
 const part = await openParticipant(port, admin);
 await part.waitFor(part.hasText('Waiting for the next question'), 'odotusnäkymä');
-await admin.click('Avaa', 'Which of these EU regulations');
+await openPoll(admin, 'Which of these EU regulations');
 await part.waitFor(part.hasText('Which of these EU regulations'), 'M3 osallistujalle');
 const network = await part.js(`fetch(document.getElementById('polls').dataset.endpoint + '?code=' + document.getElementById('ask').dataset.code).then((r) => r.text())`);
 if (network.includes('correct') || network.includes('DORA covers')) throw new Error('Oikea vastaus vuoti osallistujalle: ' + network);
@@ -53,6 +53,7 @@ step('Osallistujan rajapinta ei sisällä oikeita vastauksia eikä selityksiä')
 // Vienti lataa JSONin, joka vastaa tuotua.
 const dir = mkdtempSync(join(tmpdir(), 'hessutalks-export-'));
 await admin.cdp('Page.setDownloadBehavior', { behavior: 'allow', downloadPath: dir });
+await mode(admin, 'prep');
 await admin.click('Vie JSON');
 let file = null;
 for (let i = 0; i < 50 && !file; i++) {
