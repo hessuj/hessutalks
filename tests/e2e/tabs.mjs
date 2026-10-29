@@ -33,6 +33,30 @@ if (!s.polls || s.messages || !s.control || s.selected.join() !== 'polls') throw
 if (s.label !== 'Kysymykset ja palaute') throw new Error('Ei viestejä, ei merkkiä: ' + s.label);
 step('Oletuksena Kyselyt-välilehti: 9 sarjaa näkyvissä, viestit piilossa, ohjauspalkki näkyvissä');
 
+// Nappirivit eivät mene päällekkäin, kun ne rivittyvät (Hessun havainto Safarissa 29.10.).
+await admin.cdp('Emulation.setDeviceMetricsOverride', { width: 760, height: 1000, deviceScaleFactor: 1, mobile: false });
+const rows = await admin.js(`(() => {
+  const out = [];
+  for (const row of [...document.querySelectorAll('p')].filter((p) => p.querySelectorAll('button').length >= 2)) {
+    const r = [...row.querySelectorAll('button')].filter((b) => b.offsetParent !== null).map((b) => b.getBoundingClientRect());
+    const tops = [...new Set(r.map((x) => Math.round(x.top)))].sort((a, b) => a - b);
+    for (let i = 0; i < r.length; i++) for (let j = i + 1; j < r.length; j++) {
+      const a = r[i], b = r[j];
+      if (a.left < b.right - 0.5 && b.left < a.right - 0.5 && a.top < b.bottom - 0.5 && b.top < a.bottom - 0.5) out.push('päällekkäin');
+    }
+    for (let i = 1; i < tops.length; i++) {
+      const above = Math.max(...r.filter((x) => Math.round(x.top) === tops[i - 1]).map((x) => x.bottom));
+      if (tops[i] - above < 6) out.push('rivien väli ' + (tops[i] - above).toFixed(1) + ' px');
+    }
+    out.push('rivejä ' + tops.length);
+  }
+  return out;
+})()`);
+if (rows.some((x) => !x.startsWith('rivejä'))) throw new Error('Nappirivit: ' + rows.join(', '));
+if (!rows.some((x) => x !== 'rivejä 1' && x !== 'rivejä 0')) throw new Error('Kapeassa näkymässä napit eivät rivittyneet, testi ei mittaa mitään: ' + rows);
+await admin.cdp('Emulation.clearDeviceMetricsOverride');
+step('Nappirivit 760 px:n näkymässä: ei päällekkäisyyksiä, rivien väli vähintään 6 px');
+
 // Osallistuja lähettää kaksi viestiä, kun luennoitsija on kyselyiden välilehdellä.
 const part = await openParticipant(port, admin);
 await part.waitFor(part.has('#ask-form:not([hidden])'), 'viestilomake');

@@ -141,6 +141,8 @@ details.optional summary { cursor: pointer; font-weight: 600; color: var(--accen
 .btn.ghost { background: transparent; color: var(--ink); border-color: var(--frame); }
 .btn.ghost:hover { border-color: var(--accent); color: var(--accent); }
 .btn.small { padding: .45rem .7rem; font-size: .9rem; }
+/* Nappirivit: tasainen väli myös rivinvaihdossa (Safari: rivit menivät päällekkäin). */
+.actions { display: flex; flex-wrap: wrap; gap: .5rem; align-items: center; }
 .btn.danger { background: transparent; color: var(--bad); border-color: var(--bad); }
 .btn.danger:hover { background: var(--bad); color: var(--screen); }
 .ask-form .btn { margin-top: .5rem; }

@@ -396,7 +396,7 @@
           : 'Varakeino: passkey ei antanut avausarvoa (PRF). Syy on yleensä salasanamanageri, joka ei tue PRF:ää. Apple Salasanoihin (iCloud) tai Google-salasanoihin tallennettu passkey tukee sitä.'
             + (prfDiag ? ' Tekninen syy: ' + prfDiag + '.' : '') }),
         h('label', { for: 'pp', text: 'Tunnuslause' }), input,
-        h('p', null, h('button.btn' + (pendingPrf ? '' : '.ghost'), { type: 'submit', text: 'Avaa tunnuslauseella' }), ' ', logoutButton())),
+        h('p.actions', null, h('button.btn' + (pendingPrf ? '' : '.ghost'), { type: 'submit', text: 'Avaa tunnuslauseella' }), ' ', logoutButton())),
       out);
   }
 
@@ -1190,7 +1190,7 @@
         var box = h('div.poll-form.import-preview', null,
           h('h3', { text: r.ok ? 'Tuodaan ' + d.sets.length + ' sarjaa ja ' + d.questions + ' kysymystä' : 'Tiedostoa ei voi tuoda' }),
           report(d),
-          h('p', null,
+          h('p.actions', null,
             r.ok ? h('button.btn.small', { type: 'button', text: 'Tuo', onclick: function () {
               send(false).then(function (res) {
                 if (!res.ok) { outEl.replaceChildren(notice(res.data.error || 'Tuonti epäonnistui.', 'error')); return; }
@@ -1222,7 +1222,7 @@
         h('h3', { text: editing ? 'Muokkaa sarjaa' : 'Uusi kysymyssarja' }),
         h('label', { for: 'set-slug', text: 'Tunniste (1–16 merkkiä, A–Z, 0–9, - tai _)' }), slug,
         h('label', { for: 'set-title', text: 'Nimi' }), title,
-        h('p', null, h('button.btn.small', { type: 'submit', text: editing ? 'Tallenna' : 'Luo sarja' }), ' ',
+        h('p.actions', null, h('button.btn.small', { type: 'submit', text: editing ? 'Tallenna' : 'Luo sarja' }), ' ',
           h('button.btn.ghost.small', { type: 'button', text: 'Peruuta', onclick: function () { formEl.replaceChildren(); } })),
         out));
       formEl.scrollIntoView({ block: 'nearest' });
@@ -1315,7 +1315,7 @@
         h('label', { for: 'poll-type', text: 'Kysymystyyppi' }), type,
         h('label', { for: 'poll-prompt', text: 'Kysymys' }), prompt,
         fields,
-        h('p', null, h('button.btn.small', { type: 'submit', text: editing ? 'Tallenna' : 'Luo kysymys' }), ' ',
+        h('p.actions', null, h('button.btn.small', { type: 'submit', text: editing ? 'Tallenna' : 'Luo kysymys' }), ' ',
           h('button.btn.ghost.small', { type: 'button', text: 'Peruuta', onclick: function () { formEl.replaceChildren(); } })),
         out));
       formEl.scrollIntoView({ block: 'nearest' });
@@ -1346,7 +1346,7 @@
           h('div', null,
             h('p.big-code', { text: event.code }),
             h('p.url', null, h('a', { href: url, target: '_blank', rel: 'noopener', text: url })),
-            h('p', null,
+            h('p.actions', null,
               h('button.btn.small', { type: 'button', text: 'QR-koodi projektorille', onclick: function () {
                 present('esitys', { type: 'qr', code: event.code, url: url });
               } }), ' ',
