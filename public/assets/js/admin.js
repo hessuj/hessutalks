@@ -497,6 +497,7 @@
   var presenterNote = h('span.hint');
   var liveRefresh = null;     // nykyisen luentonäkymän päivitysfunktio (tick kutsuu)
   var liveCommand = null;     // nykyisen luentonäkymän ohjausfunktio (pikanäppäimet ja esitysikkunan komennot)
+  var eventTab = 'polls';     // luentonäkymän valittu välilehti (säilyy luentojen välillä tämän sivun ajan)
 
   // Pikanäppäimet (hallinta ja esitysikkuna). Esitysohjaimet lähettävät yleensä PageUp/PageDown.
   var COMMAND_KEYS = {
@@ -715,7 +716,7 @@
         h('button.btn.ghost.small', { type: 'button', text: 'Vie JSON', title: 'Lataa kaikki sarjat JSON-tiedostona', onclick: function () { exportJson(null); } }),
         h('button.btn.ghost.small', { type: 'button', text: 'Vie CSV', title: 'Tulokset taulukkona (puretaan tässä selaimessa)', onclick: function () { exportCsv(null); } }),
         h('button.btn.small', { type: 'button', text: 'Uusi sarja', onclick: function () { showSetForm(null); } })),
-      controlEl, outEl, formEl, setsEl);
+      outEl, formEl, setsEl);
 
     function findPoll(pid) {
       for (var i = 0; i < polls.length; i++) if (polls[i].id === pid) return polls[i];
@@ -1318,7 +1319,7 @@
       prompt.focus();
     }
 
-    return { el: el, load: load, refresh: refreshAnswers, command: command };
+    return { el: el, control: controlEl, load: load, refresh: refreshAnswers, command: command };
   }
 
   function showEvent(id) {
@@ -1399,6 +1400,36 @@
     }
     var filtersEl = h('div.filters');
 
+    // Välilehdet: kurssissa voi olla useita luentoja ja kymmeniä kysymyksiä, jolloin viestit hautautuivat
+    // sarjojen alle (Hessun USTP-kurssi 29.10.). Ohjauspalkki pysyy välilehtien yläpuolella, ja
+    // viestivälilehti näyttää uusien viestien määrän. Nuolinäppäimet jäävät pikanäppäimille.
+    var messagesEl = h('section.messages-admin', { id: 'tab-messages', role: 'tabpanel', 'aria-labelledby': 'tab-btn-messages' },
+      h('h2', { text: 'Kysymykset ja palaute' }), filtersEl, listEl);
+    panel.el.id = 'tab-polls';
+    panel.el.setAttribute('role', 'tabpanel');
+    panel.el.setAttribute('aria-labelledby', 'tab-btn-polls');
+    var tabEls = { polls: panel.el, messages: messagesEl };
+    var tabButtons = {};
+    ['polls', 'messages'].forEach(function (key) {
+      tabButtons[key] = h('button.tab', { type: 'button', role: 'tab', id: 'tab-btn-' + key, 'aria-controls': tabEls[key].id,
+        onclick: function () { selectTab(key); } });
+    });
+    var tabsEl = h('div.tabs', { role: 'tablist', 'aria-label': 'Luennon näkymät' }, tabButtons.polls, tabButtons.messages);
+
+    function selectTab(key) {
+      eventTab = key;
+      Object.keys(tabEls).forEach(function (k) {
+        tabButtons[k].setAttribute('aria-selected', String(k === key));
+        tabEls[k].hidden = k !== key;
+      });
+    }
+    function renderTabs() {
+      var fresh = items.filter(function (it) { return it.status === 'new'; }).length;
+      tabButtons.polls.textContent = 'Kyselyt';
+      tabButtons.messages.replaceChildren();
+      append(tabButtons.messages, ['Kysymykset ja palaute', fresh ? h('span.badge', { text: fresh + ' uutta' }) : null]);
+    }
+
     function setStatus(item, status) {
       api('POST', 'questions/' + item.id + '/status', { status: status }).then(function () { item.status = status; renderList(); });
     }
@@ -1424,6 +1455,7 @@
         return it.status === filter;
       }).slice().reverse();
       countEl.textContent = visible.length + ' / ' + items.length + ' viestiä';
+      renderTabs();
       updateScreens();
       listEl.replaceChildren();
       if (!visible.length) {
@@ -1488,8 +1520,10 @@
       return poll().then(function () { return panel.refresh(); });
     }
 
-    mount(headEl, panel.el, h('h2', { text: 'Kysymykset ja palaute' }), filtersEl, listEl);
+    mount(headEl, panel.control, tabsEl, panel.el, messagesEl);
     filtersEl.replaceChildren.apply(filtersEl, filterButtons());
+    renderTabs();
+    selectTab(eventTab);
     poll().then(function () { return panel.load(); }).then(function () { return panel.refresh(); }).then(function () {
       // Yksi päivitys kerrallaan: hidas vastaus ei kasaa pyyntöjä jonoon.
       var busy = false;

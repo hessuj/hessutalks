@@ -21,6 +21,10 @@ Address: <https://hessujarvinen.com/hessutalks/>
 A lecture consists of **question sets** (e.g. modules `M1`, `M4`) containing questions in order.
 Question types: multiple choice (one or several answers), open text (280 characters, optionally several answers), word cloud (1–3 words, 30 characters), Likert scale (5 or 7 points) and a 0–10 scale.
 
+One lecture can cover a whole course or lecture series: the sets divide it into lectures (e.g. `L1`–`L4`), and participants
+use the same code and nickname throughout the course. The admin lecture page has two tabs, *Kyselyt* (polls) and
+*Kysymykset ja palaute* (questions and feedback). The control bar is visible on both, and the messages tab shows the number of new messages.
+
 1. On the lecture page, create the sets (*Uusi sarja*, new set) and their questions (*Uusi kysymys*, new question) before the lecture.
    Sets and questions can be moved with the arrows, and a set can be **skipped** during the lecture. The questions of a skipped
    set are left out of the Next/Previous order, but their answers are kept.
