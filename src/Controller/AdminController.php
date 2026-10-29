@@ -374,10 +374,13 @@ final class AdminController
             } catch (\InvalidArgumentException $e) {
                 return Response::error($e->getMessage(), 422);
             }
+            // Osallistujat (tilatiedosto) näkevät sulkemisen ja uudelleenavauksen.
+            $this->live->bump($id);
             return Response::json(['event' => $this->eventOut((array) $this->events->find($id))]);
         }
         // delete
         $this->events->delete($id);
+        $this->live->forget($id);
         $this->audit->record('event_deleted', $client, (string) $event['code']);
         return Response::json(['ok' => true]);
     }

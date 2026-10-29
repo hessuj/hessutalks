@@ -109,6 +109,21 @@ await admin.click('Odotusnäkymä');
 await part.waitFor(part.hasText('Waiting for the next question'), 'odotusnäkymä', 4000);
 step('Odotusnäkymä-nappi palauttaa osallistujat odotusnäkymään');
 
+// Tila tiedostosta (Apache), ei PHP:stä: jaetun palvelimen prosessiraja (kuormitustesti 28.10.).
+const resources = () => part.js(`performance.getEntriesByType('resource').map((e) => new URL(e.name).pathname)`);
+const before = await resources();
+await new Promise((r) => setTimeout(r, 6000));
+const during = (await resources()).slice(before.length);
+const fromFile = during.filter((p) => /^\/live\/[0-9a-f]{32}\.json$/.test(p)).length;
+const fromApi = during.filter((p) => p === '/api/live').length;
+if (fromFile < 3 || fromApi > 0) throw new Error(`6 s aikana tiedostosta ${fromFile}, /api/live ${fromApi}`);
+step(`Osallistuja lukee tilan tiedostosta (${fromFile} kertaa 6 s:ssa), ei PHP:stä (/api/live 0)`);
+
+// Luennon sulkeminen: tiedosto kertoo sen, ja selain hakee syyn PHP:ltä (410) osallistujan kielellä.
+await admin.click('Sulje kysymykset');
+await part.waitFor(part.hasText('This lecture is no longer accepting messages.'), 'suljettu luento', 5000);
+step('Luennon sulkeminen näkyy osallistujalle: "This lecture is no longer accepting messages."');
+
 const errs = [...admin.logs, ...part.logs];
 if (errs.length) { console.log('Selaimen virheet:\n' + errs.join('\n')); process.exit(1); }
 process.exit(0);

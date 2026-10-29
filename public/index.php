@@ -51,4 +51,4 @@ if ($configFile === null || !is_file($appRoot . '/vendor/autoload.php')) {
 }
 require $appRoot . '/vendor/autoload.php';
 
-\HessuTalks\Bootstrap::run($appRoot, $configFile);
+\HessuTalks\Bootstrap::run($appRoot, $configFile, __DIR__);

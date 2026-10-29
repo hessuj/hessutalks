@@ -93,6 +93,7 @@ final class ParticipantController
             return $this->message($req, 'page.not_ready', 503);
         }
         $lang = self::eventLang($req, $event);
+        $liveFile = $this->live->fileName((int) $event['id']);
         return $this->page($req, 'event', [
             'lang' => $lang,
             'pageTitle' => (string) $event['title'],
@@ -101,6 +102,7 @@ final class ParticipantController
             'formToken' => $this->formToken->issue((int) $event['id']),
             'jsStrings' => (string) json_encode(I18n::jsStrings($lang), JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR),
             'liveEndpoint' => $this->config->url('/api/live'),
+            'liveFile' => $liveFile === null ? '' : $this->config->url('/live/' . $liveFile),
             'answerEndpoint' => $this->config->url('/api/polls/answer'),
             'scripts' => ['vendor/sodium.js', 'js/lang.js', 'js/participant.js', 'js/results.js', 'js/polls.js'],
         ]);
@@ -175,6 +177,8 @@ final class ParticipantController
         if (!$this->events->isOpen($event)) {
             return Response::json(['poll' => null, 'closed' => true, 'error' => I18n::t($lang, 'err.closed')], 410);
         }
+        // Tilatiedosto puuttuu (esim. luotu ennen tätä versiota): kirjoitetaan, niin seuraavat kyselyt eivät tule tänne.
+        $this->live->ensureFile((int) $event['id']);
         $version = (int) $event['live_version'];
         if (($req->query['v'] ?? null) === (string) $version) {
             return Response::json(['v' => $version, 'unchanged' => true]);

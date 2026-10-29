@@ -12,6 +12,7 @@ use HessuTalks\Http\Request;
 use HessuTalks\Http\Response;
 use HessuTalks\Repository\EventRepository;
 use HessuTalks\Repository\KeyRepository;
+use HessuTalks\Repository\LiveFile;
 use HessuTalks\Repository\LiveRepository;
 use HessuTalks\Repository\NicknameRepository;
 use HessuTalks\Repository\PasskeyRepository;
@@ -39,6 +40,7 @@ final class App
         WebAuthnAdapter $webauthn,
         private readonly Clock $clock,
         string $appRoot,
+        ?string $liveDir = null,
     ) {
         $view = new View($appRoot . '/templates', $config, self::assetVersion($appRoot));
         $events = new EventRepository($db, $clock);
@@ -53,7 +55,7 @@ final class App
         $nicknames = new NicknameRepository($db, $clock, $config->appSecret);
         $polls = new PollRepository($db, $clock, $config->appSecret);
         $sets = new SetRepository($db, $clock);
-        $live = new LiveRepository($db);
+        $live = new LiveRepository($db, $liveDir === null ? null : new LiveFile($liveDir, $config->appSecret));
         $this->participant = new ParticipantController(
             $config, $view, $events, $questions, $nicknames, $polls, $live, $keys, $limiter, new FormToken($config->appSecret, $clock),
         );

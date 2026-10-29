@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 // Kuormitustesti (vaatimus 8: 150 samanaikaista osallistujaa, tulokset alle 2 s:ssa).
-// Simuloi osallistujia kuten polls.js: luennon sivu ladataan kerran, tila kysytään 1,2 s välein
-// (?v=, muuttumaton tila on kevyt), ja avattuun kysymykseen vastataan satunnaisesti --vote-window sekunnin sisällä.
+// Simuloi osallistujia kuten polls.js: luennon sivu ladataan kerran, tila luetaan 1,2 s välein staattisesta
+// tilatiedostosta (Apache, ei PHP:tä; /api/live vain, jos tiedosto puuttuu tai luento on suljettu), ja avattuun
+// kysymykseen vastataan satunnaisesti --vote-window sekunnin sisällä.
 // Vastaukset salataan luennon julkisella avaimella (crypto_box_seal) kuten selaimessa: palvelin ei näe sisältöä.
 //
 //   node scripts/load-test.mjs http://localhost:8080/k/ABC234 --clients 150 --duration 60
@@ -17,6 +18,7 @@ const POLL_MS = 1200;
 const MAX_BACKOFF_MS = 8000;
 const REQUEST_TIMEOUT_MS = 5000;
 const MAX_CLIENTS = 300;
+const FILE_MAX_MISSES = 3;
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const attr = (tag, name) => {
@@ -40,6 +42,7 @@ export async function loadEventPage(url) {
     token: attr(ask, 'data-token'),
     lang: attr(ask, 'data-lang') || 'en',
     live: new URL(attr(box, 'data-endpoint'), origin).href,
+    file: attr(box, 'data-live-file') ? new URL(attr(box, 'data-live-file'), origin).href : null,
     answer: new URL(attr(box, 'data-answer-endpoint'), origin).href,
   };
 }
@@ -81,7 +84,7 @@ export async function start(url, { clients = 150, rampSeconds = 15, voteWindowSe
   await sodium.ready;
 
   const stats = {
-    startedAt: Date.now(), joined: 0, live: [], answer: [], statuses: {}, errors: 0, requests: 0,
+    startedAt: Date.now(), joined: 0, live: [], file: [], answer: [], statuses: {}, errors: 0, requests: 0,
     seen: new Map(),      // kysymyksen id → [aika, jolloin kukin osallistuja näki sen]
     accepted: new Map(),  // kysymyksen id → hyväksyttyjen vastausten lukumäärä
     acceptedAt: new Map(), // kysymyksen id → hyväksyttyjen vastausten ajat (selaintesti mittaa viiveen esitysnäkymään)
@@ -160,16 +163,39 @@ export async function start(url, { clients = 150, rampSeconds = 15, voteWindowSe
       }
     };
 
-    const refresh = async () => {
+    let fileMisses = 0;
+    const api = async () => {
       const q = `?code=${encodeURIComponent(page.code)}&lang=${encodeURIComponent(page.lang)}` + (version !== null ? `&v=${version}` : '');
+      const r = await timed((signal) => fetch(page.live + q, { signal, cache: 'no-store' }));
+      stats.live.push(r.ms);
+      count('live ' + r.res.status, r.res.ok || r.res.status === 410);
+      return r;
+    };
+    // Kuten polls.js fetchState: tiedosto ensin, PHP vain tarvittaessa.
+    const state = async () => {
+      if (!page.file || fileMisses >= FILE_MAX_MISSES) return api();
+      const r = await timed((signal) => fetch(page.file, { signal, cache: 'no-store' }));
+      stats.file.push(r.ms);
+      count('file ' + r.res.status, r.res.ok || r.res.status === 404);
+      if (r.res.ok && typeof r.body.v === 'number') {
+        fileMisses = 0;
+        const expired = typeof r.body.closes_at === 'number' && Date.now() / 1000 >= r.body.closes_at;
+        if (!r.body.closed && !expired) return r;
+      } else if (r.res.status === 404) {
+        fileMisses++;
+      } else if (!r.res.ok) {
+        return r;
+      }
+      return api();
+    };
+
+    const refresh = async () => {
       try {
-        const { res, body, ms } = await timed((signal) => fetch(page.live + q, { signal, cache: 'no-store' }));
-        stats.live.push(ms);
-        count('live ' + res.status, res.ok);
+        const { res, body } = await state();
         if (res.status === 410) return;   // luento suljettu: osallistuja lopettaa kuten selaimessa
         if (!res.ok) throw new Error(String(res.status));
         failures = 0;
-        if (!body.unchanged) {
+        if (!body.unchanged && body.v !== version) {
           version = typeof body.v === 'number' ? body.v : null;
           const poll = body.poll;
           if (poll && poll.status === 'open' && !answered.has(poll.id)) {
@@ -210,7 +236,7 @@ export function report(stats) {
   return {
     seconds: Math.round(seconds), joined: stats.joined, requests: stats.requests,
     rps: Math.round((stats.requests / seconds) * 10) / 10, errors: stats.errors, statuses: stats.statuses,
-    liveMs: summary(stats.live.map(Math.round)), answerMs: summary(stats.answer.map(Math.round)), polls, aborted: stats.aborted,
+    fileMs: summary(stats.file.map(Math.round)), liveMs: summary(stats.live.map(Math.round)), answerMs: summary(stats.answer.map(Math.round)), polls, aborted: stats.aborted,
   };
 }
 
@@ -243,7 +269,7 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const run = await start(o.url, { clients: o.clients, rampSeconds: o.ramp, voteWindowSeconds: o.voteWindow });
   const tick = setInterval(() => {
     const r = report(run.stats);
-    console.log(`${r.seconds} s: liittyneet ${r.joined}, ${r.rps} pyyntöä/s, virheet ${r.errors}, tila p95 ${r.liveMs.p95} ms, vastaukset ${r.polls.map((p) => p.accepted).join('/') || 0}`);
+    console.log(`${r.seconds} s: liittyneet ${r.joined}, ${r.rps} pyyntöä/s, virheet ${r.errors}, tiedosto p95 ${r.fileMs.p95} ms, PHP-tilakyselyt ${r.liveMs.n}, vastaukset ${r.polls.map((p) => p.accepted).join('/') || 0}`);
   }, 5000);
   const end = Date.now() + o.duration * 1000;
   while (Date.now() < end && !run.stats.aborted) await sleep(250);

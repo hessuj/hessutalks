@@ -24,6 +24,7 @@
   var HIDDEN_MS = 4000;      // taustalla (esim. puhelimen näyttö lukittu) harvemmin
   var MAX_BACKOFF_MS = 8000;
   var REQUEST_TIMEOUT_MS = 5000; // roikkuva pyyntö (esim. heikko mobiiliverkko) katkaistaan ja yritetään uudelleen
+  var FILE_MAX_MISSES = 3;   // tilatiedosto puuttui näin monta kertaa peräkkäin: käytetään vain /api/live-reittiä
   var VOTER_KEY = 'hessutalks.voter';
   var ANSWERS_KEY = 'hessutalks.answers';
   var WORDS_MAX_CHARS = 30;
@@ -47,6 +48,8 @@
   var timer = null;
   var failures = 0;
   var stopped = false;
+  var liveFile = box.dataset.liveFile || '';
+  var fileMisses = 0;
   var memory = {};         // jos localStorage ei ole käytettävissä
   var reconnect = h('p', 'notice poll-reconnect', null);
   reconnect.setAttribute('role', 'status');
@@ -321,32 +324,62 @@
     timer = setTimeout(refresh, ms);
   }
 
+  function getJson(url, signal) {
+    return fetch(url, { credentials: 'omit', cache: 'no-store', signal: signal }).then(function (res) {
+      return res.json().catch(function () { return {}; }).then(function (data) {
+        return { status: res.status, ok: res.ok, data: data };
+      });
+    });
+  }
+
+  function apiUrl() {
+    return box.dataset.endpoint + '?code=' + encodeURIComponent(code) + '&lang=' + encodeURIComponent(lang) +
+      (version !== null ? '&v=' + encodeURIComponent(version) : '');
+  }
+
+  // Tila luetaan staattisesta tiedostosta, jonka Apache palvelee ilman PHP:tä (150 osallistujaa jaetulla
+  // palvelimella). /api/live vain, jos tiedosto puuttuu tai luento on suljettu: PHP kertoo syyn (410).
+  function fetchState(signal) {
+    if (!liveFile || fileMisses >= FILE_MAX_MISSES) return getJson(apiUrl(), signal);
+    return getJson(liveFile, signal).then(function (r) {
+      var d = r.data;
+      if (r.ok && typeof d.v === 'number') {
+        fileMisses = 0;
+        var expired = typeof d.closes_at === 'number' && Date.now() / 1000 >= d.closes_at;
+        if (!d.closed && !expired) return r;
+      } else if (r.status === 404) {
+        fileMisses++;
+      } else if (!r.ok) {
+        throw new Error(String(r.status));
+      }
+      return getJson(apiUrl(), signal);
+    });
+  }
+
   function refresh() {
     clearTimeout(timer);
     if (stopped) return;
     if (document.hidden) { schedule(HIDDEN_MS); return; }
-    var url = box.dataset.endpoint + '?code=' + encodeURIComponent(code) + '&lang=' + encodeURIComponent(lang) +
-      (version !== null ? '&v=' + encodeURIComponent(version) : '');
     var ctrl = typeof AbortController === 'function' ? new AbortController() : null;
     var abort = ctrl ? setTimeout(function () { ctrl.abort(); }, REQUEST_TIMEOUT_MS) : null;
-    fetch(url, { credentials: 'omit', cache: 'no-store', signal: ctrl ? ctrl.signal : undefined }).then(function (res) {
+    fetchState(ctrl ? ctrl.signal : undefined).then(function (r) {
       clearTimeout(abort);
-      return res.json().catch(function () { return {}; }).then(function (data) {
-        if (res.status === 410) {
-          stopped = true;
-          render(null);
-          current.el.replaceChildren(h('p', 'notice', data.error || ''));
-          return;
-        }
-        if (!res.ok) throw new Error(String(res.status));
-        failures = 0;
-        reconnect.hidden = true;
-        if (!data.unchanged) {
-          version = typeof data.v === 'number' ? data.v : null;
-          render(data.poll && typeof data.poll === 'object' ? data.poll : null);
-        }
-        schedule(POLL_MS);
-      });
+      var data = r.data;
+      if (r.status === 410) {
+        stopped = true;
+        render(null);
+        current.el.replaceChildren(h('p', 'notice', data.error || ''));
+        return;
+      }
+      if (!r.ok) throw new Error(String(r.status));
+      failures = 0;
+      reconnect.hidden = true;
+      // Tiedosto palauttaa aina koko tilan: piirretään vain, kun versio muuttui.
+      if (!data.unchanged && data.v !== version) {
+        version = typeof data.v === 'number' ? data.v : null;
+        render(data.poll && typeof data.poll === 'object' ? data.poll : null);
+      }
+      schedule(POLL_MS);
     }).catch(function () {
       clearTimeout(abort);
       // Verkkokatko, aikakatkaisu tai palvelinvirhe: yritetään uudelleen kasvavalla viiveellä.
