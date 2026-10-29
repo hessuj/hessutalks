@@ -42,9 +42,9 @@ if (str_starts_with($path, '/assets/')) {
 // Osallistujien tilatiedostot kuten public/live/.htaccess: vain 32 heksamerkkiä + .json, ei välimuistia,
 // puuttuva tiedosto on 404 ilman sovellusta.
 if (str_starts_with($path, '/live/')) {
-    $name = substr($path, strlen('/live/'));
-    $file = $publicDir . '/live/' . $name;
-    if (preg_match('/^[0-9a-f]{32}\.json$/', $name) !== 1 || !is_file($file)) {
+    $file = realpath($publicDir . $path);
+    // Vain public/live-hakemiston sovelluksen kirjoittamat tiedostot (ei polkujen läpikulkua), kuten assets yllä.
+    if ($file === false || !str_starts_with($file, $publicDir . '/live/') || preg_match('/^[0-9a-f]{32}\.json$/', basename($file)) !== 1 || !is_file($file)) {
         http_response_code(404);
         exit;
     }
