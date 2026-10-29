@@ -1,5 +1,7 @@
 # Hyväksymistestit – MMoIT 2026 (13.–14.11.2026)
 
+**Suomi** · [English](hyvaksymistestit.en.md)
+
 Vaatimusdokumentin luvun 9 testit ja niiden todennus. Päivitetään jokaisen vaiheen PR:ssä.
 
 Merkinnät: ✅ todennettu · 🟡 osittain · ⏳ ei vielä toteutettu · 🧪 todennetaan koeajossa Hessun kanssa (oikeat laitteet / Teams)

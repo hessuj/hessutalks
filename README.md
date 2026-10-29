@@ -1,5 +1,7 @@
 # HessuTalks
 
+**Suomi** · [English](README.en.md)
+
 Päästä päähän salattu kysymys- ja palautekanava luennoille ja puheille.
 Osallistujat liittyvät luennolle koodilla tai QR-koodilla ja lähettävät kysymyksiä nimimerkillä.
 Vain luennoitsija voi lukea viestit.
@@ -11,7 +13,7 @@ Osoite: <https://hessujarvinen.com/hessutalks/>
 1. Luennoitsija luo hallintanäkymässä luennon. Sovellus antaa 6-merkkisen koodin ja QR-koodin.
 2. Osallistuja avaa sivun, valitsee nimimerkin ja kirjoittaa kysymyksen tai palautteen.
 3. Viesti ja nimimerkki salataan osallistujan selaimessa luennoitsijan julkisella avaimella.
-4. Luennoitsija avaa viestit omassa selaimessaan tunnuslauseella. Ne päivittyvät reaaliaikaisesti,
+4. Luennoitsija avaa viestit omassa selaimessaan passkeylla tai tunnuslauseella. Ne päivittyvät reaaliaikaisesti,
    ja QR-koodin, yksittäisen kysymyksen tai kysymyslistan voi näyttää projektorilla.
 
 ### Kyselyt ja kysymyssarjat
@@ -260,9 +262,9 @@ Kirjastoja ei ladata CDN:stä.
 
 ## Tila
 
-MMoIT 2026 -kurssin vaatimukset (13.–14.11.2026) on toteutettu, kuormitustestiä lukuun ottamatta.
+MMoIT 2026 -kurssin vaatimukset (13.–14.11.2026) on toteutettu, ja kuormitustesti 150 osallistujalla meni läpi tuotannossa 29.10.2026.
 Hyväksymistestit ja niiden todennus: [docs/hyvaksymistestit.md](docs/hyvaksymistestit.md).
-Tulossa: kuormitustesti 150–200 osallistujalla. Kysymysten tykkäykset (Q&A, COULD) on jätetty pois.
+Jäljellä: koeajo oikeilla laitteilla ja Teamsilla. 200 osallistujan kuormitustesti on siirretty, ja kysymysten tykkäykset (Q&A, COULD) on jätetty pois.
 
 ## Lisenssi
 

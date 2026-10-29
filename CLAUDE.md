@@ -31,6 +31,8 @@ bin/init.php       asetustiedoston luonti; bin/dev-router.php kehityspalvelin; b
 .zap/rules.tsv     ZAP baseline -säännöt (FAIL/WARN/IGNORE)
 ```
 Osallistujan tekstit ovat `src/I18n.php`:ssä molemmilla kielillä (testi valvoo). Hallinta on vain suomeksi.
+Julkinen dokumentaatio on suomeksi ja englanniksi: README.md/README.en.md, SECURITY.md/SECURITY.en.md,
+docs/hyvaksymistestit.md/.en.md. Päivitä aina molemmat (DocsTranslationTest valvoo kielilinkit ja rakenteen).
 
 ## Komennot
 ```sh
