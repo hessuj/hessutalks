@@ -7,8 +7,9 @@ namespace HessuTalks;
 /**
  * Julkaisujäädytys: tapahtuman aikana tuotantoon ei julkaista (vaatimus 8).
  *
- * Ikkunat ovat tiedostossa .github/deploy-freeze.txt, yksi riviä kohden Suomen aikaa:
- *   2026-11-13 14:00  2026-11-13 20:30   # MMoIT perjantai
+ * Ikkunat ovat GitHubin production-ympäristön muuttujassa DEPLOY_FREEZE (ei julkisessa repossa: tarkat
+ * luentoajat kertoisivat, milloin palvelunesto haittaisi eniten). Yksi ikkuna riviä kohden Suomen aikaa:
+ *   2026-11-13 14:00  2026-11-13 20:30   # kuvaus
  * Tyhjät rivit ja #-kommentit ohitetaan.
  */
 final class DeployFreeze
@@ -44,6 +45,28 @@ final class DeployFreeze
             $out[] = ['from' => $from, 'to' => $to, 'label' => trim($label)];
         }
         return $out;
+    }
+
+    /**
+     * Deploy-vaiheen päätös: [exit-koodi, viesti]. Viestit päätyvät julkisen repon Actions-lokiin, joten niissä
+     * ei ole ikkunoiden aikoja eikä kuvauksia. Virheellinen aikataulu estää julkaisun (ei ohitu kirjoitusvirheen takia).
+     *
+     * @return array{0: int, 1: string}
+     */
+    public static function decide(string $spec, \DateTimeImmutable $now, bool $override): array
+    {
+        try {
+            $window = self::activeWindow($spec, $now);
+        } catch (\InvalidArgumentException $e) {
+            return [1, '::error title=Julkaisujäädytys::DEPLOY_FREEZE-muuttuja on virheellinen. ' . $e->getMessage()];
+        }
+        if ($window === null) {
+            return [0, trim($spec) === '' ? 'Ei julkaisujäädytyksiä (DEPLOY_FREEZE tyhjä).' : 'Ei julkaisujäädytystä nyt.'];
+        }
+        if ($override) {
+            return [0, '::warning title=Julkaisujäädytys ohitettu::Julkaistaan jäädytyksen aikana (käsin käynnistetty hätäjulkaisu).'];
+        }
+        return [1, '::error title=Julkaisujäädytys::Jäädytys on voimassa, tuotantoon ei julkaista. Hätätapauksessa: Run workflow → Ohita julkaisujäädytys.'];
     }
 
     /** Palauttaa voimassa olevan ikkunan kuvauksen tai null, jos julkaisu on sallittu. */

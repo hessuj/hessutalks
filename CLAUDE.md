@@ -61,7 +61,8 @@ Lisää jokaiselle uudelle ominaisuudelle testit, myös tietoturvatestit (`tests
   vanhan PR:n ja avata uuden, jos ryhmään on tullut päivityksiä. Seuraa silloin uutta PR:ää.
 
 ## Julkaisu (GitHub Actions → cPanel)
-- Julkaisujäädytys tapahtuman aikana: .github/deploy-freeze.txt. Älä ehdota julkaisua jäädytysikkunassa.
+- Julkaisujäädytys luentojen aikana: production-ympäristön muuttuja DEPLOY_FREEZE (ei julkisessa repossa; katso
+  `gh variable get DEPLOY_FREEZE --env production`). Älä ehdota julkaisua jäädytysikkunassa, äläkä kirjoita ikkunoita julkiseen repoon.
 - FTPS-tunnus on rajattu kansioon `~/public_html/hessutalks/`. Sovelluskoodi menee `app/`-alikansioon (pääsy estetty).
 - Asetukset, tietokanta ja istunnot: `~/hessutalks-data/` webrootin ulkopuolella – deploy ei koske niihin.
 - Secretit `production`-ympäristössä: FTP_SERVER, FTP_USERNAME, FTP_PASSWORD. Muuttuja APP_URL.
@@ -69,7 +70,7 @@ Lisää jokaiselle uudelle ominaisuudelle testit, myös tietoturvatestit (`tests
 - Selainkirjastot päivitetään vain `scripts/update-vendor.sh`-skriptillä (SHA-256-lukitus).
 
 ## Tila
-MMoIT 2026 -kurssin vaatimukset (tapahtuma 13.–14.11.2026, ei julkaisuja tapahtuman aikana, .github/deploy-freeze.txt)
+MMoIT 2026 -kurssin vaatimukset (tapahtuma 13.–14.11.2026, ei julkaisuja tapahtuman aikana, DEPLOY_FREEZE)
 on toteutettu vaiheittain PR:inä #8–#17. Tila ja hyväksymistestit: docs/hyvaksymistestit.md.
 Kuormitustesti (H13) läpi tuotannossa 29.10.: 150 osallistujaa, 0 virhettä, tila staattisesta tiedostosta (200 osallistujan SHOULD siirretty).
 Jäljellä: koeajo oikeilla laitteilla ja Teamsilla (H1, H15).

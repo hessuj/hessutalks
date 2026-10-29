@@ -167,9 +167,10 @@ Jokainen push ja pull request ajaa:
 
 Kun kaikki menevät läpi `main`-haarassa, sovellus julkaistaan FTPS:llä webhotelliin ja tuotanto savutestataan.
 
-**Julkaisujäädytys:** tiedoston `.github/deploy-freeze.txt` aikaikkunoina (Suomen aikaa) deploy-job pysähtyy, eikä
-tuotantoon julkaista. Tämä koskee esimerkiksi luentoa pe 13.11. 14:00–20:30 ja la 14.11. 08:30–15:30. Hätätapauksessa
-*Actions → CI/CD → Run workflow* ja valinta *Ohita julkaisujäädytys*. Tiedoston muoto tarkistetaan PHPUnitissa jokaisessa PR:ssä.
+**Julkaisujäädytys:** luentojen aikana deploy-job pysähtyy, eikä tuotantoon julkaista. Aikaikkunat ovat `production`-ympäristön
+muuttujassa `DEPLOY_FREEZE` (*Settings → Environments → production → Variables*), eivät julkisessa repossa, eikä loki kerro
+niitä. Yksi ikkuna riviä kohden Suomen aikaa: `VVVV-KK-PP HH:MM  VVVV-KK-PP HH:MM  # kuvaus`. Virheellinen muuttuja estää
+julkaisun. Hätätapauksessa *Actions → CI/CD → Run workflow* ja valinta *Ohita julkaisujäädytys*.
 
 ZAP-säännöt ovat tiedostossa `.zap/rules.tsv`: FAIL kaataa CI:n, WARN raportoidaan ja IGNORE ohitetaan perustellusti.
 
