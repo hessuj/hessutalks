@@ -51,6 +51,7 @@ const counts = () => admin.js(`(() => {
   const items = [...document.querySelectorAll('ul.questions > li')].map((li) => li.innerText);
   return ${JSON.stringify(texts)}.map((t) => items.filter((s) => s.split('\\n').some((line) => line.trim() === t)).length);
 })()`);
+await admin.js(`document.getElementById('tab-btn-messages').click()`);
 await sleep(8000);   // useita päällekkäisiä päivityksiä
 const c = await counts();
 if (c.some((n) => n !== 1)) throw new Error('Viestit listassa (pitää olla kerran kukin): ' + JSON.stringify(Object.fromEntries(texts.map((t, i) => [t, c[i]]))));

@@ -21,6 +21,10 @@ Osoite: <https://hessujarvinen.com/hessutalks/>
 Luento koostuu **kysymyssarjoista** (esim. moduulit `M1`, `M4`), joissa on kysymykset järjestyksessä.
 Kysymystyypit: monivalinta (yksi tai useita vastauksia), avoin teksti (280 merkkiä, valinnaisesti useita vastauksia), sanapilvi (1–3 sanaa, 30 merkkiä), Likert-asteikko (5 tai 7 kohtaa) ja asteikko 0–10.
 
+Yksi luento voi kattaa koko kurssin tai luentosarjan: sarjat jakavat sen luentoihin (esim. `L1`–`L4`), ja osallistujat
+käyttävät samaa koodia ja nimimerkkiä koko kurssin ajan. Hallinnan luentosivulla on kaksi välilehteä, *Kyselyt* ja
+*Kysymykset ja palaute*. Ohjauspalkki näkyy kummallakin, ja viestivälilehti kertoo uusien viestien määrän.
+
 1. Luo luennon sivulla sarjat (*Uusi sarja*) ja niihin kysymykset (*Uusi kysymys*) valmiiksi ennen luentoa.
    Sarjoja ja kysymyksiä voi siirtää nuolilla, ja sarjan voi **ohittaa** kesken luennon. Ohitetun sarjan
    kysymykset jäävät pois Seuraava/Edellinen-järjestyksestä, mutta niiden vastaukset säilyvät.
