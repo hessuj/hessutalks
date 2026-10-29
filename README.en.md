@@ -167,9 +167,10 @@ Every push and pull request runs:
 
 When everything passes on the `main` branch, the app is deployed over FTPS to the web host and production is smoke-tested.
 
-**Deploy freeze:** during the time windows in `.github/deploy-freeze.txt` (Finnish time) the deploy job stops, and nothing
-is deployed to production. This covers, for example, the lecture on Fri 13.11. 14:00–20:30 and Sat 14.11. 08:30–15:30. In an emergency,
-*Actions → CI/CD → Run workflow* and select *Ohita julkaisujäädytys* (skip deploy freeze). The file format is checked by PHPUnit in every PR.
+**Deploy freeze:** during lectures the deploy job stops, and nothing is deployed to production. The time windows are in the
+`production` environment variable `DEPLOY_FREEZE` (*Settings → Environments → production → Variables*), not in the public repo, and
+the log does not reveal them. One window per line in Finnish time: `YYYY-MM-DD HH:MM  YYYY-MM-DD HH:MM  # description`. An invalid
+variable blocks the deploy. In an emergency, *Actions → CI/CD → Run workflow* and select *Ohita julkaisujäädytys* (skip deploy freeze).
 
 ZAP rules are in `.zap/rules.tsv`: FAIL breaks CI, WARN is reported and IGNORE is skipped with a justification.
 

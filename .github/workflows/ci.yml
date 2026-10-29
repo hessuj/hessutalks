@@ -194,9 +194,11 @@ jobs:
           coverage: none
           tools: composer:v2
 
-      # Tapahtuman aikana ei julkaisuja (vaatimus 8). Ikkunat: .github/deploy-freeze.txt
+      # Tapahtuman aikana ei julkaisuja (vaatimus 8). Ikkunat: production-ympäristön muuttuja DEPLOY_FREEZE
+      # (ei julkisessa repossa; skripti ei tulosta aikoja lokiin).
       - name: Julkaisujäädytys
         env:
+          DEPLOY_FREEZE: ${{ vars.DEPLOY_FREEZE }}
           DEPLOY_FREEZE_OVERRIDE: ${{ github.event_name == 'workflow_dispatch' && inputs.ohita_jaadytys && '1' || '' }}
         run: php bin/deploy-freeze.php
 
