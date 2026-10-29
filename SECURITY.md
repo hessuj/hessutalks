@@ -1,5 +1,7 @@
 # Tietoturva
 
+**Suomi** · [English](SECURITY.en.md)
+
 ## Haavoittuvuuksien ilmoittaminen
 
 Ilmoita haavoittuvuuksista yksityisesti GitHubin *Security → Report a vulnerability* -toiminnolla.
