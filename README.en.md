@@ -157,15 +157,25 @@ Detailed threat model and residual risks: [SECURITY.en.md](SECURITY.en.md).
 
 ## CI/CD pipeline
 
-Every push and pull request runs:
+Every push and pull request runs the security stages in this order. Each stage stores its report as a run
+artifact (*Actions → run → Artifacts*):
+
+1. **Gitleaks**: leaked secrets in the whole git history
+2. **Semgrep (SAST)**: PHP, JavaScript, OWASP Top 10, secrets
+3. **Trivy (SCA)**: known vulnerabilities in dependencies (`composer.lock`). The pipeline stops on a CRITICAL finding.
+4. **Trivy (SBOM)**: software bill of materials in CycloneDX JSON: PHP dependencies and vendored browser libraries
+   with SHA-256 hashes (`scripts/sbom-vendor.py`)
+5. **OWASP ZAP baseline (DAST)**: scan of a test instance started in CI, never production
+
+Trivy is installed from its release with a pinned SHA-256 hash (`scripts/install-trivy.sh`), not as a GitHub Action:
+`aquasecurity/trivy-action` was compromised in March 2026 (CVE-2026-33634).
+
+In parallel:
 
 - **PHPUnit**: unit tests and security tests (CSRF, origin, access control, injection, XSS,
   nickname ownership, rate limits, session timeouts, security headers, absence of personal data)
 - **PHPStan** level 8 + strict rules
 - **composer audit**: known vulnerabilities in dependencies
-- **Semgrep (SAST)**: PHP, JavaScript, OWASP Top 10, secrets
-- **Gitleaks**: leaked secrets in the whole git history
-- **OWASP ZAP baseline (DAST)**: scan of the running application
 - **CodeQL**: JavaScript security analysis
 - **Vendor integrity**: SHA-256 check of browser libraries
 - **Crypto tests**: interoperability of the browser and admin encryption format

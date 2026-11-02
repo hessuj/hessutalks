@@ -157,15 +157,25 @@ Tarkempi uhkamalli ja jäännösriskit: [SECURITY.md](SECURITY.md).
 
 ## CI/CD-putki
 
-Jokainen push ja pull request ajaa:
+Jokainen push ja pull request ajaa tietoturvavaiheet tässä järjestyksessä. Jokainen vaihe tallentaa raporttinsa
+ajon artefaktiksi (*Actions → ajo → Artifacts*):
+
+1. **Gitleaks**: vuotaneet salaisuudet koko git-historiasta
+2. **Semgrep (SAST)**: PHP, JavaScript, OWASP Top 10, salaisuudet
+3. **Trivy (SCA)**: tunnetut haavoittuvuudet riippuvuuksissa (`composer.lock`). Putki pysähtyy CRITICAL-löydökseen.
+4. **Trivy (SBOM)**: ainesosaluettelo CycloneDX JSON -muodossa: PHP-riippuvuudet ja vendoroidut selainkirjastot
+   SHA-256-summineen (`scripts/sbom-vendor.py`)
+5. **OWASP ZAP baseline (DAST)**: CI:ssä käynnistetyn testisovelluksen skannaus, ei koskaan tuotantoa
+
+Trivy asennetaan julkaisusta lukitulla SHA-256-summalla (`scripts/install-trivy.sh`), ei GitHub Actionina:
+`aquasecurity/trivy-action` kaapattiin maaliskuussa 2026 (CVE-2026-33634).
+
+Lisäksi rinnakkain:
 
 - **PHPUnit**: yksikkötestit ja tietoturvatestit (CSRF, origin, pääsynhallinta, injektiot, XSS,
   nimimerkkien omistajuus, rate limit, istuntojen aikakatkaisut, turvaotsakkeet, henkilötietojen puuttuminen)
 - **PHPStan** taso 8 + strict rules
 - **composer audit**: tunnetut haavoittuvuudet riippuvuuksissa
-- **Semgrep (SAST)**: PHP, JavaScript, OWASP Top 10, salaisuudet
-- **Gitleaks**: vuotaneet salaisuudet koko git-historiasta
-- **OWASP ZAP baseline (DAST)**: käynnissä olevan sovelluksen skannaus
 - **CodeQL**: JavaScriptin tietoturva-analyysi
 - **Vendor-eheys**: selainkirjastojen SHA-256-tarkistus
 - **Kryptotestit**: selaimen ja ylläpidon salausformaatin yhteentoimivuus
