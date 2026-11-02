@@ -36,6 +36,7 @@ final class AdminSecurityTest extends AppTestCase
         yield ['POST', '/admin/api/events'];
         yield ['POST', '/admin/api/events/1/status'];
         yield ['POST', '/admin/api/events/1/delete'];
+        yield ['POST', '/admin/api/events/1/title'];
         yield ['POST', '/admin/api/questions/1/status'];
         yield ['POST', '/admin/api/questions/1/delete'];
         yield ['POST', '/admin/api/keys'];

@@ -121,6 +121,16 @@ final class EventRepository
         return $this->db->exec('UPDATE events SET show_qr = ? WHERE id = ?', [$show ? 1 : 0, $id]) === 1;
     }
 
+    /** Otsikon muokkaus (esim. kirjoitusvirhe); koodi ja QR pysyvät samoina. Samat rajat kuin luonnissa. */
+    public function setTitle(int $id, string $title): bool
+    {
+        $title = trim((string) preg_replace('/[\p{Cc}\p{Cf}]+/u', ' ', $title));
+        if ($title === '' || mb_strlen($title) > self::TITLE_MAX) {
+            throw new \InvalidArgumentException('Otsikon pituus 1–' . self::TITLE_MAX . ' merkkiä.');
+        }
+        return $this->db->exec('UPDATE events SET title = ? WHERE id = ?', [$title, $id]) === 1;
+    }
+
     public function setLang(int $id, ?string $lang): bool
     {
         if ($lang !== null && !in_array($lang, ['fi', 'en'], true)) {

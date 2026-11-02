@@ -136,7 +136,7 @@ final class AdminController
         }
 
         // --- Kirjautuneen ylläpitäjän reitit -------------------------------
-        if (preg_match('#^events/(\d{1,10})/(questions|status|delete|lang|qr)$#', $route, $m) === 1) {
+        if (preg_match('#^events/(\d{1,10})/(questions|status|delete|lang|qr|title)$#', $route, $m) === 1) {
             return $this->eventAction($req, (int) $m[1], $m[2], $in, $client);
         }
         if (preg_match('#^events/(\d{1,10})/(polls|poll-answers|sets|live|import|export)$#', $route, $m) === 1) {
@@ -357,6 +357,17 @@ final class AdminController
             $this->events->setShowQr($id, $in['show']);
             // Versio kertoo muille hallintaikkunoille (esim. läppärin projektori), että tila muuttui.
             $this->live->bump($id);
+            return Response::json(['event' => $this->eventOut((array) $this->events->find($id))]);
+        }
+        if ($action === 'title') {
+            if (!is_string($in['title'] ?? null) || !mb_check_encoding($in['title'], 'UTF-8')) {
+                return Response::error('Virheellinen otsikko.', 422);
+            }
+            try {
+                $this->events->setTitle($id, $in['title']);
+            } catch (\InvalidArgumentException $e) {
+                return Response::error($e->getMessage(), 422);
+            }
             return Response::json(['event' => $this->eventOut((array) $this->events->find($id))]);
         }
         if ($action === 'lang') {

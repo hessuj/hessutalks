@@ -1070,6 +1070,9 @@
             text: poll.revealed ? 'Piilota oikea vastaus' : 'Paljasta oikea vastaus', title: 'Oikea vastaus ja selitykset (A)',
             onclick: function () { act(poll, 'reveal', { revealed: !poll.revealed }); } }) : null,
           poll ? h('button.btn.ghost.small', { type: 'button', text: 'Odotusnäkymä', title: 'Ei aktiivista kysymystä', onclick: function () { liveAct({ action: 'activate', poll: null }); } }) : null,
+          // Koeajon jälkeen tai väärin avatun kysymyksen vastaukset pois (vaatimus R12), varmistuksen jälkeen.
+          poll ? h('button.btn.danger.small', { type: 'button', text: 'Tyhjennä vastaukset', title: 'Poistaa aktiivisen kysymyksen kaikki vastaukset',
+            onclick: function () { act(poll, 'reset', {}, 'Tyhjennetäänkö aktiivisen kysymyksen "' + poll.prompt + '" kaikki vastaukset pysyvästi?'); } }) : null,
           h('button.btn.small' + (showQr ? '' : '.ghost'), { type: 'button', 'aria-pressed': String(showQr), text: showQr ? 'QR pieneksi' : 'QR isona', title: 'Iso QR-koodi projektorille (Q)',
             onclick: function () { command('qr'); } }),
           h('button.btn.ghost.small', { type: 'button', text: 'Aktiivinen projektorille', onclick: function () {
@@ -1407,10 +1410,29 @@
     var countEl = h('span.hint');
     var panel = pollsPanel(id, function () { return event; });
 
+    // Otsikon muokkaus (esim. kirjoitusvirhe): koodi ja QR pysyvät, joten diojen linkit toimivat edelleen.
+    var editingTitle = false;
+    function titleForm() {
+      var input = h('input', { type: 'text', id: 'event-title-edit', maxlength: 120, value: event.title, required: true, 'aria-label': 'Luennon otsikko' });
+      var msg = h('span.hint');
+      var form = h('form.title-edit.actions', { onsubmit: function (e) {
+        e.preventDefault();
+        api('POST', 'events/' + id + '/title', { title: input.value }).then(function (r) {
+          event = r.event; editingTitle = false; renderHead();
+        }).catch(function (err) { msg.textContent = err.message; });
+      } }, input,
+        h('button.btn.small', { type: 'submit', text: 'Tallenna otsikko' }),
+        h('button.btn.ghost.small', { type: 'button', text: 'Peruuta', onclick: function () { editingTitle = false; renderHead(); } }),
+        msg);
+      setTimeout(function () { input.focus(); input.select(); }, 0);
+      return form;
+    }
+
     function renderHead() {
       var url = event.url;
       headEl.replaceChildren(
         toolbar(event.title, [
+          h('button.btn.ghost.small', { type: 'button', text: 'Muokkaa otsikkoa', onclick: function () { editingTitle = true; renderHead(); } }),
           h('button.btn.ghost.small', { type: 'button', text: 'Ohjain', title: 'Puhelinohjain: isot napit aktiivisen kysymyksen ohjaukseen', onclick: function () { showRemote(id); } }),
           h('button.btn.ghost.small', { type: 'button', text: 'Kaikki luennot', onclick: function () { loadState().then(function () { showEvents(); }); } })]),
         h('div.share', null,
@@ -1446,6 +1468,7 @@
             })()),
             h('p', null, presenterNote)))
       );
+      if (editingTitle) headEl.insertBefore(titleForm(), headEl.children[1]);
     }
 
     // Projektorin lista (kysymykset tai palautteet omissa ikkunoissaan): käsiteltävät viestit, uusin ensin.

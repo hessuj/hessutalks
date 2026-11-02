@@ -9,7 +9,7 @@ namespace HessuTalks;
  *
  * Ikkunat ovat GitHubin production-ympäristön muuttujassa DEPLOY_FREEZE (ei julkisessa repossa: tarkat
  * luentoajat kertoisivat, milloin palvelunesto haittaisi eniten). Yksi ikkuna riviä kohden Suomen aikaa:
- *   2026-11-13 14:00  2026-11-13 20:30   # kuvaus
+ *   2030-11-15 14:00  2030-11-15 20:30   # kuvaus
  * Tyhjät rivit ja #-kommentit ohitetaan.
  */
 final class DeployFreeze

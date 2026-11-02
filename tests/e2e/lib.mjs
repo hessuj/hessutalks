@@ -18,6 +18,7 @@ async function connect(wsUrl) {
   let seq = 0;
   const pending = new Map();
   const logs = [];
+  const dialogs = [];   // vahvistusikkunoiden tekstit (testit tarkistavat, mitä kysyttiin)
   ws.addEventListener('message', (ev) => {
     const m = JSON.parse(ev.data);
     if (m.id && pending.has(m.id)) { pending.get(m.id)(m); pending.delete(m.id); }
@@ -25,6 +26,7 @@ async function connect(wsUrl) {
     if (m.method === 'Page.javascriptDialogOpening') {
       // confirm() on sovelluksen omaa käyttöä (vahvistukset); alert() tarkoittaisi suoritettua skriptiä (XSS).
       if (m.params.type === 'alert') logs.push('ALERT ' + m.params.message);
+      dialogs.push(m.params.message);
       cdp('Page.handleJavaScriptDialog', { accept: true });
     }
   });
@@ -50,6 +52,7 @@ async function connect(wsUrl) {
       }
       throw new Error('Aikakatkaisu: ' + what + ' (visibilityState=' + (await js('document.visibilityState').catch(() => '?')) + ')\n--- sivu ---\n' + (await js('document.body.innerText').catch(() => '?')).slice(0, 3000) + '\n' + logs.join('\n'));
     },
+    dialogs: () => dialogs.slice(),
     hasText: (s) => `document.body.innerText.includes(${JSON.stringify(s)})`,
     has: (sel) => `!!document.querySelector(${JSON.stringify(sel)})`,
     // Nappi tekstin mukaan, valinnaisesti elementin sisältä, jossa on annettu teksti.
