@@ -211,6 +211,11 @@ details.optional summary { cursor: pointer; font-weight: 600; color: var(--accen
   display: grid; align-content: start; gap: 1.6vh; overflow: hidden; min-height: 0; flex: 0 1 auto;
 }
 .stage .stage-list li { border-left: .5vw solid var(--accent); padding: .4vh 1.2vw; }
+/* Kysymyslista: otsikko ylhäällä ja lista täsmälleen jäljelle jäävässä tilassa (flex-basis 0). Keskitys ja sisällön
+   mukainen korkeus saivat Safarissa listan valumaan otsikon päälle. Ylimenevä leikataan, trimList piilottaa vajaat rivit. */
+.stage.list-stage { justify-content: flex-start; overflow: hidden; }
+.stage.list-stage > .stage-url { flex: none; }
+.stage.list-stage .stage-list { flex: 1 1 0; min-height: 0; height: 0; }
 .stage .stage-nick { display: block; font: 600 min(1.5vw, 2vh)/1.2 var(--sans); color: var(--accent); }
 .stage .stage-list-text { display: block; font: 600 min(2.1vw, 2.8vh)/1.3 var(--sans); white-space: pre-wrap; overflow-wrap: anywhere; }
 

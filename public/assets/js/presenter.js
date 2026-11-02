@@ -28,6 +28,7 @@
   }
   function show() {
     root.classList.remove('poll-stage');
+    root.classList.remove('list-stage');
     pollView = null;
     root.replaceChildren.apply(root, arguments);
   }
@@ -148,6 +149,7 @@
       ol.appendChild(li);
     });
     show(h('p', 'stage-url', title), items.length ? ol : h('p', 'stage-q', tx().noQuestions));
+    root.classList.add('list-stage');
     trimList();
   }
 
@@ -164,7 +166,27 @@
       li[i].hidden = full;
     }
   }
-  window.addEventListener('resize', trimList);
+  // Yksittäinen kysymys (enintään 2000 merkkiä): fonttia pienennetään, kunnes teksti mahtuu näytölle otsikon alle.
+  function fitQuestion() {
+    var q = root.querySelector('.stage-q');
+    if (!q || root.classList.contains('list-stage')) return;
+    q.style.fontSize = '';
+    q.style.maxWidth = '';
+    if (root.scrollHeight > root.clientHeight + 1) q.style.maxWidth = 'none';   // pitkä teksti: koko leveys ennen fontin pienennystä
+    var size = parseFloat(getComputedStyle(q).fontSize);
+    var min = Math.max(12, window.innerHeight * 0.018);
+    while (size > min && root.scrollHeight > root.clientHeight + 1) {
+      size = Math.max(min, size * 0.9);
+      q.style.fontSize = size + 'px';
+    }
+  }
+
+  // Koon muutos: ikkunan siirto projektorille, koko näyttö (Safari ei aina laukaise resize-tapahtumaa ajoissa) ja fontit.
+  function refit() { trimList(); fitQuestion(); }
+  window.addEventListener('resize', refit);
+  document.addEventListener('fullscreenchange', function () { requestAnimationFrame(refit); });
+  if (typeof ResizeObserver === 'function') new ResizeObserver(function () { refit(); }).observe(root);
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(refit);
 
   // ---------------------------------------------------------------- iso QR-koodi (Q)
 
@@ -197,7 +219,7 @@
         if (str(m.code, 20) && str(m.url, 500)) renderQr(m.code, m.url);
         break;
       case 'question':
-        if (str(m.nick, 100) !== null && str(m.text) !== null) show(h('p', 'stage-url', m.nick), h('p', 'stage-q', m.text));
+        if (str(m.nick, 100) !== null && str(m.text) !== null) { show(h('p', 'stage-url', m.nick), h('p', 'stage-q', m.text)); fitQuestion(); }
         break;
       case 'list':
         if (str(m.title, 200) === null || !Array.isArray(m.items)) return;
