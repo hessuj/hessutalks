@@ -10,7 +10,7 @@ Osoite: <https://hessujarvinen.com/hessutalks/>
 
 ## Miten se toimii
 
-1. Luennoitsija luo hallintanäkymässä luennon. Sovellus antaa 6-merkkisen koodin ja QR-koodin.
+1. Luennoitsija luo hallintanäkymässä luennon. Sovellus antaa 6-merkkisen koodin ja QR-koodin. Otsikkoa voi muokata myöhemmin (*Muokkaa otsikkoa*), ja koodi pysyy samana.
 2. Osallistuja avaa sivun, valitsee nimimerkin ja kirjoittaa kysymyksen tai palautteen.
 3. Viesti ja nimimerkki salataan osallistujan selaimessa luennoitsijan julkisella avaimella.
 4. Luennoitsija avaa viestit omassa selaimessaan passkeylla tai tunnuslauseella. Ne päivittyvät reaaliaikaisesti,
@@ -116,7 +116,7 @@ Projektoria ohjaava läppäri huomaa muutokset parissa sekunnissa.
 ### Esitys projektorilla
 
 Kun projektori on kytketty jatketuksi näytöksi (ei peilaus), luennon *…projektorille*-napit avaavat
-erillisen esitysikkunan (`/admin/esitys`) toiselle näytölle. Hallintanäkymä jää läppärin näytölle.
+erillisen esitysikkunan toiselle näytölle. Hallintanäkymä jää läppärin näytölle.
 
 - Chrome ja Edge sijoittavat ikkunan automaattisesti (Window Management API). Ensimmäisellä kerralla
   selain kysyy luvan *ikkunoiden hallintaan*. Jos ponnahdusikkuna estyy luvan kysymisen takia, paina nappia uudelleen.
@@ -228,7 +228,7 @@ käsiksi tietokantaan eikä muihin sivuston osiin.
 
    *Jos cPanelissa ei ole Terminalia:* aja sama komento omalla koneella repon juuressa (`php bin/init.php … --data=/home/CPANEL-KÄYTTÄJÄ/hessutalks-data --out=config.php`,
    vaatii PHP:n, esim. `brew install php`). Lataa sitten `config.php` File Managerilla kotihakemiston kansioon `hessutalks-data` (oikeudet `700`/`600`).
-5. **Ensimmäinen kirjautuminen:** avaa `https://example.com/hessutalks/admin`, syötä käyttöönottotunnus ja luo passkey.
+5. **Ensimmäinen kirjautuminen:** avaa sovelluksen hallintanäkymä selaimella, syötä käyttöönottotunnus ja luo passkey.
    Luo sen jälkeen salausavaimet tunnuslauseella. Tallenna tunnuslause salasanojen hallintaan
    ja talleta ladattu varmuuskopiotiedosto turvaan.
 6. **Varapasskey:** lisää *Asetukset*-sivulta toinen passkey esimerkiksi puhelimeen.
@@ -244,7 +244,7 @@ php bin/init.php --dev                  # luo var/config.php ja tulostaa käytt�
 HESSUTALKS_CONFIG=var/config.php php -S localhost:8080 -t public bin/dev-router.php
 ```
 
-Hallinta: <http://localhost:8080/admin>. Passkeyt toimivat `localhost`-osoitteessa ilman HTTPS:ää.
+Avaa hallintanäkymä kehityspalvelimen kautta. Passkeyt toimivat `localhost`-osoitteessa ilman HTTPS:ää.
 
 `HESSUTALKS_CONFIG=var/config.php php bin/seed-demo.php` luo testiavaimet ja avoimen luennon ja tulostaa
 sen koodin. CI käyttää sitä ZAP-skannaukseen. Skripti kieltäytyy toimimasta tuotantoasetuksilla.
@@ -272,7 +272,7 @@ Kirjastoja ei ladata CDN:stä.
 
 ## Tila
 
-MMoIT 2026 -kurssin vaatimukset (13.–14.11.2026) on toteutettu, ja kuormitustesti 150 osallistujalla meni läpi tuotannossa 29.10.2026.
+MMoIT 2026 -kurssin vaatimukset on toteutettu, ja kuormitustesti 150 osallistujalla meni läpi tuotannossa.
 Hyväksymistestit ja niiden todennus: [docs/hyvaksymistestit.md](docs/hyvaksymistestit.md).
 Jäljellä: koeajo oikeilla laitteilla ja Teamsilla. 200 osallistujan kuormitustesti on siirretty, ja kysymysten tykkäykset (Q&A, COULD) on jätetty pois.
 

@@ -10,7 +10,7 @@ Address: <https://hessujarvinen.com/hessutalks/>
 
 ## How it works
 
-1. The lecturer creates a lecture in the admin view. The app gives a 6-character code and a QR code.
+1. The lecturer creates a lecture in the admin view. The app gives a 6-character code and a QR code. The title can be edited later (*Muokkaa otsikkoa*, edit title), and the code stays the same.
 2. The participant opens the page, chooses a nickname and writes a question or feedback.
 3. The message and nickname are encrypted in the participant's browser with the lecturer's public key.
 4. The lecturer unlocks the messages in their own browser with a passkey or passphrase. They update in real time,
@@ -116,7 +116,7 @@ The laptop driving the projector picks up the changes within a couple of seconds
 ### Projector presentation
 
 When the projector is connected as an extended display (not mirrored), the lecture's *…projektorille* (to projector) buttons open
-a separate presenter window (`/admin/esitys`) on the second display. The admin view stays on the laptop screen.
+a separate presenter window on the second display. The admin view stays on the laptop screen.
 
 - Chrome and Edge place the window automatically (Window Management API). The first time,
   the browser asks for permission to *manage windows*. If the pop-up is blocked because of the permission prompt, press the button again.
@@ -228,7 +228,7 @@ access to the database or other parts of the site.
 
    *If cPanel has no Terminal:* run the same command on your own machine in the repo root (`php bin/init.php … --data=/home/CPANEL-USER/hessutalks-data --out=config.php`,
    requires PHP, e.g. `brew install php`). Then upload `config.php` with File Manager to the `hessutalks-data` folder in the home directory (permissions `700`/`600`).
-5. **First sign-in:** open `https://example.com/hessutalks/admin`, enter the setup token and create a passkey.
+5. **First sign-in:** open the application's admin view in a browser, enter the setup token and create a passkey.
    Then create the encryption keys with a passphrase. Save the passphrase in a password manager
    and keep the downloaded backup file safe.
 6. **Backup passkey:** add a second passkey from the *Asetukset* (settings) page, for example on your phone.
@@ -244,7 +244,7 @@ php bin/init.php --dev                  # creates var/config.php and prints the 
 HESSUTALKS_CONFIG=var/config.php php -S localhost:8080 -t public bin/dev-router.php
 ```
 
-Admin: <http://localhost:8080/admin>. Passkeys work on `localhost` without HTTPS.
+Open the admin view through the development server. Passkeys work on `localhost` without HTTPS.
 
 `HESSUTALKS_CONFIG=var/config.php php bin/seed-demo.php` creates test keys and an open lecture and prints
 its code. CI uses it for the ZAP scan. The script refuses to run with production settings.
@@ -272,7 +272,7 @@ No libraries are loaded from a CDN.
 
 ## Status
 
-The requirements of the MMoIT 2026 course (13.–14.11.2026) have been implemented, and the load test with 150 participants passed in production on 29.10.2026.
+The requirements of the MMoIT 2026 course have been implemented, and the load test with 150 participants passed in production.
 Acceptance tests and their verification: [docs/hyvaksymistestit.en.md](docs/hyvaksymistestit.en.md).
 Remaining: a trial run with real devices and Teams. The 200-participant load test has been postponed, and question upvotes (Q&A, COULD) were left out.
 

@@ -18,6 +18,16 @@ final class PublicRepoMinimizationTest extends TestCase
         '/\bftp\.hessujarvinen\.com\b/i' => 'FTP-palvelin',
         '/Entry Processes/i' => 'webhotellin prosessiraja',
         '/\bea-php\d+/i' => 'palvelimen PHP-paketti',
+        // Kurssien päivämäärät kertoisivat, milloin palvelu on käytössä (Hessun päätös 2.11.).
+        '/\b2026-11-(1[34]|2[3-9])\b/' => 'kurssin päivämäärä',
+        '/\b1[34]\.?\s?[–-]\s?1[34]\.11\./' => 'kurssin päivämäärä',
+        '/\b2[45]\.?\s?[–-]\s?2[45]\.11\./' => 'kurssin päivämäärä',
+        '/\b1[34]\s?[–-]\s?1[34] Nov\b/i' => 'kurssin päivämäärä',
+    ];
+
+    /** Dokumentaatiossa (Markdown) ei hallintanäkymän osoitteita (Hessun päätös 2.11.). Koodissa reitit ovat väistämättä. */
+    private const DOC_FORBIDDEN = [
+        '#/admin\b#' => 'hallintanäkymän osoite',
     ];
 
     public function testTrackedFilesContainNoInfrastructureDetails(): void
@@ -34,7 +44,8 @@ final class PublicRepoMinimizationTest extends TestCase
             if (!is_string($text) || str_contains($text, "\0")) {
                 continue;   // poistettu tai binääri
             }
-            foreach (self::FORBIDDEN as $pattern => $what) {
+            $patterns = self::FORBIDDEN + (str_ends_with($file, '.md') ? self::DOC_FORBIDDEN : []);
+            foreach ($patterns as $pattern => $what) {
                 if (preg_match($pattern, $text, $m) === 1) {
                     $found[] = $file . ': ' . $what . ' (' . $m[0] . ')';
                 }

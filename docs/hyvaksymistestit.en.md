@@ -1,4 +1,4 @@
-# Acceptance tests – MMoIT 2026 (13.–14.11.2026)
+# Acceptance tests – MMoIT 2026
 
 [Suomi](hyvaksymistestit.md) · **English**
 

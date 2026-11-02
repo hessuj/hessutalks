@@ -1,4 +1,4 @@
-# Hyväksymistestit – MMoIT 2026 (13.–14.11.2026)
+# Hyväksymistestit – MMoIT 2026
 
 **Suomi** · [English](hyvaksymistestit.en.md)
 

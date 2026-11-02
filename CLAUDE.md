@@ -70,7 +70,7 @@ Lisää jokaiselle uudelle ominaisuudelle testit, myös tietoturvatestit (`tests
 - Selainkirjastot päivitetään vain `scripts/update-vendor.sh`-skriptillä (SHA-256-lukitus).
 
 ## Tila
-MMoIT 2026 -kurssin vaatimukset (tapahtuma 13.–14.11.2026, ei julkaisuja tapahtuman aikana, DEPLOY_FREEZE)
+MMoIT 2026 -kurssin vaatimukset (ei julkaisuja tapahtuman aikana, DEPLOY_FREEZE)
 on toteutettu vaiheittain PR:inä #8–#17. Tila ja hyväksymistestit: docs/hyvaksymistestit.md.
 Kuormitustesti (H13) läpi tuotannossa 29.10.: 150 osallistujaa, 0 virhettä, tila staattisesta tiedostosta (200 osallistujan SHOULD siirretty).
 Jäljellä: koeajo oikeilla laitteilla ja Teamsilla (H1, H15).
