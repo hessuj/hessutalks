@@ -3,6 +3,10 @@
 #   push / pull request:  laatu + tietoturvatestit
 #   push main-haaraan:     kaikkien testien jälkeen deploy hessujarvinen.com-webhotelliin (FTPS)
 #
+# Tietoturvaputken vaiheet ajetaan järjestyksessä, ja jokainen tallentaa raporttinsa artefaktiksi:
+#   1) salaisuudet (Gitleaks) → 2) SAST (Semgrep) → 3) SCA (Trivy) → 4) SBOM (Trivy, CycloneDX) → 5) DAST (ZAP)
+# DAST skannaa CI:ssä käynnistettyä testisovellusta (localhost), ei koskaan tuotantoa.
+#
 # Kaikki actionit on kiinnitetty commit-SHA:han (toimitusketjun suojaus). Dependabot päivittää ne.
 
 name: CI/CD
@@ -95,9 +99,32 @@ jobs:
       - name: Kryptografian yhteentoimivuustestit
         run: node --test tests/js/*.test.mjs
 
-  # ---------------------------------------------------------------- SAST
+  # ---------------------------------------------------------------- 1) salaisuuksien vuodot
+  gitleaks:
+    name: Salaisuudet – Gitleaks
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: gitleaks/gitleaks-action@e0c47f4f8be36e29cdc102c57e68cb5cbf0e8d1e # v3.0.0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITLEAKS_ENABLE_UPLOAD_ARTIFACT: false
+      - name: Tallenna raportti
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: 1-gitleaks-raportti
+          path: results.sarif
+          if-no-files-found: warn
+          retention-days: 30
+
+  # ---------------------------------------------------------------- 2) SAST
   semgrep:
     name: SAST – Semgrep
+    needs: gitleaks
     runs-on: ubuntu-latest
     container:
       image: semgrep/semgrep
@@ -111,25 +138,80 @@ jobs:
             --config p/php --config p/javascript --config p/owasp-top-ten --config p/secrets \
             --exclude public/assets/vendor --exclude tests
           python3 scripts/semgrep-annotate.py semgrep.json
+      - name: Tallenna raportti
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: 2-semgrep-raportti
+          path: semgrep.json
+          if-no-files-found: warn
+          retention-days: 30
 
-  # ---------------------------------------------------------------- salaisuuksien vuodot
-  gitleaks:
-    name: Salaisuudet – Gitleaks
+  # ---------------------------------------------------------------- 3) SCA
+  # Riippuvuuksien tunnetut haavoittuvuudet (composer.lock, myös kehitysriippuvuudet). Putki pysähtyy
+  # CRITICAL-tason löydökseen; raportissa ovat kaikki tasot. Selainkirjastot on lukittu SHA-256-summilla
+  # (scripts/verify-vendor.sh), eikä Trivy tunnista niitä.
+  sca:
+    name: SCA – Trivy
+    needs: semgrep
     runs-on: ubuntu-latest
+    env:
+      TRIVY_DB_REPOSITORY: mirror.gcr.io/aquasec/trivy-db:2,ghcr.io/aquasecurity/trivy-db:2
+      TRIVY_SKIP_DIRS: tests,public/assets/vendor
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          fetch-depth: 0
           persist-credentials: false
-      - uses: gitleaks/gitleaks-action@e0c47f4f8be36e29cdc102c57e68cb5cbf0e8d1e # v3.0.0
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Asenna Trivy (SHA-256-lukitus)
+        run: scripts/install-trivy.sh "$RUNNER_TEMP/bin" && echo "$RUNNER_TEMP/bin" >> "$GITHUB_PATH"
+      - name: Raportti (kaikki tasot)
+        run: |
+          trivy fs --scanners vuln --include-dev-deps --format json --output trivy-sca.json .
+          trivy convert --scanners vuln --format table trivy-sca.json | tee trivy-sca.txt
+      - name: Pysäytä CRITICAL-löydökseen
+        run: trivy convert --scanners vuln --severity CRITICAL --exit-code 1 --format table trivy-sca.json
+      - name: Tallenna raportti
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: 3-sca-raportti
+          path: trivy-sca.*
+          if-no-files-found: warn
+          retention-days: 30
 
-  # ---------------------------------------------------------------- DAST
+  # ---------------------------------------------------------------- 4) SBOM
+  # Ainesosaluettelo (CycloneDX JSON) julkaistavasta sovelluksesta: tuotantoriippuvuudet ja vendoroidut
+  # selainkirjastot SHA-256-summineen (scripts/sbom-vendor.py).
+  sbom:
+    name: SBOM – Trivy (CycloneDX)
+    needs: sca
+    runs-on: ubuntu-latest
+    env:
+      TRIVY_SKIP_DIRS: tests,public/assets/vendor
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Asenna Trivy (SHA-256-lukitus)
+        run: scripts/install-trivy.sh "$RUNNER_TEMP/bin" && echo "$RUNNER_TEMP/bin" >> "$GITHUB_PATH"
+      - name: Luo SBOM
+        run: |
+          trivy fs --format cyclonedx --output sbom.cdx.json .
+          python3 scripts/sbom-vendor.py sbom.cdx.json public/assets/vendor/VENDOR.lock
+      - name: Tallenna SBOM
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: 4-sbom-cyclonedx
+          path: sbom.cdx.json
+          if-no-files-found: error
+          retention-days: 90
+
+  # ---------------------------------------------------------------- 5) DAST
+  # Kohde on tässä jobissa käynnistetty testisovellus (localhost, demodata), ei koskaan tuotanto.
   dast:
     name: DAST – OWASP ZAP baseline
     runs-on: ubuntu-latest
-    needs: php
+    needs: [php, sbom]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -160,7 +242,7 @@ jobs:
           cmd_options: '-a -I'
           allow_issue_writing: false
           fail_action: true
-          artifact_name: zap-raportti
+          artifact_name: 5-zap-raportti
       - name: ZAP-löydökset annotaatioiksi
         if: always()
         run: python3 scripts/zap-annotate.py report_json.json
@@ -176,7 +258,7 @@ jobs:
   deploy:
     name: Deploy – hessujarvinen.com
     if: (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && github.ref == 'refs/heads/main'
-    needs: [php, frontend, semgrep, gitleaks, dast]
+    needs: [php, frontend, gitleaks, semgrep, sca, sbom, dast]
     runs-on: ubuntu-latest
     environment:
       name: production
