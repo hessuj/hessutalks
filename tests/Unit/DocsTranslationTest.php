@@ -20,6 +20,7 @@ final class DocsTranslationTest extends TestCase
             'README' => ['README.md', 'README.en.md'],
             'SECURITY' => ['SECURITY.md', 'SECURITY.en.md'],
             'hyväksymistestit' => ['docs/hyvaksymistestit.md', 'docs/hyvaksymistestit.en.md'],
+            'uhkamalli' => ['docs/uhkamalli.md', 'docs/threat-model.md'],
         ];
     }
 
