@@ -16,6 +16,8 @@ Do not open a public issue.
 
 ## Threat model
 
+Architecture, trust boundaries and a STRIDE table with test references: [docs/threat-model.md](docs/threat-model.md).
+
 | Threat | Mitigation |
 |---|---|
 | Database or backup leaks | Messages and nicknames exist only encrypted. The private key is encrypted with an Argon2id passphrase. Only an HMAC hash of each nickname is stored. |

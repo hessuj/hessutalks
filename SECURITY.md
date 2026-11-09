@@ -16,6 +16,8 @@ Ilmoita haavoittuvuuksista yksityisesti GitHubin *Security → Report a vulnerab
 
 ## Uhkamalli
 
+Arkkitehtuuri, luottamusrajat ja STRIDE-taulukko testiviittauksineen: [docs/uhkamalli.md](docs/uhkamalli.md).
+
 | Uhka | Torjunta |
 |---|---|
 | Tietokanta tai varmuuskopio vuotaa | Viestit ja nimimerkit ovat vain salattuina. Yksityinen avain on salattu Argon2id-tunnuslauseella. Nimimerkeistä on tallessa vain HMAC-tiiviste. |
