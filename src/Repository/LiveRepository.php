@@ -129,6 +129,9 @@ final class LiveRepository
         );
         $this->db->exec('UPDATE polls SET on_stage = CASE WHEN id IS ? THEN 1 ELSE 0 END WHERE event_id = ?', [$pollId, $eventId]);
         $this->db->exec('UPDATE events SET active_poll_id = ? WHERE id = ?', [$pollId, $eventId]);
+        if ($pollId !== null) {
+            $this->hideBigQr($eventId);
+        }
         $this->bump($eventId);
         return true;
     }
@@ -145,12 +148,22 @@ final class LiveRepository
         if ($on) {
             $this->db->exec('UPDATE polls SET on_stage = 1 WHERE id = ?', [$pollId]);
             $this->db->exec('UPDATE events SET active_poll_id = ? WHERE id = ?', [$pollId, $eventId]);
+            $this->hideBigQr($eventId);
         } else {
             $this->db->exec("UPDATE polls SET on_stage = 0, status = CASE WHEN status = 'open' THEN 'closed' ELSE status END WHERE id = ?", [$pollId]);
             $this->refocus($eventId, $pollId);
         }
         $this->bump($eventId);
         return true;
+    }
+
+    /**
+     * Näytölle tuotu kysymys tulee näkyviin: iso QR-koodi peittäisi sen (Hessun koeajo 13.11.: QR jäi päälle
+     * edellisestä päivästä, ja näyttö näytti vain koodia). QR:n saa takaisin Q:lla tai napista.
+     */
+    private function hideBigQr(int $eventId): void
+    {
+        $this->db->exec('UPDATE events SET show_qr = 0 WHERE id = ?', [$eventId]);
     }
 
     /** Jos aktiivinen poistui näytöltä, aktiiviseksi tulee viimeinen näytölle jäänyt (tai ei mikään). */

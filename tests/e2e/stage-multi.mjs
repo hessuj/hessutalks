@@ -34,9 +34,13 @@ const question = async (type, prompt, fill) => {
 await question('single', 'Which risk worries you most?', async () => { await admin.fill('#poll-options', 'Phishing\nRansomware\nInsiders'); });
 await question('words', 'One word for security?', async () => {});
 await question('likert', 'Unused third question', async () => {});
+await question('open', 'Ask anything for tomorrow', async () => { await admin.js(`document.querySelector('#poll-multiple').checked = true`); });
 
 // Kaksi kysymystä näytölle: "+ Näytölle" avaa esitysikkunan, ja kumpikin avataan vastauksille.
 await mode(admin, 'live');
+// Iso QR päällä (esim. edellisestä päivästä): näytölle tuotu kysymys tulee silti näkyviin.
+await admin.click('QR isona');
+await admin.waitFor(`!!document.querySelector('.stage-bar .notice.warn')`, 'varoitus isosta QR:stä');
 const stageToggle = (prompt) => admin.js(`(() => {
   const li = [...document.querySelectorAll('.run-list li')].find((x) => x.querySelector('.run-prompt').textContent === ${JSON.stringify(prompt)});
   li.querySelector('.stage-toggle').click(); return true; })()`);
@@ -52,7 +56,9 @@ await admin.click('Avaa vastauksille', 'One word for security?');
 await admin.waitFor(`document.querySelectorAll('.live-control .badge.open').length === 2`, 'kaksi auki');
 await admin.waitFor(admin.hasText('● yhdistetty'), 'esitysnäyttö yhdistetty');
 await stage.waitFor(`document.querySelectorAll('.tile-poll').length === 2`, 'kaksi kysymystä näytöllä');
-step('Kaksi kysymystä näytöllä ja auki yhtä aikaa; esitysikkuna avautui "+ Näytölle"-napista');
+await stage.waitFor(`!document.querySelector('.stage-bigqr')`, 'iso QR väistyi');
+if (await admin.js(`!!document.querySelector('.stage-bar .notice.warn')`)) throw new Error('Varoitus isosta QR:stä jäi näkyviin');
+step('Kaksi kysymystä näytöllä ja auki yhtä aikaa; esitysikkuna avautui "+ Näytölle"-napista, ja päällä ollut iso QR väistyi');
 
 // Osallistuja näkee molemmat ja vastaa kumpaankin.
 const part = await openParticipant(port, admin);
@@ -142,6 +148,35 @@ step('Pois näytöltä: kysymys poistui näytöltä ja osallistujalta, vastaus s
 await admin.click('Tyhjennä näyttö');
 await stage.waitFor(`!document.querySelector('.tile') && !!document.querySelector('.stage-code')`, 'QR-näkymä');
 step('Tyhjennä näyttö: QR-koodi ja liittymiskoodi');
+
+// Avoimia vastauksia enemmän kuin mahtuu (koeajo 13.11.: 10 vastausta, osa jäi näkymättä): ruutu vierittyy.
+await mode(admin, 'live');
+await admin.js(`[...document.querySelectorAll('.run-row')].find((r) => r.querySelector('.run-prompt').textContent === 'Ask anything for tomorrow').click(), true`);
+await admin.waitFor(`document.querySelector('.live-now strong')?.textContent === 'Ask anything for tomorrow'`, 'avoin aktiivinen');
+await admin.click('Avaa vastauksille', 'Ask anything for tomorrow');
+await part.waitFor(`document.querySelector('form.poll textarea')`, 'avoin kysymys osallistujalla');
+const long = (i) => `Answer ${i}: how should we balance patching speed against testing when a critical CVE is published on a Friday afternoon?`;
+for (let i = 1; i <= 10; i++) {
+  await part.js(`(() => { const f = document.querySelector('form.poll'); f.querySelector('textarea').value = ${JSON.stringify(long(i))}; f.requestSubmit(); return true; })()`);
+  await part.waitFor(`document.querySelector('form.poll .notice.ok')?.textContent.includes('${i}')`, 'vastaus ' + i, 8000);
+}
+await admin.click('Näytä tulokset', 'Ask anything for tomorrow');
+await stage.cdp('Emulation.setDeviceMetricsOverride', { width: 1280, height: 720, deviceScaleFactor: 1, mobile: false });
+await stage.waitFor(`document.querySelectorAll('.tile .res-open li').length === 10`, 'kaikki 10 vastausta ruudussa', 8000);
+const box = () => stage.js(`(() => { const r = document.querySelector('.tile .poll-stage-results'); return { sh: r.scrollHeight, ch: r.clientHeight, top: r.scrollTop, oy: getComputedStyle(r).overflowY, bar: r.offsetWidth - r.clientWidth }; })()`);
+const before = await box();
+if (!(before.sh > before.ch + 10) || before.oy !== 'auto' || before.bar < 8) throw new Error('Ei vieritettävä: ' + JSON.stringify(before));
+await stage.js(`(() => { const r = document.querySelector('.tile .poll-stage-results'); r.scrollTop = r.scrollHeight; return true; })()`);
+const lastVisible = await stage.js(`(() => { const r = document.querySelector('.tile .poll-stage-results').getBoundingClientRect(); const li = [...document.querySelectorAll('.tile .res-open li')].find((x) => x.textContent.startsWith('Answer 1:')).getBoundingClientRect(); return li.bottom <= r.bottom + 1 && li.top >= r.top - 1; })()`);
+await shot(stage, 'open-scrolled');
+if (!lastVisible) throw new Error('Vanhin vastaus ei tullut näkyviin vierittämällä');
+const scrolled = (await box()).top;
+// Lista päivittyy (luennoitsija piilottaa uusimman vastauksen), eikä vieritys hyppää alkuun.
+await admin.js(`[...document.querySelectorAll('.run-results .res-open li')].find((li) => li.textContent.startsWith('Answer 10:')).querySelector('button').click(), true`);
+await stage.waitFor(`document.querySelectorAll('.tile .res-open li').length === 9`, 'piilotus näytöllä', 8000);
+const after = await box();
+if (after.top < scrolled - 2 - (before.sh - after.sh)) throw new Error('Vieritys hyppäsi: ' + JSON.stringify({ scrolled, after }));
+step(`Avoimet vastaukset (10 pitkää, 1280×720): ruutu vierittyy (${before.sh} px / ${before.ch} px), vierityspalkki ${before.bar} px näkyvissä, vanhin vastaus esiin vierittämällä, asento säilyy päivityksessä`);
 
 const errs = [...admin.logs, ...part.logs, ...stage.logs];
 if (errs.length) { console.log('Selaimen virheet:\n' + errs.join('\n')); process.exit(1); }

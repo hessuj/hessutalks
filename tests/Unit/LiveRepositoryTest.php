@@ -92,6 +92,30 @@ final class LiveRepositoryTest extends TestCase
         self::assertSame([], $this->live->stageIds($this->eventId));
     }
 
+    /** Hessun koeajo 13.11.: perjantain iso QR jäi päälle ja peitti näytölle tuodut kysymykset. */
+    public function testBringingAQuestionOnScreenHidesTheBigQr(): void
+    {
+        $s = $this->set('M1');
+        $a = $this->poll($s);
+        $b = $this->poll($s);
+        $qr = fn (): int => (int) ($this->db->one('SELECT show_qr FROM events WHERE id = ?', [$this->eventId])['show_qr'] ?? -1);
+        foreach ([
+            'aktivointi' => fn () => $this->live->activate($this->eventId, $a),
+            'näytölle lisäys' => fn () => $this->live->stage($this->eventId, $b, true),
+            'avaus' => fn () => $this->live->open($this->eventId, $a),
+            'seuraava' => fn () => $this->live->step($this->eventId, 1),
+        ] as $what => $action) {
+            $this->events->setShowQr($this->eventId, true);
+            $action();
+            self::assertSame(0, $qr(), $what . ' piilottaa ison QR:n');
+        }
+        $this->events->setShowQr($this->eventId, true);
+        $this->live->activate($this->eventId, null);
+        self::assertSame(1, $qr(), 'Odotusnäkymä ei piilota QR:ää (luennon alku)');
+        $this->live->stage($this->eventId, $a, false);
+        self::assertSame(1, $qr(), 'Näytöltä poisto ei piilota QR:ää');
+    }
+
     public function testStageToggleKeepsAnswersAndMovesFocus(): void
     {
         $s = $this->set('M1');

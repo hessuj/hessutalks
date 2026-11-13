@@ -835,7 +835,7 @@
       var data = tallyFor(poll);
       // Projektorille vain näkyvien avoimien vastausten tekstit (uusimmat), ei tunnisteita. Pitkistä
       // pohdintavastauksista vain alku: koko teksti jää hallintaan ja CSV:hen.
-      if (poll.type === 'open') data = { voters: data.voters, items: data.items.slice(0, 30).map(function (it) { return HessuResults.clip(it.text); }) };
+      if (poll.type === 'open') data = { voters: data.voters, items: data.items.slice(0, 50).map(function (it) { return HessuResults.clip(it.text); }) };
       return {
         kind: 'poll', status: poll.status,
         poll: { id: poll.id, type: poll.type, prompt: poll.prompt, config: HessuResults.publicConfig(poll.config) },
@@ -1480,6 +1480,10 @@
       renderList();
       updateScreens();
     }
+    // Näytölle tuotu sisältö tulee näkyviin: iso QR peittäisi sen (kysymyksille sama tehdään palvelimella).
+    function hideBigQr() {
+      if (panel.showQr()) panel.command('qr');
+    }
     function spotlightItem() {
       if (display.spotlight === null) return null;
       var it = items.filter(function (x) { return x.id === display.spotlight; })[0];
@@ -1516,11 +1520,11 @@
           h('strong', { text: 'Esitysnäyttö' }), stageStatus,
           h('button.btn.small', { type: 'button', text: 'Avaa esitysnäyttö', title: 'Yksi ikkuna projektorille: kaikki näytölle valittu näkyy siinä yhtä aikaa', onclick: ensureStage }),
           displayToggle('Kysymykset projektorille', display.question, 'Osallistujien kysymykset listana näytölle (päälle/pois)', function () {
-            if (!display.question) ensureStage();
+            if (!display.question) { ensureStage(); hideBigQr(); }
             setDisplay({ question: !display.question });
           }),
           displayToggle('Palautteet projektorille', display.feedback, 'Palautteet listana näytölle (päälle/pois)', function () {
-            if (!display.feedback) ensureStage();
+            if (!display.feedback) { ensureStage(); hideBigQr(); }
             setDisplay({ feedback: !display.feedback });
           }),
           displayToggle(panel.showQr() ? 'QR pieneksi' : 'QR isona', panel.showQr(), 'Iso QR-koodi projektorille (Q)', function () { panel.command('qr'); }),
@@ -1529,6 +1533,7 @@
             panel.clear();
           } })),
         h('p.hint', { text: parts.length ? 'Näytöllä: ' + parts.join(', ') + '.' : 'Näytöllä: QR-koodi ja liittymisohje.' }),
+        panel.showQr() ? notice('Iso QR-koodi peittää nyt koko näytön. Paina QR pieneksi tai Q, niin näytön sisältö tulee näkyviin.', 'warn') : null,
         h('p.hint', null, presenterNote)]);
       renderStageStatus();
     }
@@ -1691,6 +1696,7 @@
               setDisplay({ spotlight: null });
             } }) : m ? h('button.btn.small', { type: 'button', text: 'Näytä projektorilla', title: 'Viesti isona näytölle muun sisällön rinnalle', onclick: function () {
               ensureStage();
+              hideBigQr();
               setDisplay({ spotlight: it.id });
               if (it.status === 'new') setStatus(it, 'answered');
             } }) : null,
