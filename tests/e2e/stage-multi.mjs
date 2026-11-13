@@ -1,4 +1,4 @@
-// Hessun koeajo 13.11.: kysymykset, palautteet ja tulokset eivät tulleet näytölle (jokainen näkymä avautui omaan
+// Hessun koeajo luennolla: kysymykset, palautteet ja tulokset eivät tulleet näytölle (jokainen näkymä avautui omaan
 // ikkunaansa), ja kerrallaan vain yksi kysymys oli auki. Nyt yksi esitysikkuna näyttää ruudukkona kaikki näytölle
 // valitut: kaksi kyselyä auki yhtä aikaa (pylväät ja sanapilvi) ja palautelista. Mitataan, ettei mikään mene päällekkäin
 // eikä näytön ulkopuolelle, ja että yhteys palautuu, kun esitysikkuna tai hallinta ladataan uudelleen.
@@ -149,7 +149,7 @@ await admin.click('Tyhjennä näyttö');
 await stage.waitFor(`!document.querySelector('.tile') && !!document.querySelector('.stage-code')`, 'QR-näkymä');
 step('Tyhjennä näyttö: QR-koodi ja liittymiskoodi');
 
-// Avoimia vastauksia enemmän kuin mahtuu (koeajo 13.11.: 10 vastausta, osa jäi näkymättä): ruutu vierittyy.
+// Avoimia vastauksia enemmän kuin mahtuu (koeajo luennolla: 10 vastausta, osa jäi näkymättä): ruutu vierittyy.
 await mode(admin, 'live');
 await admin.js(`[...document.querySelectorAll('.run-row')].find((r) => r.querySelector('.run-prompt').textContent === 'Ask anything for tomorrow').click(), true`);
 await admin.waitFor(`document.querySelector('.live-now strong')?.textContent === 'Ask anything for tomorrow'`, 'avoin aktiivinen');

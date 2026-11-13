@@ -47,7 +47,7 @@ if (stageExpl !== 7) throw new Error('Selityksiä projektorilla ' + stageExpl);
 step('R10: M3-paljastus näyttää 4 oikeaa vaihtoehtoa ja 7 selitystä projektorilla ja osallistujalla');
 
 // R12: vastaukset nollataan vain Valmistelu-tilan kortista varmistuksen jälkeen. Luennon ohjauspalkissa ei ole
-// tyhjennystä: luennon aikana annettuja vastauksia ei poisteta vahingossa (Hessun koeajo 13.11.).
+// tyhjennystä: luennon aikana annettuja vastauksia ei poisteta vahingossa (Hessun koeajo luennolla).
 await admin.waitFor(`document.querySelector('.live-now')?.innerText.includes('1 vastaus')`, 'yksi vastaus', 8000);
 if (await admin.js(`[...document.querySelectorAll('.live-control button, .stage-bar button')].some((b) => b.textContent === 'Tyhjennä vastaukset')`)) {
   throw new Error('Tyhjennä vastaukset luennon ohjauksessa');

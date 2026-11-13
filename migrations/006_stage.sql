@@ -1,4 +1,4 @@
--- Näyttö: useita kysymyksiä yhtä aikaa projektorilla ja osallistujilla (Hessun koeajo 13.11.).
+-- Näyttö: useita kysymyksiä yhtä aikaa projektorilla ja osallistujilla (Hessun koeajo luennolla).
 -- on_stage = kysymys on näytöllä. Aktiivinen kysymys (events.active_poll_id) on näytöllä olevista se,
 -- jota pikanäppäimet ja puhelinohjain ohjaavat. Vastaukset säilyvät: taulua ei rakenneta uudelleen.
 ALTER TABLE polls ADD COLUMN on_stage INTEGER NOT NULL DEFAULT 0 CHECK (on_stage IN (0, 1));

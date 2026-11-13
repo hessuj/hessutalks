@@ -484,7 +484,7 @@
   // ================================================================ esitysnäyttö (projektori)
   //
   // Yksi esitysikkuna (/admin/esitys) jatketulla näytöllä näyttää kaiken näytölle valitun ruudukkona:
-  // kyselyt tuloksineen, kysymys- ja palautelistan ja yksittäisen viestin (Hessun koeajo 13.11.: jokainen
+  // kyselyt tuloksineen, kysymys- ja palautelistan ja yksittäisen viestin (Hessun koeajo luennolla: jokainen
   // näkymä avautui omaan ikkunaansa, ja ikkunat jäivät toistensa taakse). Ikkunassa ei ole salausavainta:
   // tämä ikkuna lähettää sille vain näytettävän sisällön.
   //
@@ -1088,7 +1088,7 @@
     }
 
     // Ohjauspalkki: aktiivinen kysymys (pikanäppäimet ohjaavat sitä) ja muut näytöllä olevat omine nappeineen.
-    // Vastausten tyhjennys on vain Valmistelu-tilassa: luennon aikana annettuja vastauksia ei poisteta (Hessu 13.11.).
+    // Vastausten tyhjennys on vain Valmistelu-tilassa: luennon aikana annettuja vastauksia ei poisteta (Hessun koeajo luennolla).
     function renderControl() {
       var poll = findPoll(active);
       var set = poll ? findSet(poll.set_id) : null;

@@ -71,7 +71,7 @@ final class LiveRepositoryTest extends TestCase
         self::assertSame($a, $this->live->activeId($this->eventId));
         self::assertSame('open', $this->pollStatus($a));
 
-        // Hessun koeajo 13.11.: useita kysymyksiä yhtä aikaa näytölle ja auki.
+        // Hessun koeajo luennolla: useita kysymyksiä yhtä aikaa näytölle ja auki.
         self::assertTrue($this->live->open($this->eventId, $b));
         self::assertSame('open', $this->pollStatus($a), 'Edellinen jää auki näytölle');
         self::assertSame('open', $this->pollStatus($b));
@@ -92,7 +92,7 @@ final class LiveRepositoryTest extends TestCase
         self::assertSame([], $this->live->stageIds($this->eventId));
     }
 
-    /** Hessun koeajo 13.11.: perjantain iso QR jäi päälle ja peitti näytölle tuodut kysymykset. */
+    /** Hessun koeajo luennolla: edellisen luennon iso QR jäi päälle ja peitti näytölle tuodut kysymykset. */
     public function testBringingAQuestionOnScreenHidesTheBigQr(): void
     {
         $s = $this->set('M1');

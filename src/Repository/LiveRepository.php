@@ -9,7 +9,7 @@ use HessuTalks\Database;
 /**
  * Näytöllä olevat kysymykset (projektori ja osallistujat) ja niistä aktiivinen.
  *
- * - Näytöllä voi olla useita kysymyksiä yhtä aikaa (Hessun koeajo 13.11.). Vain näytöllä oleva voi olla auki.
+ * - Näytöllä voi olla useita kysymyksiä yhtä aikaa (Hessun koeajo luennolla). Vain näytöllä oleva voi olla auki.
  *   Näytöltä poistettu kysymys suljetaan, jos se oli auki. Vastaukset säilyvät aina.
  * - Aktiivinen kysymys on näytöllä olevista se, jota pikanäppäimet ja puhelinohjain ohjaavat.
  * - Seuraava/Edellinen ja aktivointi vaihtavat näytölle yhden kysymyksen: muut poistetaan näytöltä.
@@ -158,7 +158,7 @@ final class LiveRepository
     }
 
     /**
-     * Näytölle tuotu kysymys tulee näkyviin: iso QR-koodi peittäisi sen (Hessun koeajo 13.11.: QR jäi päälle
+     * Näytölle tuotu kysymys tulee näkyviin: iso QR-koodi peittäisi sen (Hessun koeajo luennolla: QR jäi päälle
      * edellisestä päivästä, ja näyttö näytti vain koodia). QR:n saa takaisin Q:lla tai napista.
      */
     private function hideBigQr(int $eventId): void

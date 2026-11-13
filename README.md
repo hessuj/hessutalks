@@ -161,7 +161,7 @@ avaimella on molemmat kielet.
 | Väärinkäyttö | Nimimerkki- ja luentokohtaiset rajat, haasteiden kertakäyttöisyys, tietoturvaloki |
 | Tallennus | SQLite webrootin ulkopuolella, parametrisoidut kyselyt, `secure_delete` |
 
-Tarkempi uhkamalli ja jäännösriskit: [SECURITY.md](SECURITY.md).
+Tarkempi uhkamalli ja jäännösriskit: [SECURITY.md](SECURITY.md). Esimerkki poikkeaman käsittelystä: [esitysnäytön poikkeamakatselmus](docs/poikkeama-esitysnaytto.md).
 
 ## CI/CD-putki
 
