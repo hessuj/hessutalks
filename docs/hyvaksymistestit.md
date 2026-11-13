@@ -17,7 +17,7 @@ Todennustavat:
 | H1 | Liittyminen QR-koodilla iPhonella, Androidilla ja läppärillä | 🧪 | Selain: luennon linkki avaa odotusnäkymän ilman kirjautumista (`live-polls.mjs`). Oikeat laitteet koeajossa. |
 | H2 | Esittäjä avaa T1-kysymyksen, näkymä vaihtuu alle 2 s:ssa | ✅ | Selain: *Avaa vastauksille* → osallistujan näkymä vaihtui 1,0–1,6 s:ssa ilman päivitystä (paikallinen palvelin, pollaus 1,2 s). Tuotannon verkkoviive tarkistetaan koeajossa. |
 | H3 | Vastauksen vaihto T1:ssä: vain viimeisin lasketaan | ✅ | Selain: vastaus ja muutos → hallinnassa 1 vastaus. PHPUnit `testSameBrowserReplacesItsAnswer`. |
-| H4 | Sulkeminen estää vastaamisen ja osallistuja näkee tilan | ✅ | Selain: *Sulje vastaukset* → "This poll is closed", kentät pois käytöstä. PHPUnit `testAnswerRequiresOpenPollOfThisEvent` (myös: auki mutta ei aktiivinen → 409). |
+| H4 | Sulkeminen estää vastaamisen ja osallistuja näkee tilan | ✅ | Selain: *Sulje vastaukset* → "This poll is closed", kentät pois käytöstä. PHPUnit `testAnswerRequiresOpenPollOfThisEvent` (myös: auki mutta ei näytöllä → 409), `testSeveralPollsOnStageAcceptAnswersUntilRemoved`. |
 | H5 | T2-asteikko: jakauma ja keskiarvo oikein | ✅ | Node `results.test.mjs` (jakaumat ja tunnusluvut). T2 = Likert 5 selitteineen. |
 | H6 | T3: `<script>alert(1)</script>` näkyy tekstinä | ✅ | Selain `open-text.mjs`: osallistuja lähettää `<script>alert(1)</script><img src=x onerror=alert(2)>`, ja se näkyy tekstinä hallinnassa ja projektorilla. Yhtään elementtiä tai alert-dialogia ei synny (testi epäonnistuisi alertista). Node `results.test.mjs` (teksti säilyy tekstinä), PHPUnit `testBrowserScriptsNeverUseHtmlInjectionSinks` (ei innerHTML:ää missään skriptissä). |
 | H7 | Moderointi T3:ssa: piilotettu katoaa heti | ✅ | Selain `open-text.mjs`: *Piilota* → vastaus katosi projektorilta muutamassa millisekunnissa. Piilotus säilyy uudelleenlatauksen yli (salattuna palvelimella). Kirosanasuodatin piilottaa osumat tarkistettavaksi; hyväksyntä tuo ne näkyviin. |
@@ -41,7 +41,8 @@ Todennustavat:
 | 5 | Oikea vastaus, selitykset, paljastus, tulosten näyttö/piilotus, tulokset osallistujille (SHOULD 4.8) | ✅ PR #14 (`reveal.mjs`) |
 | 6 | Esitysnäkymä, pikanäppäimet (myös esitysohjain), iso QR, teemat, puhelinohjain (SHOULD 5.3) | ✅ PR #15 (`presenter.mjs`) |
 | 7 | Nopeusrajat (laite 10/min, osoitetiiviste 600/min hiljaa), julkaisujäädytys | ✅ PR #16 (`DeployFreezeTest`) |
-| 8 | SHOULD: CSV-vienti (kaavainjektion esto), sarjan monistus, kysymyksen siirto, esikatselu. (Tulokset osallistujille, teemat, kirosanasuodatin ja puhelinohjain tehtiin vaiheissa 4–6.) | ✅ tämä PR (`should.mjs`) |
+| 8 | SHOULD: CSV-vienti (kaavainjektion esto), sarjan monistus, kysymyksen siirto, esikatselu. (Tulokset osallistujille, teemat, kirosanasuodatin ja puhelinohjain tehtiin vaiheissa 4–6.) | ✅ PR #17 (`should.mjs`) |
+| 9 | Koeajon 13.11. korjaukset: yksi esitysikkuna ruudukkona (kysymykset, kysymys- ja palautelista, viesti), useita kysymyksiä näytöllä ja auki yhtä aikaa, yhteys palautuu uudelleenlatauksen jälkeen, vastausten tyhjennys vain Valmistelu-tilassa | ✅ tämä PR (`stage-multi.mjs`, `testSeveralPollsOnStageAcceptAnswersUntilRemoved`, `testStageMigrationKeepsAnswersAndActivePoll`) |
 
 ## Vaatimusten kattavuus
 

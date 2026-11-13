@@ -27,7 +27,7 @@ await admin.js(`(() => {
   return true;
 })()`);
 await mode(admin, 'live');
-await admin.click('Aktiivinen projektorille');
+await admin.click('Avaa esitysnäyttö');
 await attach(port, '/admin/esitys');   // esitysikkunan tahdistusviestit hallinnalle
 step('Hallinta ja esitysikkuna auki, viestihaun vastaukset palaavat väärässä järjestyksessä (3 s / 0,1 s)');
 

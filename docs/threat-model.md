@@ -25,8 +25,8 @@ flowchart LR
   P -- "HTTPS: sealed-box ciphertext, form token" --> PHP
   P -- "HTTPS: poll state (public content)" --> W
   A -- "HTTPS: passkey session, CSRF token" --> PHP
-  A -- "postMessage, same origin: text to display" --> S
-  S -. "postMessage: commands only" .-> A
+  A -- "BroadcastChannel, same origin, secret identifier: text to display" --> S
+  S -. "BroadcastChannel: commands only" .-> A
   PHP -- "parametrised SQL" --> DB
   PHP -- "writes public state" --> W
 ```
@@ -35,7 +35,7 @@ flowchart LR
 |---|---|---|
 | Participant browser | Nothing: any client can be modified | Random device identifier, the lecturer's public key |
 | Presenter browser (admin window) | Decryption and result computation | Private key in memory, unlocked with a passkey (PRF) or passphrase |
-| Projector window | Displaying text only | No key, no API access, accepts messages only from its opener |
+| Projector window | Displaying text only | No key, no API access, listens only to the channel chosen by the admin view (identifier in the URL fragment) |
 | Server (PHP, Apache) | Authorisation, rate limits, availability | Ciphertexts, HMAC hashes, public poll content; never plaintext messages or answers |
 | Database (SQLite) | Storage | As above; outside the web root |
 

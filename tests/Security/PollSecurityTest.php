@@ -52,7 +52,7 @@ final class PollSecurityTest extends AppTestCase
         self::assertIsArray($valid);
         $event = $eventId ?? $this->eventId;
         $id = (int) $repo->create($event, $eventId === null ? $this->setId : $this->set($event, 'S' . random_int(1, 99999)), $type, $valid[0], $valid[1]);
-        // Avoin kysely on aina luennon aktiivinen kysymys.
+        // Avoin kysely on aina näytöllä (ja viimeksi avattu aktiivinen).
         if ($status === 'open') {
             (new LiveRepository($this->db))->open($event, $id);
         } else {
@@ -127,7 +127,7 @@ final class PollSecurityTest extends AppTestCase
         self::assertSame(409, $this->answer($this->poll('closed'))->status);
         $notActive = $this->poll('draft');
         (new PollRepository($this->db, $this->clock, str_repeat('ab', 32)))->setStatus($notActive, 'open');
-        self::assertSame(409, $this->answer($notActive)->status, 'Auki mutta ei aktiivinen: ei vastauksia');
+        self::assertSame(409, $this->answer($notActive)->status, 'Auki mutta ei näytöllä: ei vastauksia');
         self::assertSame(409, $this->answer(999999)->status);
         self::assertSame(409, $this->answer(0, ['poll' => '1'])->status, 'Kyselyn id:n pitää olla kokonaisluku');
 
@@ -135,6 +135,37 @@ final class PollSecurityTest extends AppTestCase
         $foreign = $this->poll('open', 'single', ['options' => ['A', 'B']], (int) $other['id']);
         self::assertSame(409, $this->answer($foreign)->status, 'Toisen luennon kyselyyn ei voi vastata tämän luennon lomakkeella');
         self::assertSame(0, (int) ($this->db->one('SELECT COUNT(*) AS n FROM poll_answers')['n'] ?? -1));
+    }
+
+    /** Hessun koeajo 13.11.: useita kysymyksiä näytöllä ja auki yhtä aikaa; näytöltä poisto sulkee, vastaukset säilyvät. */
+    public function testSeveralPollsOnStageAcceptAnswersUntilRemoved(): void
+    {
+        $a = $this->poll();
+        $b = $this->poll('open', 'words', []);
+        self::assertSame(201, $this->answer($a)->status);
+        self::assertSame(201, $this->request('POST', '/api/polls/answer', [
+            'code' => $this->code, 'token' => $this->token, 'poll' => $b, 'voter' => self::voter(), 'ciphertext' => $this->seal('{"v":1,"p":' . $b . ',"a":"x"}'),
+        ])->status);
+        $live = $this->json($this->request('GET', '/api/live?code=' . $this->code));
+        self::assertSame([$a, $b], array_column($live['polls'], 'id'));
+        self::assertSame($b, $live['poll']['id'], 'Vanhat osallistujasivut näkevät aktiivisen');
+        foreach ($live['polls'] as $p) {
+            self::assertSame(['id', 'type', 'prompt', 'config', 'generation', 'status', 'results', 'reveal'], array_keys($p));
+        }
+
+        $h = ['X-CSRF-Token' => $this->loginAdmin()];
+        self::assertSame(422, $this->request('POST', '/admin/api/polls/' . $a . '/stage', ['on' => 'no'], $h)->status);
+        self::assertSame(403, $this->request('POST', '/admin/api/polls/' . $a . '/stage', ['on' => false])->status, 'CSRF-token vaaditaan');
+        self::assertSame(200, $this->request('POST', '/admin/api/polls/' . $a . '/stage', ['on' => false], $h)->status);
+        self::assertSame(409, $this->answer($a, ['voter' => self::voter('myohassa')])->status, 'Näytöltä poistettu ei ota vastauksia');
+        self::assertSame([$b], array_column($this->json($this->request('GET', '/api/live?code=' . $this->code))['polls'], 'id'));
+        self::assertSame(1, (int) ($this->db->one('SELECT COUNT(*) AS n FROM poll_answers WHERE poll_id = ?', [$a])['n'] ?? 0), 'Vastaukset säilyvät');
+
+        // Luonnos näytöllä: osallistuja ei näe sitä eikä voi vastata.
+        $draft = $this->poll('draft');
+        self::assertSame(200, $this->request('POST', '/admin/api/polls/' . $draft . '/stage', ['on' => true], $h)->status);
+        self::assertSame([$b], array_column($this->json($this->request('GET', '/api/live?code=' . $this->code))['polls'], 'id'));
+        self::assertSame(409, $this->answer($draft)->status);
     }
 
     public function testAnswerRequiresTokenOriginAndCiphertext(): void
@@ -315,12 +346,15 @@ final class PollSecurityTest extends AppTestCase
         $foreign = $this->poll('draft', 'words', [], (int) $this->createEvent('Toinen')['id']);
         self::assertSame(404, $this->request('POST', $base . '/live', ['action' => 'activate', 'poll' => $foreign], $h)->status);
 
-        // Avaaminen tekee aktiiviseksi; sarjan poisto poistaa kysymykset ja aktiivisuuden.
+        // Avaaminen tuo näytölle muiden rinnalle ja tekee aktiiviseksi; sarjan poisto poistaa kysymykset
+        // näytöltä, ja aktiiviseksi jää näytölle jäänyt.
         self::assertSame(200, $this->request('POST', '/admin/api/polls/' . $b . '/status', ['status' => 'open'], $h)->status);
-        self::assertSame($b, $this->json($this->request('GET', $base . '/polls'))['active']);
+        $state = $this->json($this->request('GET', $base . '/polls'));
+        self::assertSame($b, $state['active']);
+        self::assertSame([true, true], array_column($state['polls'], 'on_stage'));
         self::assertSame(200, $this->request('POST', '/admin/api/sets/' . $m2 . '/delete', [], $h)->status);
         $state = $this->json($this->request('GET', $base . '/polls'));
-        self::assertNull($state['active']);
+        self::assertSame($a, $state['active']);
         self::assertSame([$a], array_column($state['polls'], 'id'));
         self::assertNull($this->json($this->request('GET', '/api/live?code=' . $this->code))['poll']);
     }

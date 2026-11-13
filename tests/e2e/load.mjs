@@ -25,7 +25,7 @@ await admin.waitFor(admin.hasText('Which control matters most?'), 'kysymys');
 const url = await admin.js(`document.querySelector('.share .url a').href`);
 
 await mode(admin, 'live');
-await admin.click('Aktiivinen projektorille');
+await admin.click('Avaa esitysnäyttö');
 const stage = await attach(port, '/admin/esitys');
 await stage.cdp('Emulation.setDeviceMetricsOverride', { width: 1920, height: 1080, deviceScaleFactor: 1, mobile: false });
 

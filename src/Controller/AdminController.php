@@ -142,7 +142,7 @@ final class AdminController
         if (preg_match('#^events/(\d{1,10})/(polls|poll-answers|sets|live|import|export)$#', $route, $m) === 1) {
             return $this->eventPolls($req, (int) $m[1], $m[2], $in, $client);
         }
-        if (preg_match('#^polls/(\d{1,10})/(update|status|delete|reset|move|moderation|results|reveal|summary|set)$#', $route, $m) === 1 && $req->method === 'POST') {
+        if (preg_match('#^polls/(\d{1,10})/(update|status|delete|reset|move|moderation|results|reveal|summary|set|stage)$#', $route, $m) === 1 && $req->method === 'POST') {
             return $this->pollAction((int) $m[1], $m[2], $in, $client);
         }
         if (preg_match('#^sets/(\d{1,10})/(update|move|skip|delete|duplicate)$#', $route, $m) === 1 && $req->method === 'POST') {
@@ -493,8 +493,15 @@ final class AdminController
                 }
                 $this->live->bump((int) $event['id']);
                 break;
+            case 'stage':
+                // Näytölle muiden rinnalle tai pois näytöltä (pois = suljetaan; vastaukset säilyvät).
+                if (!is_bool($in['on'] ?? null)) {
+                    return Response::error('Virheellinen arvo.', 422);
+                }
+                $this->live->stage((int) $event['id'], $id, $in['on']);
+                break;
             case 'status':
-                // Avaaminen tekee kyselystä aktiivisen (vain aktiivinen voi olla auki).
+                // Avaaminen tuo kyselyn näytölle muiden rinnalle ja tekee siitä aktiivisen.
                 $status = is_string($in['status'] ?? null) ? $in['status'] : '';
                 if ($status === 'open') {
                     $this->live->open((int) $event['id'], $id);
@@ -589,6 +596,7 @@ final class AdminController
             'moderation' => is_string($poll['moderation'] ?? null) ? $poll['moderation'] : null,
             'results_visible' => ($poll['results_visible'] ?? false) === true,
             'revealed' => ($poll['revealed'] ?? false) === true,
+            'on_stage' => ($poll['on_stage'] ?? false) === true,
             'position' => (int) ($poll['position'] ?? 0),
             'url' => $this->config->publicOrigin . $this->config->url('/k/' . (string) ($event['code'] ?? '')),
         ];

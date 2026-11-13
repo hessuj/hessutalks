@@ -160,9 +160,9 @@ final class ParticipantController
     }
 
     /**
-     * Luennon aktiivinen kysymys. Selain kysyy tätä noin sekunnin välein. Jos ?v vastaa luennon
+     * Luennon näytöllä olevat kysymykset (polls) ja aktiivinen (poll). Selain kysyy tätä noin sekunnin välein. Jos ?v vastaa luennon
      * live_versionia, palautetaan vain {"unchanged": true}: yksi tietokantakysely, pieni vastaus.
-     * poll = null tarkoittaa odotusnäkymää.
+     * Tyhjä polls tarkoittaa odotusnäkymää. poll on vanhojen osallistujasivujen yhteensopivuutta varten.
      */
     public function live(Request $req): Response
     {
@@ -183,7 +183,11 @@ final class ParticipantController
         if (($req->query['v'] ?? null) === (string) $version) {
             return Response::json(['v' => $version, 'unchanged' => true]);
         }
-        return Response::json(['v' => $version, 'poll' => $this->live->participantPoll($event)]);
+        return Response::json([
+            'v' => $version,
+            'poll' => $this->live->participantPoll($event),
+            'polls' => $this->live->participantPolls((int) $event['id']),
+        ]);
     }
 
     /** Tallentaa salatun kyselyvastauksen. Saman selaimen uusi vastaus korvaa aiemman. */
@@ -197,8 +201,8 @@ final class ParticipantController
 
         $pollId = $in['poll'] ?? null;
         $poll = is_int($pollId) ? $this->polls->find($pollId) : null;
-        // Vain aktiivinen ja avoin kysymys ottaa vastaan vastauksia.
-        if ($poll === null || $poll['event_id'] !== $eventId || $poll['status'] !== 'open' || $this->live->activeId($eventId) !== $poll['id']) {
+        // Vain näytöllä oleva ja avoin kysymys ottaa vastaan vastauksia.
+        if ($poll === null || $poll['event_id'] !== $eventId || !$this->live->answerable($eventId, (int) $poll['id'])) {
             return Response::error(I18n::t($lang, 'err.poll_closed'), 409);
         }
         $openChars = $poll['type'] === 'open' ? PollRepository::openMax($poll) : PollRepository::OPEN_MAX;

@@ -51,7 +51,7 @@ step('H6 (hallinta): <script> ja <img onerror> näkyvät tekstinä; kirosanasuod
 
 // Projektori (tulokset ovat oletuksena piilossa: luennoitsija näyttää ne)
 await admin.click('Näytä tulokset');
-await admin.click('Aktiivinen projektorille');
+await admin.click('Avaa esitysnäyttö');
 const stage = await attach(port, '/admin/esitys');
 await stage.waitFor(`[...document.querySelectorAll('.res-open-text')].some((e) => e.textContent === ${JSON.stringify(XSS)})`, 'XSS-teksti projektorilla');
 if (await stage.js(`!!document.querySelector('#presenter img:not([alt="QR-koodi"]), #presenter script')`)) throw new Error('XSS: elementti syntyi projektorille');

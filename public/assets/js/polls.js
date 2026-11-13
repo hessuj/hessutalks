@@ -1,7 +1,7 @@
 /*
  * HessuTalks – osallistujan kyselyt (monivalinta, sanapilvi, Likert, asteikko).
  *
- * Näkyvissä on aina luennon aktiivinen kysymys tai odotusnäkymä. Selain kysyy tilaa noin sekunnin
+ * Näkyvissä ovat luennon näytöllä olevat kysymykset (yksi tai useampi) tai odotusnäkymä. Selain kysyy tilaa noin sekunnin
  * välein (lyhyt pollaus HTTPS:n yli, ei WebSocketia: toimii kaikissa verkoissa). Yhteyskatkon jälkeen
  * yritetään uudelleen kasvavalla viiveellä, ja oma vastaus palautetaan selaimen muistista.
  *
@@ -44,7 +44,8 @@
   }
 
   var version = null;
-  var current = null;      // { sig, el } näkyvissä oleva kysymys tai odotusnäkymä
+  var cards = [];          // [{ id, sig, el }] näkyvissä olevat kysymykset näytön järjestyksessä
+  var waitingEl = null;    // odotusnäkymä, kun yhtään kysymystä ei ole näytöllä
   var sodium = null;
   var publicKey = null;
   var timer = null;
@@ -310,16 +311,34 @@
     }
   }
 
-  /** Näyttää aktiivisen kysymyksen tai odotusnäkymän. Keskeneräinen vastaus säilyy, jos mikään ei muuttunut. */
-  function render(poll) {
-    var sig = poll ? JSON.stringify([poll.id, poll.type, poll.prompt, poll.config, poll.generation, poll.status]) : 'waiting';
-    if (!current || current.sig !== sig) {
-      var el = poll ? buildCard(poll) : waitingView();
-      if (current) current.el.replaceWith(el); else box.appendChild(el);
-      current = { sig: sig, el: el };
-    }
-    if (poll && current.el.resultsBox) updateExtras(current.el, poll);
+  /**
+   * Näyttää näytöllä olevat kysymykset tai odotusnäkymän. Kortti piirretään uudelleen vain, jos sen kysymys
+   * muuttui: keskeneräinen vastaus säilyy, vaikka muita kysymyksiä tulee tai poistuu.
+   */
+  function render(list) {
+    var prev = {};
+    cards.forEach(function (c) { prev[c.id] = c; });
+    var next = list.map(function (poll) {
+      var sig = JSON.stringify([poll.id, poll.type, poll.prompt, poll.config, poll.generation, poll.status]);
+      var c = prev[poll.id];
+      if (!c || c.sig !== sig) c = { id: poll.id, sig: sig, el: buildCard(poll) };
+      updateExtras(c.el, poll);
+      return c;
+    });
+    if (!next.length && !waitingEl) waitingEl = waitingView();
+    if (next.length) waitingEl = null;
+    var nodes = next.length ? next.map(function (c) { return c.el; }) : [waitingEl];
+    // Järjestys ja sisältö: vain muuttuneet solmut vaihtuvat (fokus ja kirjoitettu teksti säilyvät).
+    nodes.forEach(function (n, i) { if (box.children[i] !== n) box.insertBefore(n, box.children[i] || null); });
+    while (box.children.length > nodes.length) box.lastChild.remove();
+    cards = next;
     zone.hidden = false;
+  }
+
+  /** Tilan kysymykset: uusi muoto (polls) tai vanha yhden kysymyksen muoto (poll). */
+  function pollsOf(data) {
+    if (Array.isArray(data.polls)) return data.polls.filter(function (p) { return p && typeof p === 'object'; });
+    return data.poll && typeof data.poll === 'object' ? [data.poll] : [];
   }
 
   function schedule(ms) {
@@ -371,8 +390,8 @@
       var data = r.data;
       if (r.status === 410) {
         stopped = true;
-        render(null);
-        current.el.replaceChildren(h('p', 'notice', data.error || ''));
+        render([]);
+        waitingEl.replaceChildren(h('p', 'notice', data.error || ''));
         return;
       }
       if (!r.ok) throw new Error(String(r.status));
@@ -381,7 +400,7 @@
       // Tiedosto palauttaa aina koko tilan: piirretään vain, kun versio muuttui.
       if (!data.unchanged && data.v !== version) {
         version = typeof data.v === 'number' ? data.v : null;
-        render(data.poll && typeof data.poll === 'object' ? data.poll : null);
+        render(pollsOf(data));
       }
       schedule(POLL_MS);
     }).catch(function () {
@@ -395,7 +414,7 @@
 
   // Esikatselu (hallinnan /admin/esikatselu): kortti piirretään sivun datasta, mitään ei haeta eikä lähetetä.
   if (previewMode) {
-    try { render(JSON.parse(box.dataset.preview)); } catch (e) { box.textContent = 'Esikatselu epäonnistui.'; }
+    try { render([JSON.parse(box.dataset.preview)]); } catch (e) { box.textContent = 'Esikatselu epäonnistui.'; }
     return;
   }
 
@@ -406,7 +425,7 @@
       publicKey = sodium.from_base64(ask.dataset.pk, sodium.base64_variants.ORIGINAL);
       if (publicKey.length !== sodium.crypto_box_PUBLICKEYBYTES) throw new Error('key');
       box.parentNode.insertBefore(reconnect, box);
-      render(null);
+      render([]);
       refresh();
       document.addEventListener('visibilitychange', function () { if (!document.hidden) { failures = 0; refresh(); } });
       window.addEventListener('online', function () { failures = 0; refresh(); });

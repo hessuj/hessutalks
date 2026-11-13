@@ -395,17 +395,25 @@ final class AdminSecurityTest extends AppTestCase
         self::assertSame('DENY', $r->headers['X-Frame-Options'] ?? null);
     }
 
-    public function testPresenterScriptAcceptsOnlyOpenerMessagesAndUsesTextContent(): void
+    public function testPresenterUsesSecretChannelAndTextContent(): void
     {
         $js = (string) file_get_contents(dirname(__DIR__, 2) . '/public/assets/js/presenter.js');
-        self::assertStringContainsString('ev.origin !== window.location.origin', $js);
-        self::assertStringContainsString('ev.source !== window.opener', $js);
+        // Kanava (vain sama origin) on nimetty hallinnan arpomalla tunnisteella, joka tulee URL:n #-osasta
+        // (ei lähde palvelimelle). Ilman kelvollista tunnistetta ikkuna ei kuuntele mitään.
+        self::assertStringContainsString("new BroadcastChannel('hessutalks-esitys-' + id)", $js);
+        self::assertStringContainsString('window.location.hash.slice(1)', $js);
+        self::assertStringContainsString('/^[A-Za-z0-9_-]{22}(\\.p)?$/.test(id)', $js);
+        self::assertStringNotContainsString("addEventListener('message'", $js, 'Ei postMessage-viestejä muilta ikkunoilta');
         self::assertSame(0, preg_match('/\\.(innerHTML|outerHTML)\\b|insertAdjacentHTML|document\\.write/', $js));
         self::assertStringNotContainsString('sodium', $js);
-        // Hallinta lähettää viestit vain omaan originiinsa, ei koskaan '*'.
+        // Hallinta arpoo tunnisteen selaimen satunnaislukugeneraattorilla (16 tavua) ja käyttää samaa kanavaa.
         $admin = (string) file_get_contents(dirname(__DIR__, 2) . '/public/assets/js/admin.js');
-        self::assertStringNotContainsString("postMessage(msg, '*')", $admin);
-        self::assertSame(0, preg_match('/postMessage\([^)]*[\'"]\*[\'"]/', $admin . $js));
+        self::assertStringContainsString('window.crypto.getRandomValues(b)', $admin);
+        self::assertStringContainsString('new Uint8Array(16)', $admin);
+        self::assertStringContainsString("new BroadcastChannel('hessutalks-esitys-' + STAGE_TOKEN + suffix)", $admin);
+        self::assertSame(0, preg_match('/postMessage\\([^)]*[\'"]\\*[\'"]/', $admin . $js));
+        // Purettu viesti ei jää selaimen tallennukseen: näytön tila muistaa viestistä vain id:n.
+        self::assertStringContainsString("display.spotlight = Number.isInteger(saved.spotlight) ? saved.spotlight : null", $admin);
     }
 
     // ------------------------------------------------------------ turvaotsakkeet

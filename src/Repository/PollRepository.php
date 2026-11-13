@@ -500,7 +500,7 @@ final class PollRepository
                 $row[$k] = (int) $row[$k];
             }
         }
-        foreach (['skipped', 'results_visible', 'revealed'] as $k) {
+        foreach (['skipped', 'results_visible', 'revealed', 'on_stage'] as $k) {
             if (isset($row[$k])) {
                 $row[$k] = (bool) $row[$k];
             }

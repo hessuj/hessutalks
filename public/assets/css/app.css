@@ -444,6 +444,28 @@ label.check input { width: auto; }
 .poll-stage-code { font: 700 max(28px, min(3vw, 4.4vh))/1 var(--mono); letter-spacing: .1em; margin: 0 0 .4vh; }
 .poll-stage-foot { margin-top: auto; }
 
+/* Ruudukko: useita kyselyitä, listoja ja viesti yhtä aikaa yhdessä ikkunassa (Hessun koeajo 13.11.).
+   Fonttikoot ruudun koon mukaan (cqw/cqh): yksi ruutu on yhtä iso kuin ennen, useampi kutistuu. */
+.stage.board { justify-content: flex-start; align-items: stretch; text-align: left; gap: 1.6vh; padding: 3vh 3vw; }
+.board-grid { flex: 1 1 0; min-height: 0; display: grid; gap: 2vh 1.6vw; }
+.tile { container-type: size; min-width: 0; min-height: 0; overflow: hidden; display: flex; flex-direction: column; gap: 1.4vh; }
+.stage.board.multi .tile { border: 2px solid var(--frame); padding: 1.2vh 1.2vw; }
+.tile .poll-stage-prompt { flex: none; font-size: clamp(16px, min(4.4cqw, 9cqh), 64px); }
+.tile .poll-stage-results { --res-text: clamp(13px, min(3.1cqw, 6cqh), 40px); }
+.tile .poll-stage-results .res-columns { max-height: none; }
+.tile .poll-stage-results .res-row { margin: .9cqh 0; }
+.tile .poll-stage-count { flex: none; margin: 0; font-size: clamp(12px, min(2.2cqw, 4cqh), 34px); }
+.tile .stage-url { flex: none; font-size: clamp(14px, min(3cqw, 5.5cqh), 44px); }
+.tile .stage-empty { margin: 0; font-size: clamp(14px, min(3cqw, 5cqh), 40px); color: var(--ink-dim); }
+.tile-list .stage-list { flex: 1 1 0; min-height: 0; width: 100%; gap: 1.2cqh; }
+.tile .stage-list li { border-left-width: max(4px, .8cqw); padding: .4cqh 1.2cqw; }
+.tile .stage-nick { font-size: clamp(11px, min(1.6cqw, 3cqh), 26px); }
+.tile .stage-list-text { font-size: clamp(12px, min(2.2cqw, 4cqh), 34px); }
+.tile .stage-q { max-width: none; font-size: clamp(14px, min(4.5cqw, 8cqh), 72px); }
+.stage.board .poll-stage-foot { flex: none; }
+.stage.board.multi .poll-stage-foot img { height: min(11vh, 10vw); }
+.stage.board .poll-stage-count:empty { display: none; }
+
 /* Iso QR-koodi (Q) peittää esitysnäkymän. */
 .stage-bigqr {
   position: fixed; inset: 0; z-index: 20; background: var(--screen); border: var(--frame-w) solid var(--frame);
@@ -469,3 +491,18 @@ body.presenter.light .res-open li { background: #f1f0f8; }
 .remote-btn { min-height: 4.2rem; font-size: 1.1rem; width: 100%; }
 .shortcuts { font-size: .8rem; }
 .move-set { width: auto; max-width: 14rem; font-size: .85rem; padding: .2rem .4rem; }
+
+/* ---- hallinta: esitysnäytön palkki ja näytöllä olevat kysymykset ---- */
+.stage-bar { border: 2px solid var(--frame); padding: .6rem .8rem; margin: 0 0 1rem; display: grid; gap: .45rem; }
+.stage-bar .q-actions { display: flex; flex-wrap: wrap; gap: .4rem; align-items: center; }
+.stage-bar .hint { margin: 0; }
+.stage-status { font: 600 .85rem var(--mono); }
+.stage-status.ok { color: var(--ok); }
+.stage-row { display: flex; flex-wrap: wrap; gap: .4rem .6rem; align-items: center; padding: .4rem .5rem; border-left: 4px solid var(--frame); }
+.stage-row.focus { border-left-color: var(--accent); background: rgba(127, 211, 219, .08); }
+.stage-row strong { overflow-wrap: anywhere; flex: 1 1 14rem; }
+.stage-row .badge { margin-left: 0; }
+.run-list li { display: flex; gap: .3rem; align-items: stretch; }
+.run-list li > .run-row { flex: 1; min-width: 0; }
+.run-row.staged { border-color: var(--accent); }
+.stage-toggle { white-space: nowrap; }

@@ -1,6 +1,6 @@
 // MMoIT-vaatimukset v2 (2.11.): R9 ei paljastusnappia ilman oikeaa vastausta, R10 multi-paljastus (4 oikeaa ja
-// 7 selitystä), R11 pitkät vaihtoehdot rivittyvät projektorilla ja puhelimessa, R12 aktiivisen kysymyksen
-// vastausten nollaus varmistuksen jälkeen, sekä luennon otsikon muokkaus (koodi pysyy).
+// 7 selitystä), R11 pitkät vaihtoehdot rivittyvät projektorilla ja puhelimessa, R12 kysymyksen vastausten
+// nollaus Valmistelu-tilassa varmistuksen jälkeen (ei luennon ohjauksessa), sekä luennon otsikon muokkaus (koodi pysyy).
 // Ajo: scripts/e2e.sh mmoit-must.mjs  (tai node tests/e2e/mmoit-must.mjs <cdp-port> <app-url>)
 import { fileURLToPath } from 'node:url';
 import { tab, attach, step, setupAdmin, createEvent, openParticipant, openPoll, mode } from './lib.mjs';
@@ -36,7 +36,7 @@ await openPoll(admin, 'Which of these EU regulations');
 await part.waitFor(`document.querySelectorAll('form.poll input[type=checkbox]').length === 7`, 'M3 osallistujalle');
 await part.js(`(() => { const c = document.querySelectorAll('form.poll input[type=checkbox]'); c[0].click(); c[3].click(); document.querySelector('form.poll').requestSubmit(); return true; })()`);
 await part.waitFor(`!!document.querySelector('form.poll .notice.ok')`, 'vastaus');
-await admin.click('Aktiivinen projektorille');
+await admin.click('Avaa esitysnäyttö');
 const stage = await attach(port, '/admin/esitys');
 await admin.click('Näytä tulokset');
 await admin.click('Paljasta oikea vastaus');
@@ -46,17 +46,24 @@ await part.waitFor(`document.querySelectorAll('.poll-explanation').length === 7`
 if (stageExpl !== 7) throw new Error('Selityksiä projektorilla ' + stageExpl);
 step('R10: M3-paljastus näyttää 4 oikeaa vaihtoehtoa ja 7 selitystä projektorilla ja osallistujalla');
 
-// R12: aktiivisen kysymyksen vastaukset nollataan ohjauspalkista varmistuksen jälkeen.
+// R12: vastaukset nollataan vain Valmistelu-tilan kortista varmistuksen jälkeen. Luennon ohjauspalkissa ei ole
+// tyhjennystä: luennon aikana annettuja vastauksia ei poisteta vahingossa (Hessun koeajo 13.11.).
 await admin.waitFor(`document.querySelector('.live-now')?.innerText.includes('1 vastaus')`, 'yksi vastaus', 8000);
+if (await admin.js(`[...document.querySelectorAll('.live-control button, .stage-bar button')].some((b) => b.textContent === 'Tyhjennä vastaukset')`)) {
+  throw new Error('Tyhjennä vastaukset luennon ohjauksessa');
+}
+const r12 = await admin.js(`document.querySelector('.live-now strong').textContent`);
+await mode(admin, 'prep');
 await admin.cdp('Page.enable');
 const before = admin.dialogs().length;
-await admin.js(`setTimeout(() => [...document.querySelectorAll('.live-control button')].find((b) => b.textContent === 'Tyhjennä vastaukset').click(), 0), true`);
+await admin.js(`setTimeout(() => [...[...document.querySelectorAll('article.poll-card')].find((c) => c.querySelector('.poll-card-prompt').textContent.includes(${JSON.stringify(r12)})).querySelectorAll('button')].find((b) => b.textContent === 'Tyhjennä vastaukset').click(), 0), true`);
 const t0 = Date.now();
 while (admin.dialogs().length === before && Date.now() - t0 < 5000) await new Promise((r) => setTimeout(r, 100));
 const asked = admin.dialogs()[before] || '';
 if (!asked.includes('Which of these EU regulations')) throw new Error('Varmistus: ' + asked);
+await mode(admin, 'live');
 await admin.waitFor(`document.querySelector('.live-now')?.innerText.includes('0 vastausta')`, 'nollattu', 8000);
-step('R12: Tyhjennä vastaukset ohjauspalkissa kysyy varmistuksen ja nollaa aktiivisen kysymyksen (1 → 0)');
+step('R12: ei tyhjennystä luennon ohjauksessa; Valmistelu-kortin Tyhjennä vastaukset kysyy varmistuksen ja nollaa (1 → 0)');
 
 // R9: M4/3 ilman oikeaa vastausta: ei paljastusnappia.
 await openPoll(admin, 'Stage 3: The media asks');

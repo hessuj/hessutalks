@@ -1,10 +1,15 @@
 /*
  * HessuTalks – esitysikkuna projektorille (jatkettu näyttö).
  *
+ * Yksi ikkuna näyttää kaiken, mitä luennoitsija on valinnut näytölle: kyselyt tuloksineen, kysymys- ja
+ * palautelistan ja yksittäisen viestin. Ruudukko jaetaan niin, että kaikki mahtuvat (Hessun koeajo 13.11.:
+ * jokainen näkymä avautui omaan ikkunaansa, ja ikkunat jäivät toistensa taakse).
+ *
  * Turvallisuusperiaatteet:
- *  - Ikkunassa ei ole salausavainta eikä salauskirjastoa. Se näyttää vain sen, minkä
- *    hallintanäkymä (window.opener) lähettää postMessagella.
- *  - Viestit hyväksytään vain avaajaikkunalta ja samasta originista. Sisältö tarkistetaan.
+ *  - Ikkunassa ei ole salausavainta eikä salauskirjastoa. Se näyttää vain sen, minkä hallintanäkymä lähettää.
+ *  - Viestit kulkevat BroadcastChannelilla (vain sama origin), jonka nimessä on hallinnan arpoma
+ *    satunnainen tunniste (URL:n #-osa, ei lähde palvelimelle). Muut saman originin sivut eivät tiedä kanavaa.
+ *    Yhteys palautuu itsestään, jos jompikumpi ikkuna ladataan uudelleen. Sisältö tarkistetaan.
  *  - Teksti lisätään DOMiin vain textContentilla (ei innerHTML:ää) -> ei XSS:ää.
  */
 (function () {
@@ -16,6 +21,7 @@
 
   var MAX_TEXT = 4000;
   var MAX_ITEMS = 20;
+  var MAX_TILES = 12;
 
   function h(tag, cls, text) {
     var el = document.createElement(tag);
@@ -27,12 +33,12 @@
     return typeof v === 'string' && v.length <= (max || MAX_TEXT) ? v : null;
   }
   function show() {
-    root.classList.remove('poll-stage');
-    root.classList.remove('list-stage');
-    pollView = null;
+    root.className = 'stage';
+    board = null;
     root.replaceChildren.apply(root, arguments);
   }
   function waiting(msg) {
+    have = null;
     show(h('p', 'stage-url', msg));
   }
 
@@ -40,41 +46,46 @@
   var lang = 'fi';
   var TEXT = {
     fi: {
-      answers: function (n) { return n === 1 ? '1 vastaus' : n + ' vastausta'; }, closed: ' · kysely on suljettu',
-      later: 'Tulokset näytetään myöhemmin.', none: 'Ei vastauksia.', noQuestions: 'Ei kysymyksiä.',
-      mean: 'Keskiarvo', median: 'mediaani', locale: 'fi-FI', ended: 'Hallintanäkymä suljettiin.'
+      answers: function (n) { return n === 1 ? '1 vastaus' : n + ' vastausta'; }, closed: ' · suljettu', draft: ' · ei vielä auki',
+      later: 'Tulokset näytetään myöhemmin.', none: 'Ei vastauksia.', noMessages: 'Ei vielä viestejä.',
+      mean: 'Keskiarvo', median: 'mediaani', locale: 'fi-FI', ended: 'Hallintanäkymä suljettiin.',
+      more: function (n) { return '+' + n + ' muuta näytöllä'; }
     },
     en: {
-      answers: function (n) { return n === 1 ? '1 answer' : n + ' answers'; }, closed: ' · poll closed',
-      later: 'Results will be shown later.', none: 'No answers yet.', noQuestions: 'No questions yet.',
-      mean: 'Average', median: 'median', locale: 'en-GB', ended: 'The admin view was closed.'
+      answers: function (n) { return n === 1 ? '1 answer' : n + ' answers'; }, closed: ' · closed', draft: ' · not open yet',
+      later: 'Results will be shown later.', none: 'No answers yet.', noMessages: 'No messages yet.',
+      mean: 'Average', median: 'median', locale: 'en-GB', ended: 'The admin view was closed.',
+      more: function (n) { return '+' + n + ' more'; }
     }
   };
   function tx() { return TEXT[lang]; }
 
-  function renderQr(code, url) {
+  function qrImg(url, cell, margin) {
     var qr = window.qrcode(0, 'M');
     qr.addData(url);
     qr.make();
     var img = h('img');
-    img.src = qr.createDataURL(10, 4);
+    img.src = qr.createDataURL(cell, margin);
     img.alt = 'QR-koodi';
-    show(h('p', 'stage-code', code), img, h('p', 'stage-url', url));
+    return img;
   }
 
-  // ---------------------------------------------------------------- kyselyn tulokset
+  function renderQr(code, url) {
+    show(h('p', 'stage-code', code), qrImg(url, 10, 4), h('p', 'stage-url', url));
+  }
+
+  // ---------------------------------------------------------------- sisällön tarkistus
 
   var POLL_TYPES = ['single', 'multi', 'words', 'likert', 'scale', 'open'];
+  var STATUSES = ['draft', 'open', 'closed'];
   var OPEN_ON_STAGE = 10;
-  var pollView = null;   // { id, prompt, results, count } – sama näkymä päivitetään, jotta kaaviot animoituvat
-  var lastPoll = null;
 
   function isCount(n) { return typeof n === 'number' && Number.isInteger(n) && n >= 0; }
   function validPoll(m) {
     var p = m.poll;
     var d = m.data;
     if (!p || typeof p !== 'object' || !isCount(p.id) || POLL_TYPES.indexOf(p.type) === -1 || str(p.prompt, 300) === null) return false;
-    if (!p.config || typeof p.config !== 'object' || str(m.url, 500) === null || !d || typeof d !== 'object' || !isCount(d.voters)) return false;
+    if (!p.config || typeof p.config !== 'object' || STATUSES.indexOf(m.status) === -1 || !d || typeof d !== 'object' || !isCount(d.voters)) return false;
     if (p.type === 'single' || p.type === 'multi') {
       var opts = p.config.options;
       if (!Array.isArray(opts) || opts.length > 10 || !opts.every(function (o) { return str(o, 120) !== null; })) return false;
@@ -104,59 +115,133 @@
     return { correct: r.correct, explanations: ex || null };
   }
 
-  function renderPoll(m) {
-    var p = m.poll;
-    lastPoll = m;
-    if (!pollView || pollView.id !== p.id) {
-      var prompt = h('p', 'poll-stage-prompt');
-      var results = h('div', 'poll-stage-results');
-      var qr = window.qrcode(0, 'M');
-      qr.addData(m.url);
-      qr.make();
-      var img = h('img');
-      img.src = qr.createDataURL(6, 2);
-      img.alt = 'QR-koodi';
-      var count = h('p', 'poll-stage-count');
-      var info = h('div', 'poll-stage-info');
-      // Liittymiskoodi ja osoite aina kulmassa (myöhässä tulevat ja Teams-osallistujat).
-      info.appendChild(h('p', 'poll-stage-code', m.code));
-      info.appendChild(h('p', 'poll-stage-url', m.url.replace(/^https?:\/\//, '')));
-      info.appendChild(count);
-      var foot = h('div', 'poll-stage-foot');
-      foot.appendChild(img);
-      foot.appendChild(info);
-      show(prompt, results, foot);
-      root.classList.add('poll-stage');
-      pollView = { id: p.id, prompt: prompt, results: results, count: count };
+  function validItems(items) {
+    return Array.isArray(items) ? items.slice(0, MAX_ITEMS).filter(function (it) {
+      return it && str(it.nick, 100) !== null && str(it.text) !== null;
+    }) : null;
+  }
+
+  /** Ruutu: { key, kind, ... } tai null, jos sisältö ei kelpaa. */
+  function validTile(t) {
+    if (!t || typeof t !== 'object') return null;
+    if (t.kind === 'poll') return validPoll(t) ? { key: 'poll-' + t.poll.id, kind: 'poll', m: t } : null;
+    if (t.kind === 'list') {
+      var items = validItems(t.items);
+      return str(t.title, 200) !== null && (t.list === 'question' || t.list === 'feedback') && items
+        ? { key: 'list-' + t.list, kind: 'list', title: t.title, items: items } : null;
     }
-    pollView.prompt.textContent = p.prompt;
-    pollView.count.textContent = tx().answers(m.data.voters) + (m.status === 'closed' ? tx().closed : '');
-    window.HessuResults.render(pollView.results, p, m.data, {
+    if (t.kind === 'question') {
+      return str(t.nick, 100) !== null && str(t.text) !== null ? { key: 'question', kind: 'question', nick: t.nick, text: t.text } : null;
+    }
+    return null;
+  }
+
+  // ---------------------------------------------------------------- ruudukko
+
+  var board = null;   // { keys, grid, tiles: { key -> { el, kind, ... } }, foot }
+  var lastBoard = null;
+
+  /** Sarakkeet ruutujen määrän mukaan (16:9-näyttö): 1, 2, 2×2, 3×2, 3×3, 4×3. */
+  function columns(n) { return n <= 1 ? 1 : n <= 4 ? 2 : n <= 9 ? 3 : 4; }
+
+  function pollTile() {
+    var el = h('section', 'tile tile-poll');
+    var prompt = h('p', 'poll-stage-prompt');
+    var results = h('div', 'poll-stage-results');
+    var count = h('p', 'poll-stage-count');
+    el.appendChild(prompt);
+    el.appendChild(results);
+    el.appendChild(count);
+    return { el: el, prompt: prompt, results: results, count: count };
+  }
+
+  function updatePoll(tile, m) {
+    tile.prompt.textContent = m.poll.prompt;
+    tile.count.textContent = tx().answers(m.data.voters) + (m.status === 'closed' ? tx().closed : m.status === 'draft' ? tx().draft : '');
+    window.HessuResults.render(tile.results, m.poll, m.data, {
       max: OPEN_ON_STAGE, clip: window.HessuResults.OPEN_CLIP, hidden: m.results !== true, reveal: validReveal(m),
       hiddenText: tx().later, emptyText: tx().none, labels: { mean: tx().mean, median: tx().median }, locale: tx().locale
     });
   }
 
-  // Sanapilvi asetellaan ikkunan koon mukaan: piirretään uudelleen, kun koko muuttuu.
-  window.addEventListener('resize', function () { if (pollView && lastPoll) renderPoll(lastPoll); });
-
-  function renderList(title, items) {
+  function listTile(t) {
+    var el = h('section', 'tile tile-list');
+    el.appendChild(h('p', 'stage-url', t.title));
+    if (!t.items.length) {
+      el.appendChild(h('p', 'stage-empty', tx().noMessages));
+      return { el: el };
+    }
     var ol = h('ol', 'stage-list');
-    items.forEach(function (it) {
+    t.items.forEach(function (it) {
       var li = h('li');
       li.appendChild(h('span', 'stage-nick', it.nick));
       li.appendChild(h('span', 'stage-list-text', it.text));
       ol.appendChild(li);
     });
-    show(h('p', 'stage-url', title), items.length ? ol : h('p', 'stage-q', tx().noQuestions));
-    root.classList.add('list-stage');
-    trimList();
+    el.appendChild(ol);
+    return { el: el };
+  }
+
+  function questionTile(t) {
+    var el = h('section', 'tile tile-question');
+    el.appendChild(h('p', 'stage-url', t.nick));
+    el.appendChild(h('p', 'stage-q', t.text));
+    return { el: el };
+  }
+
+  function renderBoard(m, tiles) {
+    var shown = tiles.slice(0, MAX_TILES);
+    var keys = shown.map(function (t) { return t.key; }).join('|');
+    if (!board || board.keys !== keys) {
+      var old = board ? board.tiles : {};
+      var grid = h('div', 'board-grid');
+      var cols = columns(shown.length);
+      grid.style.gridTemplateColumns = 'repeat(' + cols + ', minmax(0, 1fr))';
+      grid.style.gridTemplateRows = 'repeat(' + Math.ceil(shown.length / cols) + ', minmax(0, 1fr))';
+      var map = {};
+      shown.forEach(function (t) {
+        // Kyselyruutu säilyy, jotta kaaviot animoituvat; listat ja viesti piirretään aina uudelleen.
+        map[t.key] = t.kind === 'poll' && old[t.key] ? old[t.key] : t.kind === 'poll' ? pollTile() : null;
+        if (map[t.key]) grid.appendChild(map[t.key].el);
+        else grid.appendChild(h('section', 'tile'));
+      });
+      var info = h('div', 'poll-stage-info');
+      var code = h('p', 'poll-stage-code');
+      var url = h('p', 'poll-stage-url');
+      var more = h('p', 'poll-stage-count');
+      info.appendChild(code);
+      info.appendChild(url);
+      info.appendChild(more);
+      var foot = h('div', 'poll-stage-foot');
+      foot.appendChild(h('span', 'foot-qr'));
+      foot.appendChild(info);
+      root.className = 'stage board' + (shown.length > 1 ? ' multi' : '');
+      root.replaceChildren(grid, foot);
+      board = { keys: keys, grid: grid, tiles: map, foot: foot, code: code, url: url, more: more, qrFor: null };
+    }
+    // Liittymiskoodi ja osoite aina alareunassa (myöhässä tulevat ja Teams-osallistujat).
+    if (board.qrFor !== m.url) { board.foot.firstChild.replaceChildren(qrImg(m.url, 6, 2)); board.qrFor = m.url; }
+    board.code.textContent = m.code;
+    board.url.textContent = m.url.replace(/^https?:\/\//, '');
+    board.more.textContent = tiles.length > shown.length ? tx().more(tiles.length - shown.length) : '';
+    shown.forEach(function (t, i) {
+      if (t.kind === 'poll') { updatePoll(board.tiles[t.key], t.m); return; }
+      var tile = t.kind === 'list' ? listTile(t) : questionTile(t);
+      var slot = board.grid.children[i];
+      if (slot) slot.replaceWith(tile.el);
+      board.tiles[t.key] = tile;
+    });
+    refit();
+  }
+
+  // Sanapilvi asetellaan ruudun koon mukaan: piirretään uudelleen, kun koko muuttuu.
+  function redrawPolls() {
+    if (!board || !lastBoard) return;
+    lastBoard.tiles.forEach(function (t) { if (t.kind === 'poll' && board.tiles[t.key]) updatePoll(board.tiles[t.key], t.m); });
   }
 
   // Piilottaa listan lopusta kohdat, jotka eivät mahdu kokonaan näkyviin (ei puoliksi leikattuja rivejä).
-  function trimList() {
-    var ol = root.querySelector('.stage-list');
-    if (!ol) return;
+  function trimList(ol) {
     var li = ol.children;
     for (var i = 0; i < li.length; i++) li[i].hidden = false;
     var bottom = ol.getBoundingClientRect().bottom;
@@ -166,26 +251,32 @@
       li[i].hidden = full;
     }
   }
-  // Yksittäinen kysymys (enintään 2000 merkkiä): fonttia pienennetään, kunnes teksti mahtuu näytölle otsikon alle.
-  function fitQuestion() {
-    var q = root.querySelector('.stage-q');
-    if (!q || root.classList.contains('list-stage')) return;
+  // Yksittäinen viesti (enintään 2000 merkkiä): fonttia pienennetään, kunnes teksti mahtuu ruutuun otsikon alle.
+  function fitQuestion(tile) {
+    var q = tile.querySelector('.stage-q');
+    if (!q) return;
     q.style.fontSize = '';
-    q.style.maxWidth = '';
-    if (root.scrollHeight > root.clientHeight + 1) q.style.maxWidth = 'none';   // pitkä teksti: koko leveys ennen fontin pienennystä
     var size = parseFloat(getComputedStyle(q).fontSize);
-    var min = Math.max(12, window.innerHeight * 0.018);
-    while (size > min && root.scrollHeight > root.clientHeight + 1) {
+    var min = Math.max(12, window.innerHeight * 0.016);
+    while (size > min && tile.scrollHeight > tile.clientHeight + 1) {
       size = Math.max(min, size * 0.9);
       q.style.fontSize = size + 'px';
     }
   }
 
   // Koon muutos: ikkunan siirto projektorille, koko näyttö (Safari ei aina laukaise resize-tapahtumaa ajoissa) ja fontit.
-  function refit() { trimList(); fitQuestion(); }
-  window.addEventListener('resize', refit);
-  document.addEventListener('fullscreenchange', function () { requestAnimationFrame(refit); });
-  if (typeof ResizeObserver === 'function') new ResizeObserver(function () { refit(); }).observe(root);
+  function refit() {
+    Array.prototype.forEach.call(root.querySelectorAll('.stage-list'), trimList);
+    Array.prototype.forEach.call(root.querySelectorAll('.tile-question'), fitQuestion);
+  }
+  var resizeFrame = 0;
+  function onResize() {
+    cancelAnimationFrame(resizeFrame);
+    resizeFrame = requestAnimationFrame(function () { redrawPolls(); refit(); });
+  }
+  window.addEventListener('resize', onResize);
+  document.addEventListener('fullscreenchange', onResize);
+  if (typeof ResizeObserver === 'function') new ResizeObserver(onResize).observe(root);
   if (document.fonts && document.fonts.ready) document.fonts.ready.then(refit);
 
   // ---------------------------------------------------------------- iso QR-koodi (Q)
@@ -194,46 +285,45 @@
   function setBigQr(code, url) {
     if (bigQr) { bigQr.remove(); bigQr = null; }
     if (!code) return;
-    var qr = window.qrcode(0, 'M');
-    qr.addData(url);
-    qr.make();
-    var img = h('img');
-    img.src = qr.createDataURL(12, 4);
-    img.alt = 'QR-koodi';
     bigQr = h('div', 'stage-bigqr');
     bigQr.appendChild(h('p', 'stage-code', code));
-    bigQr.appendChild(img);
+    bigQr.appendChild(qrImg(url, 12, 4));
     bigQr.appendChild(h('p', 'stage-url', url));
     document.body.appendChild(bigQr);
   }
 
+  // ---------------------------------------------------------------- viestit hallinnalta
+
+  var have = null;    // viimeksi näytetyn sisällön tunniste (hallinta lähettää uudelleen, jos se ei täsmää)
+
+  function onBoard(m) {
+    if (str(m.code, 20) === null || str(m.url, 500) === null || !Array.isArray(m.tiles)) return;
+    // Iso QR-koodi kulkee jokaisen viestin mukana (tila on hallinnassa ja palvelimella).
+    setBigQr(m.bigQr === true ? m.code : null, m.url);
+    var tiles = m.tiles.map(validTile).filter(Boolean);
+    lastBoard = { tiles: tiles };
+    if (!tiles.length) { renderQr(m.code, m.url); return; }
+    renderBoard(m, tiles);
+  }
+
   function onMessage(ev) {
-    if (ev.origin !== window.location.origin || !window.opener || ev.source !== window.opener) return;
     var m = ev.data;
     if (!m || typeof m !== 'object') return;
     lang = m.lang === 'en' ? 'en' : 'fi';
-    // Iso QR-koodi kulkee jokaisen viestin mukana (tila on hallinnassa ja palvelimella).
-    if (m.type !== 'end') setBigQr(m.bigQr === true && str(m.code, 20) && str(m.url, 500) ? m.code : null, m.url);
     switch (m.type) {
-      case 'qr':
-        if (str(m.code, 20) && str(m.url, 500)) renderQr(m.code, m.url);
-        break;
-      case 'question':
-        if (str(m.nick, 100) !== null && str(m.text) !== null) { show(h('p', 'stage-url', m.nick), h('p', 'stage-q', m.text)); fitQuestion(); }
-        break;
-      case 'list':
-        if (str(m.title, 200) === null || !Array.isArray(m.items)) return;
-        renderList(m.title, m.items.slice(0, MAX_ITEMS).filter(function (it) {
-          return it && str(it.nick, 100) !== null && str(it.text) !== null;
-        }));
-        break;
-      case 'poll':
-        if (validPoll(m)) renderPoll(m);
+      case 'board':
+        onBoard(m);
+        have = str(m.key, 40);
         break;
       case 'blank':
+        setBigQr(null);
+        lastBoard = null;
         show();
+        have = str(m.key, 40);
         break;
       case 'end':
+        setBigQr(null);
+        lastBoard = null;
         waiting(tx().ended);
         break;
     }
@@ -256,10 +346,25 @@
   }
   try { applyTheme(window.localStorage.getItem(THEME_KEY) === 'light'); } catch (e) { /* oletus tumma */ }
 
+  document.addEventListener('fullscreenchange', function () {
+    if (hint) hint.hidden = !!document.fullscreenElement;
+  });
+
+  // ---------------------------------------------------------------- yhteys hallintaan
+
+  // Kanavan tunniste: hallinnan arpoma (22 merkkiä), esikatselulla pääte ".p".
+  var id = window.location.hash.slice(1);
+  if (!/^[A-Za-z0-9_-]{22}(\.p)?$/.test(id) || typeof BroadcastChannel !== 'function') {
+    waiting('Avaa esitysnäyttö hallintanäkymän napista.');
+    return;
+  }
+  var channel = new BroadcastChannel('hessutalks-esitys-' + id);
+  channel.onmessage = onMessage;
+
   // ---------------------------------------------------------------- pikanäppäimet
   //
-  // Esitysikkunalla ei ole pääsyä rajapintaan: komento lähetetään hallintaikkunalle (avaaja), joka
-  // tekee toiminnon. Langattomat esitysohjaimet lähettävät yleensä PageUp/PageDown tai nuolinäppäimiä.
+  // Esitysikkunalla ei ole pääsyä rajapintaan: komento lähetetään hallinnalle, joka tekee toiminnon.
+  // Langattomat esitysohjaimet lähettävät yleensä PageUp/PageDown tai nuolinäppäimiä.
   var KEYS = {
     ArrowRight: 'next', PageDown: 'next', ArrowDown: 'next',
     ArrowLeft: 'prev', PageUp: 'prev', ArrowUp: 'prev',
@@ -270,34 +375,15 @@
     if (e.key === 'f' || e.key === 'F') { toggleFullscreen(); return; }
     if (e.key === 't' || e.key === 'T') { applyTheme(!document.body.classList.contains('light')); return; }
     var cmd = KEYS[e.key];
-    if (!cmd || !window.opener || window.opener.closed) return;
+    if (!cmd) return;
     e.preventDefault();
-    window.opener.postMessage({ type: 'command', cmd: cmd }, window.location.origin);
-  });
-  document.addEventListener('fullscreenchange', function () {
-    if (hint) hint.hidden = !!document.fullscreenElement;
+    channel.postMessage({ type: 'command', cmd: cmd });
   });
 
-  // ---------------------------------------------------------------- yhteys hallintaan
-
-  window.addEventListener('message', onMessage);
-
-  if (!window.opener) {
-    waiting('Avaa esitysnäyttö hallintanäkymän napista.');
-    return;
-  }
-  window.opener.postMessage({ type: 'ready' }, window.location.origin);
-
-  // Tahdistus: hallintanäkymä päivittää tulokset näiden viestien tahdissa, vaikka sen välilehti olisi
-  // taustalla (selain hidastaa taustan ajastimia, mutta ei viestien käsittelyä).
-  setInterval(function () {
-    if (window.opener && !window.opener.closed) window.opener.postMessage({ type: 'tick' }, window.location.origin);
-  }, 1000);
-
-  // Jos hallintaikkuna suljetaan, tyhjennä näyttö, ettei sisältö jää näkyviin.
-  var watch = setInterval(function () {
-    if (window.opener && !window.opener.closed) return;
-    clearInterval(watch);
-    waiting(tx().ended);
-  }, 2000);
+  // Tahdistus sekunnin välein: hallinta lähettää sisällön uudelleen, jos tämä ikkuna ei ole ajan tasalla
+  // (esim. jompikumpi ladattiin uudelleen), ja päivittää tulokset, vaikka sen välilehti olisi taustalla
+  // (selain hidastaa taustan ajastimia, mutta ei viestien käsittelyä).
+  function hello() { channel.postMessage({ type: 'hello', have: have }); }
+  hello();
+  setInterval(hello, 1000);
 })();

@@ -38,7 +38,7 @@ step('Oletuksena Kyselyt-välilehti: 9 sarjaa näkyvissä, viestit piilossa, ohj
 await admin.cdp('Emulation.setDeviceMetricsOverride', { width: 760, height: 1000, deviceScaleFactor: 1, mobile: false });
 const rows = await admin.js(`(() => {
   const out = [];
-  for (const row of [...document.querySelectorAll('p')].filter((p) => p.querySelectorAll('button').length >= 2)) {
+  for (const row of [...document.querySelectorAll('p, .q-actions')].filter((p) => p.querySelectorAll('button').length >= 2)) {
     const r = [...row.querySelectorAll('button')].filter((b) => b.offsetParent !== null).map((b) => b.getBoundingClientRect());
     const tops = [...new Set(r.map((x) => Math.round(x.top)))].sort((a, b) => a - b);
     for (let i = 0; i < r.length; i++) for (let j = i + 1; j < r.length; j++) {
