@@ -42,7 +42,7 @@ Verification methods:
 | 6 | Presenter view, keyboard shortcuts (also presentation remote), large QR, themes, phone remote (SHOULD 5.3) | ✅ PR #15 (`presenter.mjs`) |
 | 7 | Rate limits (device 10/min, address hash 600/min silently), deploy freeze | ✅ PR #16 (`DeployFreezeTest`) |
 | 8 | SHOULD: CSV export (formula injection prevention), set duplication, moving a question, preview. (Results for participants, themes, profanity filter and phone remote were done in phases 4–6.) | ✅ PR #17 (`should.mjs`) |
-| 9 | Fixes after the 13.11. trial run: a single presenter window as a grid (questions, question and feedback lists, a message), several questions on screen and open at the same time, the connection recovers after a reload, clearing answers only in preparation mode | ✅ this PR (`stage-multi.mjs`, `testSeveralPollsOnStageAcceptAnswersUntilRemoved`, `testStageMigrationKeepsAnswersAndActivePoll`) |
+| 9 | Fixes after the first trial run in a lecture: a single presenter window as a grid (questions, question and feedback lists, a message), several questions on screen and open at the same time, the connection recovers after a reload, clearing answers only in preparation mode | ✅ PR #40, #41 ([incident review](incident-presenter.md), `stage-multi.mjs`, `testSeveralPollsOnStageAcceptAnswersUntilRemoved`, `testStageMigrationKeepsAnswersAndActivePoll`) |
 
 ## Requirements coverage
 

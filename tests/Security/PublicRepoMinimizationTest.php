@@ -23,6 +23,10 @@ final class PublicRepoMinimizationTest extends TestCase
         '/\b1[34]\.?\s?[–-]\s?1[34]\.11\./' => 'kurssin päivämäärä',
         '/\b2[45]\.?\s?[–-]\s?2[45]\.11\./' => 'kurssin päivämäärä',
         '/\b1[34]\s?[–-]\s?1[34] Nov\b/i' => 'kurssin päivämäärä',
+        // Myös yksittäinen kurssipäivä (koeajon korjausten kommenteissa oli "13.11.", jota yllä olevat eivät tunnistaneet).
+        '/(?<![\d.])(1[34]|2[3-9])\.\s?11\./' => 'kurssin päivämäärä',
+        '/\b(1[34]|2[3-9])(th)?\s+Nov(ember)?\b/i' => 'kurssin päivämäärä',
+        '/\bNov(ember)?\s+(1[34]|2[3-9])\b/i' => 'kurssin päivämäärä',
     ];
 
     /** Dokumentaatiossa (Markdown) ei hallintanäkymän osoitteita (Hessun päätös 2.11.). Koodissa reitit ovat väistämättä. */

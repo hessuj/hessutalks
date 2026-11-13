@@ -161,7 +161,7 @@ key has both languages.
 | Abuse | Per-nickname and per-lecture limits, single-use challenges, security log |
 | Storage | SQLite outside the webroot, parametrized queries, `secure_delete` |
 
-Detailed threat model and residual risks: [SECURITY.en.md](SECURITY.en.md).
+Detailed threat model and residual risks: [SECURITY.en.md](SECURITY.en.md). An example of incident handling: [presenter display incident review](docs/incident-presenter.md).
 
 ## CI/CD pipeline
 

@@ -2,7 +2,7 @@
  * HessuTalks – esitysikkuna projektorille (jatkettu näyttö).
  *
  * Yksi ikkuna näyttää kaiken, mitä luennoitsija on valinnut näytölle: kyselyt tuloksineen, kysymys- ja
- * palautelistan ja yksittäisen viestin. Ruudukko jaetaan niin, että kaikki mahtuvat (Hessun koeajo 13.11.:
+ * palautelistan ja yksittäisen viestin. Ruudukko jaetaan niin, että kaikki mahtuvat (Hessun koeajo luennolla:
  * jokainen näkymä avautui omaan ikkunaansa, ja ikkunat jäivät toistensa taakse).
  *
  * Turvallisuusperiaatteet:
@@ -78,7 +78,7 @@
 
   var POLL_TYPES = ['single', 'multi', 'words', 'likert', 'scale', 'open'];
   var STATUSES = ['draft', 'open', 'closed'];
-  var OPEN_ON_STAGE = 50;   // ruutu vierittyy, jos kaikki eivät mahdu (Hessun koeajo 13.11.)
+  var OPEN_ON_STAGE = 50;   // ruutu vierittyy, jos kaikki eivät mahdu (Hessun koeajo luennolla)
 
   function isCount(n) { return typeof n === 'number' && Number.isInteger(n) && n >= 0; }
   function validPoll(m) {

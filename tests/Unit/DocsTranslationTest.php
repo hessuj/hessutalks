@@ -21,6 +21,7 @@ final class DocsTranslationTest extends TestCase
             'SECURITY' => ['SECURITY.md', 'SECURITY.en.md'],
             'hyväksymistestit' => ['docs/hyvaksymistestit.md', 'docs/hyvaksymistestit.en.md'],
             'uhkamalli' => ['docs/uhkamalli.md', 'docs/threat-model.md'],
+            'poikkeama' => ['docs/poikkeama-esitysnaytto.md', 'docs/incident-presenter.md'],
         ];
     }
 

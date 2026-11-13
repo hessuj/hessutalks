@@ -137,7 +137,7 @@ final class PollSecurityTest extends AppTestCase
         self::assertSame(0, (int) ($this->db->one('SELECT COUNT(*) AS n FROM poll_answers')['n'] ?? -1));
     }
 
-    /** Hessun koeajo 13.11.: useita kysymyksiä näytöllä ja auki yhtä aikaa; näytöltä poisto sulkee, vastaukset säilyvät. */
+    /** Hessun koeajo luennolla: useita kysymyksiä näytöllä ja auki yhtä aikaa; näytöltä poisto sulkee, vastaukset säilyvät. */
     public function testSeveralPollsOnStageAcceptAnswersUntilRemoved(): void
     {
         $a = $this->poll();
