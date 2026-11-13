@@ -98,7 +98,7 @@ be shown later") follow the same choice: *English* → English, *Suomi* and *by 
 ### Presenter view, keyboard shortcuts and phone remote
 
 The presenter display is the lecture's presenter view for Teams sharing and the room projector. The bottom always shows the
-QR code and join code, and each question shows its answer count. A single question fills the screen (question over 40 px at 1080p).
+QR code and join code, and each question shows its answer count. If there are more answers than fit, the tile scrolls. A single question fills the screen (question over 40 px at 1080p).
 Several are split into a grid (at most 12), and the fonts shrink with the tile size.
 
 | Key | Action |
@@ -108,7 +108,7 @@ Several are split into a grid (at most 12), and the fonts shrink with the tile s
 | Space | Open / close for answers |
 | R | Show / hide results |
 | A | Reveal correct answer |
-| Q | Large QR code full screen |
+| Q | Large QR code covering the screen (moves aside when you bring something on screen) |
 | T | Light / dark theme (presenter window) |
 | F or double-click | Full screen (presenter window) |
 

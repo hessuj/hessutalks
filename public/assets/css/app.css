@@ -153,6 +153,7 @@ details.optional summary { cursor: pointer; font-weight: 600; color: var(--accen
 .notice { padding: .8rem 1rem; border: 2px solid var(--accent); margin: 1rem 0; }
 .notice.error { border-color: var(--bad); color: var(--bad); }
 .notice.ok { border-color: var(--ok); color: var(--ok); }
+.notice.warn { border-color: #f4d78b; color: #f4d78b; }
 
 /* ---- hallinta ---- */
 .toolbar { display: flex; flex-wrap: wrap; gap: .6rem; align-items: center; margin: 0 0 1.25rem; }
@@ -452,6 +453,16 @@ label.check input { width: auto; }
 .stage.board.multi .tile { border: 2px solid var(--frame); padding: 1.2vh 1.2vw; }
 .tile .poll-stage-prompt { flex: none; font-size: clamp(16px, min(4.4cqw, 9cqh), 64px); }
 .tile .poll-stage-results { --res-text: clamp(13px, min(3.1cqw, 6cqh), 40px); }
+/* Ruudun tulokset vierittyvät, jos kaikki eivät mahdu (esim. avoimet vastaukset). Keskitys automaattisilla
+   marginaaleilla: justify-content: center leikkaisi ylimenevän alun ulottumattomiin. Palkki näkyy aina. */
+.tile .poll-stage-results { justify-content: flex-start; overflow-y: auto; overscroll-behavior: contain; padding-right: .4vw; }
+.tile .poll-stage-results > :first-child { margin-top: auto; }
+.tile .poll-stage-results > :last-child { margin-bottom: auto; }
+.tile.tile-open .poll-stage-results > :first-child { margin-top: 0; }
+.tile .poll-stage-results .res-open { overflow: visible; }
+.tile .poll-stage-results::-webkit-scrollbar { width: 14px; }
+.tile .poll-stage-results::-webkit-scrollbar-track { background: rgba(0, 0, 0, .25); }
+.tile .poll-stage-results::-webkit-scrollbar-thumb { background: var(--ink-dim); border: 3px solid transparent; background-clip: padding-box; }
 .tile .poll-stage-results .res-columns { max-height: none; }
 .tile .poll-stage-results .res-row { margin: .9cqh 0; }
 .tile .poll-stage-count { flex: none; margin: 0; font-size: clamp(12px, min(2.2cqw, 4cqh), 34px); }

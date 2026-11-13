@@ -78,7 +78,7 @@
 
   var POLL_TYPES = ['single', 'multi', 'words', 'likert', 'scale', 'open'];
   var STATUSES = ['draft', 'open', 'closed'];
-  var OPEN_ON_STAGE = 10;
+  var OPEN_ON_STAGE = 50;   // ruutu vierittyy, jos kaikki eivät mahdu (Hessun koeajo 13.11.)
 
   function isCount(n) { return typeof n === 'number' && Number.isInteger(n) && n >= 0; }
   function validPoll(m) {
@@ -156,12 +156,16 @@
   }
 
   function updatePoll(tile, m) {
+    // Vieritysasento säilyy, kun uusia vastauksia tulee tai tulokset piirretään uudelleen.
+    var scroll = tile.results.scrollTop;
+    tile.el.classList.toggle('tile-open', m.poll.type === 'open');
     tile.prompt.textContent = m.poll.prompt;
     tile.count.textContent = tx().answers(m.data.voters) + (m.status === 'closed' ? tx().closed : m.status === 'draft' ? tx().draft : '');
     window.HessuResults.render(tile.results, m.poll, m.data, {
       max: OPEN_ON_STAGE, clip: window.HessuResults.OPEN_CLIP, hidden: m.results !== true, reveal: validReveal(m),
       hiddenText: tx().later, emptyText: tx().none, labels: { mean: tx().mean, median: tx().median }, locale: tx().locale
     });
+    tile.results.scrollTop = scroll;
   }
 
   function listTile(t) {

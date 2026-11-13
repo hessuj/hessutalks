@@ -98,7 +98,7 @@ myöhemmin") seuraavat samaa valintaa: *English* → englanti, *Suomi* ja *selai
 ### Esitysnäkymä, pikanäppäimet ja puhelinohjain
 
 Esitysnäyttö on luennon esitysnäkymä Teams-jakoon ja salin projektorille. Alareunassa ovat aina QR-koodi ja
-liittymiskoodi, ja jokaisessa kysymyksessä sen vastausmäärä. Yksi kysymys täyttää näytön (kysymys yli 40 px 1080p:llä).
+liittymiskoodi, ja jokaisessa kysymyksessä sen vastausmäärä. Jos vastauksia on enemmän kuin mahtuu, ruutu vierittyy. Yksi kysymys täyttää näytön (kysymys yli 40 px 1080p:llä).
 Useampi jaetaan ruudukoksi (enintään 12), ja fontit pienenevät ruudun koon mukaan.
 
 | Näppäin | Toiminto |
@@ -108,7 +108,7 @@ Useampi jaetaan ruudukoksi (enintään 12), ja fontit pienenevät ruudun koon mu
 | Välilyönti | Avaa / sulje vastaukset |
 | R | Näytä / piilota tulokset |
 | A | Paljasta oikea vastaus |
-| Q | Iso QR-koodi koko näytölle |
+| Q | Iso QR-koodi koko näytön peitoksi (väistyy, kun tuot jotain näytölle) |
 | T | Vaalea / tumma teema (esitysikkuna) |
 | F tai kaksoisklikkaus | Koko näyttö (esitysikkuna) |
 
