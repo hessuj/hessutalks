@@ -38,7 +38,7 @@ await part.waitFor(part.hasText('What is your FIRST action?'), 'kysymys osallist
 await part.js(`(() => { [...document.querySelectorAll('.poll-choice')].find((l) => l.innerText.trim() === 'Stop the mowers').querySelector('input').click(); document.querySelector('form.poll').requestSubmit(); return true; })()`);
 await part.waitFor(`document.querySelector('form.poll .notice.ok')`, 'kuittaus');
 
-await admin.click('Aktiivinen projektorille');
+await admin.click('Avaa esitysnäyttö');
 const stage = await attach(port, '/admin/esitys');
 await stage.waitFor(`document.querySelector('.poll-stage-count')?.textContent.startsWith('1 answer')`, 'vastausmäärä projektorilla', 8000);
 if (!(await stage.js(`!!document.querySelector('.results.res-hidden') && [...document.querySelectorAll('.res-value')].every((e) => e.textContent === '')`))) {

@@ -81,8 +81,9 @@ final class LiveFileSecurityTest extends AppTestCase
         self::assertStringNotContainsStringIgnoringCase($this->code, $name);
         self::assertNotSame((new LiveFile($this->dir, str_repeat('cd', 32)))->name($this->eventId), $name, 'Nimi riippuu salaisesta avaimesta');
         self::assertSame(0644, fileperms($this->dir . '/' . $name) & 0777, 'Apache lukee, muut eivät kirjoita');
-        self::assertSame(['v', 'poll', 'closed', 'closes_at'], array_keys($this->file()));
+        self::assertSame(['v', 'poll', 'polls', 'closed', 'closes_at'], array_keys($this->file()));
         self::assertNull($this->file()['poll']);
+        self::assertSame([], $this->file()['polls']);
         self::assertFalse($this->file()['closed']);
         self::assertSame([], glob($this->dir . '/.*.json.*') ?: [], 'Ei väliaikaistiedostoja');
     }
@@ -94,6 +95,8 @@ final class LiveFileSecurityTest extends AppTestCase
         $api = $this->json($this->request('GET', '/api/live?code=' . $this->code));
         self::assertSame($api['v'], $this->file()['v']);
         self::assertSame($api['poll'], $this->file()['poll'], 'Sama sisältö kuin /api/live');
+        self::assertSame($api['polls'], $this->file()['polls']);
+        self::assertSame([$api['poll']], $this->file()['polls']);
         self::assertStringNotContainsString('Kyllä – oikein', (string) json_encode($this->file(), JSON_UNESCAPED_UNICODE), 'Ei selityksiä ennen paljastusta');
         self::assertNull($this->file()['poll']['reveal']);
 

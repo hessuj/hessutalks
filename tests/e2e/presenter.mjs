@@ -25,7 +25,7 @@ for (const prompt of ['Is this a risk? Phishing.', 'Is this a risk? DDoS.']) {
 const code = await admin.js(`document.querySelector('.big-code').textContent`);
 
 await mode(admin, 'live');
-await admin.click('Aktiivinen projektorille');
+await admin.click('Avaa esitysnäyttö');
 const stage = await attach(port, '/admin/esitys');
 await stage.cdp('Emulation.setDeviceMetricsOverride', { width: 1920, height: 1080, deviceScaleFactor: 1, mobile: false });
 await stage.waitFor(`document.body.innerText.includes(${JSON.stringify(code)})`, 'QR-näkymä ilman aktiivista');

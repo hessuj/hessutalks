@@ -51,7 +51,7 @@ await admin.waitFor(`[...document.querySelectorAll('.res-open-text')].some((e) =
 step('Hallinta näyttää koko 3500 merkin tekstin');
 
 await admin.click('Näytä tulokset');
-await admin.click('Aktiivinen projektorille');
+await admin.click('Avaa esitysnäyttö');
 const stage = await attach(port, '/admin/esitys');
 await stage.waitFor(`!!document.querySelector('.res-open-text')`, 'vastaus projektorilla');
 const shown = await stage.js(`document.querySelector('.res-open-text').textContent`);

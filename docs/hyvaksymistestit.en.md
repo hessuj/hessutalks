@@ -17,7 +17,7 @@ Verification methods:
 | H1 | Joining with a QR code on iPhone, Android and laptop | 🧪 | Browser: the lecture link opens the waiting screen without sign-in (`live-polls.mjs`). Real devices in the trial run. |
 | H2 | Presenter opens question T1, the view changes in under 2 s | ✅ | Browser: *Avaa vastauksille* (open for answers) → the participant view changed in 1.0–1.6 s without a reload (local server, polling 1.2 s). Production network latency is checked in the trial run. |
 | H3 | Changing the answer in T1: only the latest counts | ✅ | Browser: answer and change → 1 answer in the admin view. PHPUnit `testSameBrowserReplacesItsAnswer`. |
-| H4 | Closing prevents answering and the participant sees the state | ✅ | Browser: *Sulje vastaukset* (close answers) → "This poll is closed", fields disabled. PHPUnit `testAnswerRequiresOpenPollOfThisEvent` (also: open but not active → 409). |
+| H4 | Closing prevents answering and the participant sees the state | ✅ | Browser: *Sulje vastaukset* (close answers) → "This poll is closed", fields disabled. PHPUnit `testAnswerRequiresOpenPollOfThisEvent` (also: open but not on screen → 409), `testSeveralPollsOnStageAcceptAnswersUntilRemoved`. |
 | H5 | T2 scale: distribution and mean correct | ✅ | Node `results.test.mjs` (distributions and statistics). T2 = Likert 5 with labels. |
 | H6 | T3: `<script>alert(1)</script>` is shown as text | ✅ | Browser `open-text.mjs`: the participant sends `<script>alert(1)</script><img src=x onerror=alert(2)>`, and it is shown as text in the admin view and on the projector. No element or alert dialog is created (the test would fail on an alert). Node `results.test.mjs` (text stays text), PHPUnit `testBrowserScriptsNeverUseHtmlInjectionSinks` (no innerHTML in any script). |
 | H7 | Moderation in T3: a hidden item disappears immediately | ✅ | Browser `open-text.mjs`: *Piilota* (hide) → the answer disappeared from the projector within a few milliseconds. Hiding persists across reloads (encrypted on the server). The profanity filter hides matches for review; approval makes them visible. |
@@ -41,7 +41,8 @@ Verification methods:
 | 5 | Correct answer, explanations, reveal, show/hide results, results for participants (SHOULD 4.8) | ✅ PR #14 (`reveal.mjs`) |
 | 6 | Presenter view, keyboard shortcuts (also presentation remote), large QR, themes, phone remote (SHOULD 5.3) | ✅ PR #15 (`presenter.mjs`) |
 | 7 | Rate limits (device 10/min, address hash 600/min silently), deploy freeze | ✅ PR #16 (`DeployFreezeTest`) |
-| 8 | SHOULD: CSV export (formula injection prevention), set duplication, moving a question, preview. (Results for participants, themes, profanity filter and phone remote were done in phases 4–6.) | ✅ this PR (`should.mjs`) |
+| 8 | SHOULD: CSV export (formula injection prevention), set duplication, moving a question, preview. (Results for participants, themes, profanity filter and phone remote were done in phases 4–6.) | ✅ PR #17 (`should.mjs`) |
+| 9 | Fixes after the 13.11. trial run: a single presenter window as a grid (questions, question and feedback lists, a message), several questions on screen and open at the same time, the connection recovers after a reload, clearing answers only in preparation mode | ✅ this PR (`stage-multi.mjs`, `testSeveralPollsOnStageAcceptAnswersUntilRemoved`, `testStageMigrationKeepsAnswersAndActivePoll`) |
 
 ## Requirements coverage
 

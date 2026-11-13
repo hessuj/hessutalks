@@ -25,8 +25,8 @@ flowchart LR
   P -- "HTTPS: sealed box -salateksti, lomaketunniste" --> PHP
   P -- "HTTPS: kyselyn tila (julkinen sisältö)" --> W
   A -- "HTTPS: passkey-istunto, CSRF-tunniste" --> PHP
-  A -- "postMessage, sama origin: näytettävä teksti" --> S
-  S -. "postMessage: vain komennot" .-> A
+  A -- "BroadcastChannel, sama origin, salainen tunniste: näytettävä teksti" --> S
+  S -. "BroadcastChannel: vain komennot" .-> A
   PHP -- "parametrisoitu SQL" --> DB
   PHP -- "kirjoittaa julkisen tilan" --> W
 ```
@@ -35,7 +35,7 @@ flowchart LR
 |---|---|---|
 | Osallistujan selain | Ei mihinkään: kuka tahansa voi muokata asiakasta | Satunnainen laitetunniste, luennoitsijan julkinen avain |
 | Esittäjän selain (hallintaikkuna) | Purkaminen ja tulosten laskenta | Yksityinen avain muistissa, avattu passkeylla (PRF) tai tunnuslauseella |
-| Projektori-ikkuna | Vain tekstin näyttäminen | Ei avainta, ei API-pääsyä, hyväksyy viestit vain avaajaltaan |
+| Projektori-ikkuna | Vain tekstin näyttäminen | Ei avainta, ei API-pääsyä, kuuntelee vain hallinnan arpomaa kanavaa (tunniste URL:n #-osassa) |
 | Palvelin (PHP, Apache) | Valtuutus, nopeusrajat, saatavuus | Salatekstit, HMAC-tiivisteet, kyselyjen julkinen sisältö; ei koskaan selväkielisiä viestejä tai vastauksia |
 | Tietokanta (SQLite) | Tallennus | Kuten yllä; webrootin ulkopuolella |
 

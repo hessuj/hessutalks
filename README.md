@@ -32,19 +32,24 @@ aktiivisen). Luennolla-tilassa ei ole muokkaus- eikä poistonappeja.
 1. Luo luennon sivulla sarjat (*Uusi sarja*) ja niihin kysymykset (*Uusi kysymys*) valmiiksi ennen luentoa.
    Sarjoja ja kysymyksiä voi siirtää nuolilla, ja sarjan voi **ohittaa** kesken luennon. Ohitetun sarjan
    kysymykset jäävät pois Seuraava/Edellinen-järjestyksestä, mutta niiden vastaukset säilyvät.
-2. Luennolla on kerrallaan yksi **aktiivinen kysymys**, jonka kaikki osallistujat näkevät. Ohjauspalkissa:
-   *Seuraava →* ja *← Edellinen* vaihtavat aktiivista kysymystä, *Avaa vastauksille* ja *Sulje vastaukset*
-   ohjaavat vastaamista, ja *Odotusnäkymä* poistaa aktiivisen kysymyksen.
-   Luonnos-tilainen aktiivinen kysymys näkyy projektorilla, mutta osallistujat näkevät odotusnäkymän
-   (*Waiting for the next question…*), kunnes avaat sen. Vain aktiivinen kysymys voi olla auki.
+2. **Näytöllä** voi olla yksi tai useampi kysymys yhtä aikaa: projektori näyttää ne ruudukkona, ja osallistujat
+   näkevät ne allekkain ja voivat vastata kaikkiin avoimiin. Luennolla-tilan listassa *+ Näytölle* lisää kysymyksen
+   muiden rinnalle ja *✓ Näytöllä* poistaa sen. Rivin klikkaus, *Seuraava →* ja *← Edellinen* vaihtavat näytölle
+   vain yhden kysymyksen. *Avaa vastauksille* tuo kysymyksen näytölle muiden rinnalle. *Pois näytöltä* sulkee
+   kysymyksen, ja *Odotusnäkymä* poistaa kaikki. Vastaukset säilyvät aina.
+   Viimeksi näytölle tuotu on **aktiivinen**: pikanäppäimet ja puhelinohjain ohjaavat sitä, ja muut näytöllä
+   olevat ovat ohjauspalkissa omilla riveillään (*Aktiiviseksi*, *Avaa vastauksille*, *Näytä tulokset*, …).
+   Luonnos-tilainen kysymys näkyy projektorilla, mutta osallistujat näkevät sen vasta, kun avaat sen
+   (siihen asti *Waiting for the next question…*). Vain näytöllä oleva kysymys voi olla auki.
 3. Osallistujat käyttävät koko ajan samaa luennon QR-koodia tai linkkiä. Näkymä vaihtuu itsestään noin
    sekunnin viiveellä ilman sivun päivitystä. Yhteyskatkon jälkeen sivu yhdistää uudelleen, ja oma vastaus säilyy myös uudelleenlatauksessa.
 4. **Tulokset ja paljastus:** tulokset ovat aluksi piilossa (projektorilla kysymys, vaihtoehdot ja vastausmäärä).
    *Näytä tulokset* tuo ne projektorille ja tuloskoosteena myös osallistujien puhelimiin (monivalinnat ja asteikot).
    *Paljasta oikea vastaus* korostaa oikeat vaihtoehdot ja näyttää selitykset, jos kysymykselle on määritelty oikea vastaus.
    Oikeat vastaukset ja selitykset annetaan kysymyslomakkeella tai JSON-tiedostossa, eikä niitä lähetetä osallistujille ennen paljastusta.
-5. *Aktiivinen projektorille* avaa ikkunan, joka seuraa aktiivista kysymystä ja sen tuloksia (ilman aktiivista kysymystä
-   siinä näkyy luennon QR-koodi). *Tulokset projektorille* näyttää yksittäisen kysymyksen tulokset omassa ikkunassaan.
+5. **Esitysnäyttö** on yksi ikkuna (*Avaa esitysnäyttö* luennon sivun yläosassa), ja se näyttää kaiken näytölle valitun
+   yhtä aikaa: kysymykset tuloksineen, *Kysymykset projektorille*- ja *Palautteet projektorille*-listat sekä viestin,
+   jonka valitset *Näytä projektorilla* -napilla. Jos näytöllä ei ole mitään, siinä on luennon QR-koodi.
 6. **Moderointi:** avoimen vastauksen voi piilottaa *Piilota*-napilla ja sanapilven sanan klikkaamalla sitä. Piilotus katoaa projektorilta heti.
    Kirosanasuodatin (englanti ja suomi) piilottaa osumat automaattisesti, ja ne odottavat hyväksyntää (⚠ … ✓).
    Piilotukset tallennetaan palvelimelle salattuina luennoitsijan avaimella, joten ne säilyvät uudelleenlatauksen yli.
@@ -92,8 +97,9 @@ myöhemmin") seuraavat samaa valintaa: *English* → englanti, *Suomi* ja *selai
 
 ### Esitysnäkymä, pikanäppäimet ja puhelinohjain
 
-*Aktiivinen projektorille* on luennon pääesitysnäkymä Teams-jakoon ja salin projektorille. Kulmassa ovat aina
-QR-koodi, liittymiskoodi ja vastausmäärä, ja kysymys on isolla fontilla (yli 40 px 1080p:llä).
+Esitysnäyttö on luennon esitysnäkymä Teams-jakoon ja salin projektorille. Alareunassa ovat aina QR-koodi ja
+liittymiskoodi, ja jokaisessa kysymyksessä sen vastausmäärä. Yksi kysymys täyttää näytön (kysymys yli 40 px 1080p:llä).
+Useampi jaetaan ruudukoksi (enintään 12), ja fontit pienenevät ruudun koon mukaan.
 
 | Näppäin | Toiminto |
 |---|---|
@@ -115,16 +121,18 @@ Projektoria ohjaava läppäri huomaa muutokset parissa sekunnissa.
 
 ### Esitys projektorilla
 
-Kun projektori on kytketty jatketuksi näytöksi (ei peilaus), luennon *…projektorille*-napit avaavat
-erillisen esitysikkunan toiselle näytölle. Hallintanäkymä jää läppärin näytölle.
+Kun projektori on kytketty jatketuksi näytöksi (ei peilaus), *Avaa esitysnäyttö* avaa esitysikkunan.
+Myös *+ Näytölle*, *…projektorille* ja *Näytä projektorilla* avaavat sen, jos se ei ole auki. Hallintanäkymä jää
+läppärin näytölle. Luennon sivun yläosa kertoo, onko esitysnäyttö yhdistetty (● yhdistetty).
 
 - Chrome ja Edge sijoittavat ikkunan automaattisesti (Window Management API). Ensimmäisellä kerralla
-  selain kysyy luvan *ikkunoiden hallintaan*. Jos ponnahdusikkuna estyy luvan kysymisen takia, paina nappia uudelleen.
+  selain kysyy luvan *ikkunoiden hallintaan*. Jos selain estää ponnahdusikkunan, salli ponnahdusikkunat sivulle ja paina nappia uudelleen.
 - Muissa selaimissa ikkuna aukeaa tavallisena ikkunana: raahaa se projektorin näytölle.
 - Kaksoisklikkaus tai F-näppäin vaihtaa koko näytön tilaan, Esc palauttaa.
-- Kysymykset, palautteet ja jokainen kysely avautuvat omiin ikkunoihinsa, jotka voivat olla auki yhtä aikaa.
-  Listat ja tulokset päivittyvät automaattisesti. Napin painaminen tuo ikkunan eteen.
-- *Tyhjennä projektori* tyhjentää näytön. Näyttö tyhjenee myös uloskirjautuessa ja hallintasivun sulkeutuessa.
+- Esitysikkunoita on vain yksi: kaikki näytölle valittu näkyy siinä. Listat ja tulokset päivittyvät automaattisesti.
+- Yhteys palautuu itsestään, jos esitysikkuna tai hallinta ladataan uudelleen (hallinnassa avaimen avauksen jälkeen).
+- *Tyhjennä näyttö* poistaa kaiken näytöltä (näkyviin jää QR-koodi). Näyttö tyhjenee myös uloskirjautuessa ja
+  hallintasivun sulkeutuessa.
 
 ### Ei henkilötietoja
 

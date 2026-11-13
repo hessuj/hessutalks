@@ -74,5 +74,8 @@ MMoIT 2026 -kurssin vaatimukset (ei julkaisuja tapahtuman aikana, DEPLOY_FREEZE)
 on toteutettu vaiheittain PR:inä #8–#17. Tila ja hyväksymistestit: docs/hyvaksymistestit.md.
 Kuormitustesti (H13) läpi tuotannossa 29.10.: 150 osallistujaa, 0 virhettä, tila staattisesta tiedostosta (200 osallistujan SHOULD siirretty).
 Jäljellä: koeajo oikeilla laitteilla ja Teamsilla (H1, H15).
+Koeajo luennolla 13.11.: esitysnäyttö uusittu. Yksi esitysikkuna (BroadcastChannel, tunniste URL:n #-osassa) näyttää
+ruudukkona kaiken näytölle valitun, ja näytöllä voi olla useita kysymyksiä auki (`polls.on_stage`). Annettuja vastauksia
+ei poisteta luennon aikana: tyhjennys vain Valmistelu-tilassa.
 Selaintestit (scripts/e2e.sh) ajetaan aina käyttöliittymämuutosten jälkeen. Sarjojen haku testeissä otsikon mukaan
 (valikot sisältävät muiden sarjojen nimiä).

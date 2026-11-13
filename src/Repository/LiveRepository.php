@@ -7,10 +7,13 @@ namespace HessuTalks\Repository;
 use HessuTalks\Database;
 
 /**
- * Luennon aktiivinen kysymys: kerrallaan korkeintaan yksi, ja kaikki osallistujat näkevät sen.
+ * Näytöllä olevat kysymykset (projektori ja osallistujat) ja niistä aktiivinen.
  *
- * - Vain aktiivinen kysymys voi olla auki. Kun aktiivinen vaihtuu, edellinen suljetaan, jos se oli auki.
- * - Luonnos-tilainen aktiivinen kysymys näkyy esittäjälle, mutta osallistujat näkevät odotusnäkymän.
+ * - Näytöllä voi olla useita kysymyksiä yhtä aikaa (Hessun koeajo 13.11.). Vain näytöllä oleva voi olla auki.
+ *   Näytöltä poistettu kysymys suljetaan, jos se oli auki. Vastaukset säilyvät aina.
+ * - Aktiivinen kysymys on näytöllä olevista se, jota pikanäppäimet ja puhelinohjain ohjaavat.
+ * - Seuraava/Edellinen ja aktivointi vaihtavat näytölle yhden kysymyksen: muut poistetaan näytöltä.
+ * - Luonnos-tilainen kysymys näkyy esittäjälle, mutta osallistujat eivät näe sitä ennen avaamista.
  * - Seuraava/Edellinen kulkee sarjojen ja kysymysten järjestyksessä ja ohittaa ohitetut sarjat.
  * - live_version kasvaa jokaisesta osallistujille näkyvästä muutoksesta. Osallistujan selain
  *   kysyy tilaa sekunnin välein ja saa lyhyen vastauksen, kun mikään ei ole muuttunut.
@@ -50,6 +53,7 @@ final class LiveRepository
         $ok = $this->file->write($eventId, [
             'v' => (int) $event['live_version'],
             'poll' => $closed ? null : $this->participantPoll($event),
+            'polls' => $closed ? [] : $this->participantPolls($eventId),
             'closed' => $closed,
             'closes_at' => isset($event['closes_at']) ? (int) $event['closes_at'] : null,
         ]);
@@ -97,21 +101,80 @@ final class LiveRepository
     }
 
     /**
-     * Asettaa aktiivisen kysymyksen (null = odotusnäkymä). Edellinen aktiivinen suljetaan, jos se oli auki.
-     * false = kysely ei kuulu luennolle.
+     * Näytöllä olevien kysymysten id:t sarjojen ja kysymysten järjestyksessä.
+     * @return list<int>
+     */
+    public function stageIds(int $eventId): array
+    {
+        $rows = $this->db->all(
+            'SELECT p.id FROM polls p JOIN poll_sets s ON s.id = p.set_id
+             WHERE p.event_id = ? AND p.on_stage = 1 ORDER BY s.position ASC, s.id ASC, p.position ASC, p.id ASC',
+            [$eventId],
+        );
+        return array_map(static fn (array $r): int => (int) $r['id'], $rows);
+    }
+
+    /**
+     * Vaihtaa näytölle vain tämän kysymyksen ja tekee siitä aktiivisen (null = odotusnäkymä).
+     * Muut näytöltä poistuvat suljetaan, jos ne olivat auki. false = kysely ei kuulu luennolle.
      */
     public function activate(int $eventId, ?int $pollId): bool
     {
-        if ($pollId !== null && $this->db->one('SELECT id FROM polls WHERE id = ? AND event_id = ?', [$pollId, $eventId]) === null) {
+        if ($pollId !== null && !$this->belongs($eventId, $pollId)) {
             return false;
         }
-        $current = $this->activeId($eventId);
-        if ($current !== null && $current !== $pollId) {
-            $this->db->exec("UPDATE polls SET status = 'closed' WHERE id = ? AND status = 'open'", [$current]);
-        }
+        $this->db->exec(
+            "UPDATE polls SET status = 'closed' WHERE event_id = ? AND on_stage = 1 AND status = 'open' AND id IS NOT ?",
+            [$eventId, $pollId],
+        );
+        $this->db->exec('UPDATE polls SET on_stage = CASE WHEN id IS ? THEN 1 ELSE 0 END WHERE event_id = ?', [$pollId, $eventId]);
         $this->db->exec('UPDATE events SET active_poll_id = ? WHERE id = ?', [$pollId, $eventId]);
         $this->bump($eventId);
         return true;
+    }
+
+    /**
+     * Lisää kysymyksen näytölle muiden rinnalle (ja tekee siitä aktiivisen) tai poistaa sen näytöltä.
+     * Poistettu suljetaan, jos se oli auki; aktiiviseksi tulee viimeinen näytölle jäävä.
+     */
+    public function stage(int $eventId, int $pollId, bool $on): bool
+    {
+        if (!$this->belongs($eventId, $pollId)) {
+            return false;
+        }
+        if ($on) {
+            $this->db->exec('UPDATE polls SET on_stage = 1 WHERE id = ?', [$pollId]);
+            $this->db->exec('UPDATE events SET active_poll_id = ? WHERE id = ?', [$pollId, $eventId]);
+        } else {
+            $this->db->exec("UPDATE polls SET on_stage = 0, status = CASE WHEN status = 'open' THEN 'closed' ELSE status END WHERE id = ?", [$pollId]);
+            $this->refocus($eventId, $pollId);
+        }
+        $this->bump($eventId);
+        return true;
+    }
+
+    /** Jos aktiivinen poistui näytöltä, aktiiviseksi tulee viimeinen näytölle jäänyt (tai ei mikään). */
+    private function refocus(int $eventId, int $removed): void
+    {
+        $left = $this->stageIds($eventId);
+        $this->db->exec(
+            'UPDATE events SET active_poll_id = ? WHERE id = ? AND active_poll_id = ?',
+            [$left === [] ? null : $left[count($left) - 1], $eventId, $removed],
+        );
+    }
+
+    private function belongs(int $eventId, int $pollId): bool
+    {
+        return $this->db->one('SELECT id FROM polls WHERE id = ? AND event_id = ?', [$pollId, $eventId]) !== null;
+    }
+
+    /** Voiko kysymykseen vastata: auki ja näytöllä. */
+    public function answerable(int $eventId, int $pollId): bool
+    {
+        return $this->db->one(
+            "SELECT id FROM polls WHERE id = ? AND event_id = ? AND on_stage = 1 AND status = 'open'",
+            [$pollId, $eventId],
+        ) !== null;
     }
 
     /**
@@ -139,10 +202,10 @@ final class LiveRepository
         return null;
     }
 
-    /** Avaa kyselyn vastauksille ja tekee siitä aktiivisen. */
+    /** Avaa kyselyn vastauksille: se tulee näytölle muiden rinnalle ja aktiiviseksi. */
     public function open(int $eventId, int $pollId): bool
     {
-        if (!$this->activate($eventId, $pollId)) {
+        if (!$this->stage($eventId, $pollId, true)) {
             return false;
         }
         $this->db->exec("UPDATE polls SET status = 'open' WHERE id = ?", [$pollId]);
@@ -153,21 +216,24 @@ final class LiveRepository
     /** Poistaa aktiivisuuden, jos aktiivinen kysymys on poistumassa (kysely tai sen sarja poistetaan). */
     public function forgetPoll(int $eventId, int $pollId): void
     {
-        $this->db->exec('UPDATE events SET active_poll_id = NULL WHERE id = ? AND active_poll_id = ?', [$eventId, $pollId]);
+        $this->db->exec('UPDATE polls SET on_stage = 0 WHERE id = ? AND event_id = ?', [$pollId, $eventId]);
+        $this->refocus($eventId, $pollId);
         $this->bump($eventId);
     }
 
     public function forgetSet(int $eventId, int $setId): void
     {
-        $this->db->exec(
-            'UPDATE events SET active_poll_id = NULL WHERE id = ? AND active_poll_id IN (SELECT id FROM polls WHERE set_id = ?)',
-            [$eventId, $setId],
-        );
+        $ids = $this->db->all('SELECT id FROM polls WHERE set_id = ? AND event_id = ?', [$setId, $eventId]);
+        $this->db->exec('UPDATE polls SET on_stage = 0 WHERE set_id = ? AND event_id = ?', [$setId, $eventId]);
+        foreach ($ids as $r) {
+            $this->refocus($eventId, (int) $r['id']);
+        }
         $this->bump($eventId);
     }
 
     /**
      * Osallistujalle näytettävä aktiivinen kysymys: vain julkiset kentät. Luonnos ei näy (odotusnäkymä).
+     * Vanhojen osallistujasivujen yhteensopivuus; uudet sivut käyttävät participantPolls()-listaa.
      * @param array<string, mixed> $event
      * @return array<string, mixed>|null
      */
@@ -178,12 +244,34 @@ final class LiveRepository
         }
         $row = $this->db->one(
             "SELECT id, type, prompt, config, generation, status, results_visible, revealed, summary FROM polls
-             WHERE id = ? AND event_id = ? AND status IN ('open', 'closed')",
+             WHERE id = ? AND event_id = ? AND on_stage = 1 AND status IN ('open', 'closed')",
             [(int) $event['active_poll_id'], (int) $event['id']],
         );
-        if ($row === null) {
-            return null;
-        }
+        return $row === null ? null : self::publicPoll($row);
+    }
+
+    /**
+     * Osallistujille näytettävät kysymykset (näytöllä, ei luonnokset) näytön järjestyksessä.
+     * @return list<array<string, mixed>>
+     */
+    public function participantPolls(int $eventId): array
+    {
+        $rows = $this->db->all(
+            "SELECT p.id, p.type, p.prompt, p.config, p.generation, p.status, p.results_visible, p.revealed, p.summary
+             FROM polls p JOIN poll_sets s ON s.id = p.set_id
+             WHERE p.event_id = ? AND p.on_stage = 1 AND p.status IN ('open', 'closed')
+             ORDER BY s.position ASC, s.id ASC, p.position ASC, p.id ASC",
+            [$eventId],
+        );
+        return array_map(self::publicPoll(...), $rows);
+    }
+
+    /**
+     * @param array<string, mixed> $row
+     * @return array<string, mixed>
+     */
+    private static function publicPoll(array $row): array
+    {
         $config = json_decode((string) $row['config'], true);
         $config = is_array($config) ? $config : [];
         $summary = (int) $row['results_visible'] === 1 && is_string($row['summary']) ? json_decode($row['summary'], true) : null;

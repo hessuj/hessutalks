@@ -13,7 +13,7 @@ use HessuTalks\Security\Clock;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Aktiivinen kysymys ja sarjat: vain yksi aktiivinen, vain aktiivinen voi olla auki,
+ * Näyttö ja sarjat: useita kysymyksiä näytöllä, vain näytöllä oleva voi olla auki, yksi aktiivinen,
  * Seuraava/Edellinen ohittaa ohitetut sarjat, ja luonnos näkyy osallistujalle odotusnäkymänä.
  */
 final class LiveRepositoryTest extends TestCase
@@ -61,23 +61,57 @@ final class LiveRepositoryTest extends TestCase
         return (array) $this->events->find($this->eventId);
     }
 
-    public function testOnlyActivePollIsOpenAndSwitchingClosesPrevious(): void
+    public function testOpeningAddsToStageAndActivatingReplacesStage(): void
     {
         $s = $this->set('M1');
         $a = $this->poll($s);
         $b = $this->poll($s);
+        $c = $this->poll($s);
         self::assertTrue($this->live->open($this->eventId, $a));
         self::assertSame($a, $this->live->activeId($this->eventId));
         self::assertSame('open', $this->pollStatus($a));
 
+        // Hessun koeajo 13.11.: useita kysymyksiä yhtä aikaa näytölle ja auki.
         self::assertTrue($this->live->open($this->eventId, $b));
-        self::assertSame('closed', $this->pollStatus($a), 'Edellinen aktiivinen suljetaan');
+        self::assertSame('open', $this->pollStatus($a), 'Edellinen jää auki näytölle');
         self::assertSame('open', $this->pollStatus($b));
-        self::assertSame(1, (int) ($this->db->one("SELECT COUNT(*) AS n FROM polls WHERE status = 'open'")['n'] ?? 0));
+        self::assertSame([$a, $b], $this->live->stageIds($this->eventId));
+        self::assertSame($b, $this->live->activeId($this->eventId), 'Viimeksi avattu on aktiivinen');
+        self::assertTrue($this->live->answerable($this->eventId, $a));
+        self::assertTrue($this->live->answerable($this->eventId, $b));
+        self::assertFalse($this->live->answerable($this->eventId, $c), 'Näytön ulkopuolinen ei ota vastauksia');
+
+        // Aktivointi (rivin klikkaus, Seuraava) vaihtaa näytölle yhden kysymyksen ja sulkee muut.
+        self::assertTrue($this->live->activate($this->eventId, $c));
+        self::assertSame([$c], $this->live->stageIds($this->eventId));
+        self::assertSame('closed', $this->pollStatus($a));
+        self::assertSame('closed', $this->pollStatus($b));
 
         self::assertTrue($this->live->activate($this->eventId, null));
         self::assertNull($this->live->activeId($this->eventId));
-        self::assertSame('closed', $this->pollStatus($b), 'Odotusnäkymään siirtyminen sulkee avoimen');
+        self::assertSame([], $this->live->stageIds($this->eventId));
+    }
+
+    public function testStageToggleKeepsAnswersAndMovesFocus(): void
+    {
+        $s = $this->set('M1');
+        $a = $this->poll($s);
+        $b = $this->poll($s);
+        $this->live->open($this->eventId, $a);
+        $this->db->exec("INSERT INTO poll_answers (poll_id, voter_hash, ciphertext, created_at) VALUES (?, 'v1', 'x', 1)", [$a]);
+        self::assertTrue($this->live->stage($this->eventId, $b, true));
+        self::assertSame('draft', $this->pollStatus($b), 'Näytölle lisäys ei avaa vastauksille');
+        self::assertSame($b, $this->live->activeId($this->eventId));
+
+        self::assertTrue($this->live->stage($this->eventId, $b, false));
+        self::assertSame($a, $this->live->activeId($this->eventId), 'Aktiiviseksi jää näytölle jäänyt');
+        self::assertTrue($this->live->stage($this->eventId, $a, false));
+        self::assertSame('closed', $this->pollStatus($a), 'Näytöltä poistettu suljetaan');
+        self::assertNull($this->live->activeId($this->eventId));
+        self::assertSame(1, (int) ($this->db->one('SELECT COUNT(*) AS n FROM poll_answers WHERE poll_id = ?', [$a])['n'] ?? 0), 'Vastaukset säilyvät');
+
+        $foreign = (int) $this->events->create('Toinen', null)['id'];
+        self::assertFalse($this->live->stage($foreign, $a, true), 'Toisen luennon kautta ei voi lisätä');
     }
 
     public function testStepSkipsSkippedSetsAndStopsAtEnds(): void
@@ -210,6 +244,38 @@ final class LiveRepositoryTest extends TestCase
         $new->exec("INSERT INTO polls (event_id, set_id, type, prompt, created_at, updated_at) VALUES (1, 1, 'open', 'Avoin?', 1, 1)");
         $new->exec('DELETE FROM polls WHERE id = 1');
         self::assertSame(0, (int) ($new->one('SELECT COUNT(*) AS n FROM poll_answers')['n'] ?? -1), 'ON DELETE CASCADE toimii uudessa taulussa');
+        array_map('unlink', glob($dir . '/*') ?: []);
+        rmdir($dir);
+    }
+
+    /** Migraatio 006 (näyttö): aktiivinen kysely siirtyy näytölle auki pysyen, kaikki vastaukset säilyvät. */
+    public function testStageMigrationKeepsAnswersAndActivePoll(): void
+    {
+        $dir = sys_get_temp_dir() . '/hessutalks-migr-' . bin2hex(random_bytes(4));
+        mkdir($dir);
+        foreach (glob(dirname(__DIR__, 2) . '/migrations/*.sql') ?: [] as $f) {
+            if (basename($f) < '006') {
+                copy($f, $dir . '/' . basename($f));
+            }
+        }
+        $file = $dir . '/test.sqlite';
+        $old = new Database($file, $dir);
+        $old->exec("INSERT INTO events (code, title, status, created_at) VALUES ('ABCDEF', 'Koeajo', 'open', 1)");
+        $old->exec("INSERT INTO poll_sets (event_id, slug, title, position, created_at) VALUES (1, 'M1', 'M1', 1, 1)");
+        $old->exec("INSERT INTO polls (event_id, set_id, position, type, prompt, status, created_at, updated_at) VALUES (1, 1, 1, 'single', 'Vanha', 'closed', 1, 1), (1, 1, 2, 'words', 'Auki', 'open', 1, 1)");
+        $old->exec("INSERT INTO poll_answers (poll_id, voter_hash, ciphertext, created_at) VALUES (1, 'h1', 'x', 1), (1, 'h2', 'y', 1), (2, 'h1', 'z', 1)");
+        $old->exec('UPDATE events SET active_poll_id = 2 WHERE id = 1');
+        unset($old);
+
+        $new = new Database($file, dirname(__DIR__, 2) . '/migrations');
+        self::assertSame(3, (int) ($new->one('SELECT COUNT(*) AS n FROM poll_answers')['n'] ?? 0), 'Vastaukset säilyvät');
+        self::assertSame([[1, 'closed', 0], [2, 'open', 1]], array_map(
+            static fn (array $r): array => [(int) $r['id'], $r['status'], (int) $r['on_stage']],
+            $new->all('SELECT id, status, on_stage FROM polls ORDER BY id'),
+        ));
+        $live = new LiveRepository($new);
+        self::assertTrue($live->answerable(1, 2), 'Luennon aikana auki ollut ottaa yhä vastauksia');
+        self::assertSame(2, $live->activeId(1));
         array_map('unlink', glob($dir . '/*') ?: []);
         rmdir($dir);
     }

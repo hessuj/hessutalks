@@ -32,19 +32,24 @@ row makes that question active). The live mode has no edit or delete buttons.
 1. On the lecture page, create the sets (*Uusi sarja*, new set) and their questions (*Uusi kysymys*, new question) before the lecture.
    Sets and questions can be moved with the arrows, and a set can be **skipped** during the lecture. The questions of a skipped
    set are left out of the Next/Previous order, but their answers are kept.
-2. A lecture has one **active question** at a time, seen by all participants. In the control bar,
-   *Seuraava →* and *← Edellinen* (next/previous) change the active question, *Avaa vastauksille* and *Sulje vastaukset*
-   (open/close for answers) control answering, and *Odotusnäkymä* (waiting screen) removes the active question.
-   An active question in draft state is shown on the projector, but participants see the waiting screen
-   (*Waiting for the next question…*) until you open it. Only the active question can be open.
+2. One or more questions can be **on screen** at the same time: the projector shows them as a grid, and participants
+   see them one below the other and can answer every open one. In the lecture mode list, *+ Näytölle* (to screen) adds a
+   question next to the others and *✓ Näytöllä* (on screen) removes it. Clicking a row, *Seuraava →* and *← Edellinen*
+   (next/previous) put a single question on screen. *Avaa vastauksille* (open for answers) brings the question on screen
+   next to the others. *Pois näytöltä* (off screen) closes the question, and *Odotusnäkymä* (waiting screen) removes all. Answers are always kept.
+   The question brought on screen last is the **active** one: keyboard shortcuts and the phone remote control it, and the
+   other questions on screen have their own rows in the control bar (*Aktiiviseksi* (make active), *Avaa vastauksille*,
+   *Näytä tulokset*, …). A question in draft state is shown on the projector, but participants see it only after you open it
+   (until then *Waiting for the next question…*). Only a question on screen can be open.
 3. Participants use the same lecture QR code or link the whole time. The view changes by itself within about
    a second without reloading the page. After a connection loss the page reconnects, and the participant's own answer survives a reload.
 4. **Results and reveal:** results are hidden at first (the projector shows the question, the options and the answer count).
    *Näytä tulokset* (show results) brings them to the projector and, as a summary, to the participants' phones (multiple choice and scales).
    *Paljasta oikea vastaus* (reveal correct answer) highlights the correct options and shows the explanations, if the question has a correct answer.
    Correct answers and explanations are entered in the question form or the JSON file, and they are not sent to participants before the reveal.
-5. *Aktiivinen projektorille* (active to projector) opens a window that follows the active question and its results (without an active question
-   it shows the lecture QR code). *Tulokset projektorille* (results to projector) shows the results of a single question in its own window.
+5. The **presenter display** is a single window (*Avaa esitysnäyttö*, open presenter display, at the top of the lecture page), and it shows
+   everything chosen for the screen at once: questions with their results, the *Kysymykset projektorille* and *Palautteet projektorille*
+   (questions/feedback to projector) lists and a message picked with *Näytä projektorilla* (show on projector). Empty screen: the lecture QR code.
 6. **Moderation:** an open-text answer can be hidden with the *Piilota* (hide) button and a word-cloud word by clicking it. A hidden item disappears from the projector immediately.
    The profanity filter (English and Finnish) hides matches automatically, and they wait for approval (⚠ … ✓).
    Hidden items are stored on the server encrypted with the lecturer's key, so they persist across reloads.
@@ -92,8 +97,9 @@ be shown later") follow the same choice: *English* → English, *Suomi* and *by 
 
 ### Presenter view, keyboard shortcuts and phone remote
 
-*Aktiivinen projektorille* is the main presenter view for Teams sharing and the room projector. The corner always shows
-the QR code, join code and answer count, and the question is in a large font (over 40 px at 1080p).
+The presenter display is the lecture's presenter view for Teams sharing and the room projector. The bottom always shows the
+QR code and join code, and each question shows its answer count. A single question fills the screen (question over 40 px at 1080p).
+Several are split into a grid (at most 12), and the fonts shrink with the tile size.
 
 | Key | Action |
 |---|---|
@@ -115,16 +121,18 @@ The laptop driving the projector picks up the changes within a couple of seconds
 
 ### Projector presentation
 
-When the projector is connected as an extended display (not mirrored), the lecture's *…projektorille* (to projector) buttons open
-a separate presenter window on the second display. The admin view stays on the laptop screen.
+When the projector is connected as an extended display (not mirrored), *Avaa esitysnäyttö* opens the presenter window.
+*+ Näytölle*, *…projektorille* and *Näytä projektorilla* also open it if it is not open. The admin view stays on the laptop
+screen. The top of the lecture page shows whether the presenter display is connected (● yhdistetty).
 
 - Chrome and Edge place the window automatically (Window Management API). The first time,
-  the browser asks for permission to *manage windows*. If the pop-up is blocked because of the permission prompt, press the button again.
+  the browser asks for permission to *manage windows*. If the browser blocks the pop-up, allow pop-ups for the page and press the button again.
 - In other browsers the window opens as a normal window: drag it to the projector display.
 - Double-click or the F key toggles full screen, Esc exits.
-- Questions, feedback and each poll open in their own windows, which can be open at the same time.
-  Lists and results update automatically. Pressing the button brings the window to the front.
-- *Tyhjennä projektori* (clear projector) blanks the display. The display is also cleared on sign-out and when the admin page is closed.
+- There is only one presenter window: everything chosen for the screen is shown in it. Lists and results update automatically.
+- The connection recovers by itself if the presenter window or the admin view is reloaded (in the admin view after unlocking the key).
+- *Tyhjennä näyttö* (clear screen) removes everything from the screen (the QR code remains). The display is also cleared on
+  sign-out and when the admin page is closed.
 
 ### No personal data
 
