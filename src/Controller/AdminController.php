@@ -507,6 +507,11 @@ final class AdminController
                     $this->live->open((int) $event['id'], $id);
                     break;
                 }
+                // Luonnokseksi: pois näytöltä ja osallistujilta, vastaukset säilyvät (issue #39).
+                if ($status === 'draft') {
+                    $this->live->toDraft((int) $event['id'], $id);
+                    break;
+                }
                 try {
                     $this->polls->setStatus($id, $status);
                 } catch (\InvalidArgumentException $e) {

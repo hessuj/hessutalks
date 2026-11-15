@@ -41,6 +41,8 @@ row makes that question active). The live mode has no edit or delete buttons.
    other questions on screen have their own rows in the control bar (*Aktiiviseksi* (make active), *Avaa vastauksille*,
    *Näytä tulokset*, …). A question in draft state is shown on the projector, but participants see it only after you open it
    (until then *Waiting for the next question…*). Only a question on screen can be open.
+   *Palauta luonnokseksi* (back to draft) in the Valmistelu (preparation) mode takes a published question off the screen and away
+   from participants and hides its results and correct answer. Given answers are kept, and the question can be published again.
 3. Participants use the same lecture QR code or link the whole time. The view changes by itself within about
    a second without reloading the page. After a connection loss the page reconnects, and the participant's own answer survives a reload.
 4. **Results and reveal:** results are hidden at first (the projector shows the question, the options and the answer count).
