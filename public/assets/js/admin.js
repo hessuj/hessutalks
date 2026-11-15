@@ -724,7 +724,7 @@
    * Luennon kysymyssarjat ja kyselyt: luonti, järjestys, ohitus, aktiivisen kysymyksen ohjaus
    * ja reaaliaikaiset tulokset. Vastaukset puretaan tässä selaimessa; palvelin ei näe niitä.
    */
-  function pollsPanel(eventId, getEvent, onChange) {
+  function pollsPanel(eventId, getEvent, onChange, getMessages) {
     var sets = [];
     var polls = [];
     var active = null;      // aktiivisen kysymyksen id tai null (odotusnäkymä)
@@ -759,6 +759,7 @@
       h('button.btn.ghost.small', { type: 'button', text: 'Tuo JSON', title: 'Tuo sarjat JSON-tiedostosta', onclick: function () { fileInput.click(); } }),
       h('button.btn.ghost.small', { type: 'button', text: 'Vie JSON', title: 'Lataa kaikki sarjat JSON-tiedostona', onclick: function () { exportJson(null); } }),
       h('button.btn.ghost.small', { type: 'button', text: 'Vie CSV', title: 'Tulokset taulukkona (puretaan tässä selaimessa)', onclick: function () { exportCsv(null); } }),
+      h('button.btn.ghost.small', { type: 'button', text: 'Vie Markdown', title: 'Luennon kysymykset, tulokset ja osallistujien viestit raporttina (puretaan tässä selaimessa)', onclick: exportMarkdown }),
       h('button.btn.small', { type: 'button', text: 'Uusi sarja', onclick: function () { showSetForm(null); } }));
     var el = h('section.polls-admin', null, fileInput,
       h('div.toolbar', null, h('h2', { text: 'Kysymyssarjat' }),
@@ -966,6 +967,36 @@
       }).catch(fail);
     }
 
+    /**
+     * Koko luennon (tai luentosarjan) raportti Markdownina: sarjat, kysymykset ja tulokset sekä osallistujien
+     * kysymykset ja palautteet. Puretaan tässä selaimessa, joten palvelin ei näe sisältöä. Ei nimimerkkejä
+     * eikä tunnisteita; moderoinnissa piilotetut ja arkistoidut viestit jäävät pois.
+     */
+    function exportMarkdown() {
+      loadAllAnswers().then(function () {
+        var ev = getEvent();
+        var msgs = { questions: [], feedback: [] };
+        (getMessages ? getMessages() : []).forEach(function (it) {
+          var m = it.msg;
+          if (!m || m.e !== ev.code || typeof m.t !== 'string' || it.status === 'archived') return;
+          msgs[m.k === 'feedback' ? 'feedback' : 'questions'].push(m.t);
+        });
+        var md = HessuResults.markdown({
+          title: ev.title, code: ev.code, url: ev.url, lang: ev.lang === 'en' ? 'en' : 'fi', date: new Date().toISOString().slice(0, 10),
+          sets: sets.map(function (set) {
+            return { slug: set.slug, title: set.title, polls: polls.filter(function (p) { return p.set_id === set.id; }).map(function (poll) {
+              return { prompt: poll.prompt, type: poll.type, config: poll.config, data: tallyFor(poll) };
+            }) };
+          }),
+          messages: msgs
+        });
+        var blob = new Blob([md], { type: 'text/markdown;charset=utf-8' });
+        var a = h('a', { href: URL.createObjectURL(blob), download: 'hessutalks-' + ev.code + '-raportti.md' });
+        document.body.appendChild(a); a.click(); a.remove();
+        setTimeout(function () { URL.revokeObjectURL(a.href); }, 1000);
+      }).catch(fail);
+    }
+
     // ---------------------------------------------------------------- esikatselu (vaatimus 6)
 
     function previewParticipant(poll) {
@@ -1105,7 +1136,7 @@
           controlCount),
         h('div.q-actions', null,
           h('button.btn.ghost.small', { type: 'button', text: '← Edellinen', onclick: function () { liveAct({ action: 'prev' }); } }),
-          h('button.btn.small', { type: 'button', text: 'Seuraava →', title: 'Vaihtaa näytölle seuraavan kysymyksen (muut pois näytöltä)', onclick: function () { liveAct({ action: 'next' }); } }),
+          h('button.btn.small', { type: 'button', text: 'Seuraava →', title: 'Vaihtaa aktiivisen kysymyksen seuraavaan (muut näytöllä olevat pysyvät)', onclick: function () { liveAct({ action: 'next' }); } }),
           poll ? pollButtons(poll) : null,
           staged().length ? h('button.btn.ghost.small', { type: 'button', text: 'Odotusnäkymä', title: 'Kaikki kysymykset pois näytöltä', onclick: function () { liveAct({ action: 'activate', poll: null }); } }) : null),
         others.length ? h('p.eyebrow', { text: 'Muut näytöllä (' + others.length + ')' }) : null,
@@ -1201,8 +1232,8 @@
           var isActive = p.id === active;
           list.appendChild(h('li', null, h('button.run-row' + (isActive ? '.active' : '') + (p.on_stage ? '.staged' : ''), {
             type: 'button', 'aria-current': isActive ? 'true' : null, 'data-poll': String(p.id),
-            title: isActive ? 'Aktiivinen kysymys' : 'Vaihda näytölle vain tämä (avaa vastauksille ohjauspalkista)',
-            onclick: function () { if (!isActive || staged().length > 1) liveAct({ action: 'activate', poll: p.id }); }
+            title: isActive ? 'Aktiivinen kysymys' : 'Näytölle muiden rinnalle ja aktiiviseksi (avaa vastauksille ohjauspalkista)',
+            onclick: function () { if (!isActive) liveAct({ action: 'activate', poll: p.id }); }
           },
             h('span.run-num', { text: String(n) }),
             h('span.run-type', { text: TYPE_SHORT[p.type] || p.type }),
@@ -1459,7 +1490,7 @@
     var listEl = h('ul.questions');
     var headEl = h('div');
     var countEl = h('span.hint');
-    var panel = pollsPanel(id, function () { return event; }, function () { renderStageBar(); updateScreens(); });
+    var panel = pollsPanel(id, function () { return event; }, function () { renderStageBar(); updateScreens(); }, function () { return items; });
 
     // Mitä näytöllä on kyselyjen lisäksi: kysymys- ja palautelista ja yksittäinen viesti. Muistetaan tämän
     // välilehden ajan (uudelleenlataus). Viestistä vain id: purettu teksti ei jää selaimen tallennukseen.

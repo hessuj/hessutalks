@@ -43,6 +43,7 @@ Todennustavat:
 | 7 | Nopeusrajat (laite 10/min, osoitetiiviste 600/min hiljaa), julkaisujäädytys | ✅ PR #16 (`DeployFreezeTest`) |
 | 8 | SHOULD: CSV-vienti (kaavainjektion esto), sarjan monistus, kysymyksen siirto, esikatselu. (Tulokset osallistujille, teemat, kirosanasuodatin ja puhelinohjain tehtiin vaiheissa 4–6.) | ✅ PR #17 (`should.mjs`) |
 | 9 | Ensimmäisen luentokoeajon korjaukset: yksi esitysikkuna ruudukkona (kysymykset, kysymys- ja palautelista, viesti), useita kysymyksiä näytöllä ja auki yhtä aikaa, yhteys palautuu uudelleenlatauksen jälkeen, vastausten tyhjennys vain Valmistelu-tilassa | ✅ PR #40, #41 ([poikkeamakatselmus](poikkeama-esitysnaytto.md), `stage-multi.mjs`, `testSeveralPollsOnStageAcceptAnswersUntilRemoved`, `testStageMigrationKeepsAnswersAndActivePoll`) |
+| 10 | Luentopalautteen backlog: kaksi tai useampi kysymys auki aina (rivin klikkaus ja Seuraava eivät sulje muita), istunto 3 h toimettomuutta, Markdown-raportti koko luennosta tai luentosarjasta | ✅ tämä PR (`stage-multi.mjs`, `testOpeningAndActivatingKeepOtherQuestionsOpen`, `testSessionSurvivesTwoHoursWithoutActivity`, Node `results.test.mjs`) |
 
 ## Vaatimusten kattavuus
 

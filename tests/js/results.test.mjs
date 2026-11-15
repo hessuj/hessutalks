@@ -138,3 +138,43 @@ test('CSV: puolipiste-erotin, lainausmerkit ja kaavainjektion esto', () => {
   assert.equal(R.csvCell(null), '');
   assert.equal(R.csv([['a', 'b'], ['=1', 'x;y']]), "a;b\r\n'=1;\"x;y\"\r\n");
 });
+
+// ---------------------------------------------------------------- Markdown-raportti
+
+const report = (overrides = {}) => ({
+  title: 'Cyber course', code: 'ABC123', url: 'https://example.com/k/ABC123', lang: 'en', date: '2026-01-02',
+  sets: [{ slug: 'M1', title: 'Warm-up', polls: [
+    { prompt: 'Which risk?', type: 'single', config: { options: ['Phishing', 'Ransomware'], correct: [1], explanations: ['Common', 'Most costly'] }, data: { voters: 4, counts: [1, 3] } },
+    { prompt: 'Security slows us down', type: 'likert', config: { points: 5, min_label: 'Disagree', max_label: 'Agree' }, data: { voters: 2, counts: [0, 1, 0, 1, 0], from: 1, mean: 3, median: 3 } },
+    { prompt: 'One word?', type: 'words', config: {}, data: { voters: 3, words: [['trust', 2], ['safety', 1]] } },
+    { prompt: 'Ask anything', type: 'open', config: {}, data: { voters: 3, hidden: 1, items: [{ id: 2, text: 'Second\nline two', ts: 20 }, { id: 1, text: 'First', ts: 10 }] } },
+  ] }],
+  messages: { questions: ['How do I patch?'], feedback: [] },
+  ...overrides,
+});
+
+test('Markdown-raportti: otsikot, taulukot, oikea vastaus, tunnusluvut ja viestit', () => {
+  const md = R.markdown(report());
+  for (const part of [
+    '# Cyber course', 'Code ABC123', '## M1 · Warm-up', '### 1. Which risk?', '*Multiple choice · 4 answers*',
+    '| Option | Answers | % |', '| Phishing | 1 | 25 % |', '| ✓ Ransomware | 3 | 75 % |', '**Correct answer:** Ransomware',
+    '- **Ransomware:** Most costly', '| 1 (Disagree) | 0 | 0 % |', '| 5 (Agree) | 0 | 0 % |', '**Average 3.00** · median 3',
+    '| trust | 2 |', '- First\n- Second  \n  line two', '*1 hidden in moderation.*',
+    '## Questions and feedback from participants', '### Questions', '- How do I patch?', '### Feedback\n\nNo messages.',
+  ]) assert.ok(md.includes(part), 'puuttuu: ' + part);
+  assert.ok(md.indexOf('- First') < md.indexOf('- Second'), 'avoimet vastaukset vanhimmasta uusimpaan');
+  assert.ok(!/\n{3,}/.test(md), 'ei tyhjiä rivejä peräkkäin');
+  assert.ok(R.markdown(report({ lang: 'fi' })).includes('*Monivalinta · 4 vastausta*'));
+});
+
+test('Markdown-raportti: osallistujan teksti ei muutu HTML:ksi, linkiksi, kuvaksi, otsikoksi eikä taulukoksi', () => {
+  const evil = ['<script>alert(1)</script>', '[click](javascript:alert(1))', '![x](https://evil.example/x.png)', '# Heading', '| a | b |', '**bold**', '---', '1. list', '> quote'];
+  const md = R.markdown(report({ messages: { questions: evil, feedback: [] }, sets: [] }));
+  assert.ok(!md.includes('<script>'), 'ei raakaa HTML:ää');
+  assert.ok(md.includes('\\<script\\>'));
+  assert.ok(md.includes('\\[click\\](javascript:alert(1))'), 'ei linkkiä');
+  assert.ok(md.includes('!\\[x\\]'), 'ei kuvaa');
+  assert.ok(md.includes('- \\# Heading') && md.includes('- \\| a \\| b \\|') && md.includes('- \\*\\*bold\\*\\*'));
+  assert.ok(md.includes('- \\---') && md.includes('- 1\\. list') && md.includes('- \\> quote'));
+  assert.equal(R.mdEscape('e.g. 3.5 - ok (yes)!'), 'e.g. 3.5 - ok (yes)!', 'tavallinen teksti pysyy luettavana');
+});

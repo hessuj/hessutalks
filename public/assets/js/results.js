@@ -165,6 +165,112 @@
     return rows.map(function (r) { return r.map(csvCell).join(';'); }).join('\r\n') + '\r\n';
   }
 
+  // ---------------------------------------------------------------- Markdown-raportti
+
+  var MD_TEXT = {
+    fi: {
+      code: 'Koodi', exported: 'Viety HessuTalksista', anon: 'Vastaukset ovat nimettömiä. Moderoinnissa piilotetut vastaukset eivät ole mukana.',
+      types: { single: 'Monivalinta', multi: 'Monivalinta, useita vastauksia', open: 'Avoin teksti', words: 'Sanapilvi', likert: 'Likert-asteikko', scale: 'Asteikko 0–10' },
+      answers: function (n) { return n === 1 ? '1 vastaus' : n + ' vastausta'; }, option: 'Vaihtoehto', value: 'Arvo', word: 'Sana', count: 'Vastauksia',
+      correct: 'Oikea vastaus', mean: 'Keskiarvo', median: 'mediaani', none: 'Ei vastauksia.', hidden: function (n) { return n + ' piilotettu moderoinnissa.'; },
+      messages: 'Osallistujien kysymykset ja palaute', questions: 'Kysymykset', feedback: 'Palaute', noMessages: 'Ei viestejä.', locale: 'fi-FI'
+    },
+    en: {
+      code: 'Code', exported: 'Exported from HessuTalks', anon: 'Answers are anonymous. Answers hidden in moderation are left out.',
+      types: { single: 'Multiple choice', multi: 'Multiple choice, several answers', open: 'Open text', words: 'Word cloud', likert: 'Likert scale', scale: 'Scale 0–10' },
+      answers: function (n) { return n === 1 ? '1 answer' : n + ' answers'; }, option: 'Option', value: 'Value', word: 'Word', count: 'Answers',
+      correct: 'Correct answer', mean: 'Average', median: 'median', none: 'No answers.', hidden: function (n) { return n + ' hidden in moderation.'; },
+      messages: 'Questions and feedback from participants', questions: 'Questions', feedback: 'Feedback', noMessages: 'No messages.', locale: 'en-GB'
+    }
+  };
+
+  /**
+   * Osallistujan teksti Markdowniin tekstinä: erikoismerkit escapoidaan, joten teksti ei voi muuttua
+   * HTML:ksi, linkiksi, otsikoksi tai taulukoksi raporttia näytettäessä.
+   */
+  function mdEscape(v) {
+    return String(v === null || v === undefined ? '' : v)
+      .replace(/[\\`*_\[\]<>|~]/g, '\\$&')
+      // Rivin alussa: otsikko, lainaus, lista tai numeroitu lista; pelkkä =- tai --rivi tekisi otsikon.
+      .replace(/^(\s*)([#+-])(?=\s|$)/gm, '$1\\$2')
+      .replace(/^(\s*)(\d+)([.)])(?=\s|$)/gm, '$1$2\\$3')
+      .replace(/^(\s*)(=+|-+)\s*$/gm, '$1\\$2');
+  }
+  /** Taulukon solu: rivinvaihdot välilyönneiksi. */
+  function mdCell(v) { return mdEscape(String(v).replace(/\s*\n\s*/g, ' ')); }
+  /** Listan kohta: monirivinen teksti sisennetään, jotta se pysyy samassa kohdassa. */
+  function mdItem(v) { return '- ' + mdEscape(v).split('\n').map(function (l) { return l.trim(); }).filter(Boolean).join('  \n  '); }
+
+  /**
+   * Luennon (tai luentosarjan) kysymykset ja vastaukset Markdown-raportiksi. Puhdas funktio: kaikki data
+   * annetaan valmiiksi purettuna ja laskettuna (tally). Raportti ei sisällä nimimerkkejä eikä tunnisteita.
+   * r = { title, code, url, lang, date, sets: [{ slug, title, polls: [{ prompt, type, config, data }] }],
+   *       messages: { questions: [teksti], feedback: [teksti] } }
+   */
+  function markdown(r) {
+    var t = MD_TEXT[r.lang === 'en' ? 'en' : 'fi'];
+    var out = ['# ' + mdEscape(r.title), '', t.code + ' ' + mdEscape(r.code) + (r.url ? ' · ' + mdEscape(r.url) : ''), '',
+      '*' + t.exported + (r.date ? ' ' + mdEscape(r.date) : '') + '. ' + t.anon + '*', ''];
+    (r.sets || []).forEach(function (set) {
+      out.push('## ' + mdEscape(set.slug) + ' · ' + mdEscape(set.title), '');
+      set.polls.forEach(function (poll, i) {
+        var d = poll.data || { voters: 0 };
+        var cfg = poll.config || {};
+        out.push('### ' + (i + 1) + '. ' + mdEscape(poll.prompt), '', '*' + (t.types[poll.type] || poll.type) + ' · ' + t.answers(d.voters) + '*', '');
+        if (poll.type === 'single' || poll.type === 'multi') {
+          var correct = Array.isArray(cfg.correct) ? cfg.correct : [];
+          out.push('| ' + t.option + ' | ' + t.count + ' | % |', '|---|---:|---:|');
+          (cfg.options || []).forEach(function (opt, j) {
+            var n = (d.counts || [])[j] || 0;
+            out.push('| ' + (correct.indexOf(j) !== -1 ? '✓ ' : '') + mdCell(opt) + ' | ' + n + ' | ' + pct(n, d.voters) + ' % |');
+          });
+          out.push('');
+          if (correct.length) {
+            out.push('**' + t.correct + ':** ' + correct.map(function (j) { return mdEscape((cfg.options || [])[j]); }).join(', '), '');
+            if (Array.isArray(cfg.explanations)) {
+              cfg.explanations.forEach(function (e, j) { if (e) out.push('- **' + mdEscape((cfg.options || [])[j]) + ':** ' + mdEscape(e)); });
+              out.push('');
+            }
+          }
+        } else if (poll.type === 'likert' || poll.type === 'scale') {
+          var from = typeof d.from === 'number' ? d.from : (poll.type === 'scale' ? 0 : 1);
+          out.push('| ' + t.value + ' | ' + t.count + ' | % |', '|---:|---:|---:|');
+          (d.counts || []).forEach(function (n, j) {
+            var v = from + j;
+            var label = j === 0 && cfg.min_label ? ' (' + mdCell(cfg.min_label) + ')' : j === d.counts.length - 1 && cfg.max_label ? ' (' + mdCell(cfg.max_label) + ')' : '';
+            out.push('| ' + v + label + ' | ' + n + ' | ' + pct(n, d.voters) + ' % |');
+          });
+          out.push('');
+          if (typeof d.mean === 'number') out.push('**' + t.mean + ' ' + fmt(d.mean, 2, t.locale) + '** · ' + t.median + ' ' + fmt(d.median, d.median % 1 ? 1 : 0, t.locale), '');
+        } else if (poll.type === 'words') {
+          if (!(d.words || []).length) out.push(t.none, '');
+          else {
+            out.push('| ' + t.word + ' | ' + t.count + ' |', '|---|---:|');
+            d.words.forEach(function (w) { out.push('| ' + mdCell(w[0]) + ' | ' + w[1] + ' |'); });
+            out.push('');
+          }
+        } else {
+          var items = (d.items || []).slice().sort(function (x, y) { return (x.ts || 0) - (y.ts || 0) || (x.id || 0) - (y.id || 0); });
+          if (!items.length) out.push(t.none);
+          items.forEach(function (it) { out.push(mdItem(typeof it === 'string' ? it : it.text)); });
+          out.push('');
+          if (d.hidden) out.push('*' + t.hidden(d.hidden) + '*', '');
+        }
+      });
+    });
+    var m = r.messages;
+    if (m) {
+      out.push('## ' + t.messages, '');
+      [['questions', t.questions], ['feedback', t.feedback]].forEach(function (k) {
+        out.push('### ' + k[1], '');
+        if (!(m[k[0]] || []).length) out.push(t.noMessages);
+        (m[k[0]] || []).forEach(function (text) { out.push(mdItem(text)); });
+        out.push('');
+      });
+    }
+    return out.join('\n').replace(/\n{3,}/g, '\n\n').trim() + '\n';
+  }
+
   /** Projektorille ja osallistujille: ilman oikeita vastauksia ja selityksiä (paljastetaan erikseen). */
   function publicConfig(config) {
     var out = {};
@@ -382,7 +488,7 @@
   var api = {
     validAnswer: validAnswer, normalizeWords: normalizeWords, tally: tally, render: render,
     isProfane: isProfane, emptyModeration: emptyModeration, publicConfig: publicConfig, OPEN_MAX: OPEN_MAX, OPEN_LIMIT: OPEN_LIMIT, OPEN_CLIP: OPEN_CLIP, openMax: openMax, clip: clip,
-    isHiddenWord: isHiddenWord, isHiddenAnswer: isHiddenAnswer, csv: csv, csvCell: csvCell
+    isHiddenWord: isHiddenWord, isHiddenAnswer: isHiddenAnswer, csv: csv, csvCell: csvCell, markdown: markdown, mdEscape: mdEscape
   };
   if (typeof module === 'object' && module.exports) module.exports = api;
   else global.HessuResults = api;

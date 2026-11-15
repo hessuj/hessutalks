@@ -61,7 +61,7 @@ final class LiveRepositoryTest extends TestCase
         return (array) $this->events->find($this->eventId);
     }
 
-    public function testOpeningAddsToStageAndActivatingReplacesStage(): void
+    public function testOpeningAndActivatingKeepOtherQuestionsOpen(): void
     {
         $s = $this->set('M1');
         $a = $this->poll($s);
@@ -81,11 +81,20 @@ final class LiveRepositoryTest extends TestCase
         self::assertTrue($this->live->answerable($this->eventId, $b));
         self::assertFalse($this->live->answerable($this->eventId, $c), 'Näytön ulkopuolinen ei ota vastauksia');
 
-        // Aktivointi (rivin klikkaus, Seuraava) vaihtaa näytölle yhden kysymyksen ja sulkee muut.
+        // Hessun palaute luennolta: aktivointi (rivin klikkaus) ei saa sulkea muita, kaksi avointa pitää onnistua aina.
         self::assertTrue($this->live->activate($this->eventId, $c));
-        self::assertSame([$c], $this->live->stageIds($this->eventId));
-        self::assertSame('closed', $this->pollStatus($a));
-        self::assertSame('closed', $this->pollStatus($b));
+        self::assertSame([$a, $b, $c], $this->live->stageIds($this->eventId));
+        self::assertSame($c, $this->live->activeId($this->eventId));
+        self::assertSame('open', $this->pollStatus($a));
+        self::assertSame('open', $this->pollStatus($b));
+
+        // Seuraava/Edellinen vaihtaa vain aktiivisen: c pois näytöltä, muut pysyvät auki.
+        self::assertTrue($this->live->stage($this->eventId, $c, false));
+        self::assertTrue($this->live->activate($this->eventId, $b));
+        self::assertSame($c, $this->live->step($this->eventId, 1));
+        self::assertSame([$a, $c], $this->live->stageIds($this->eventId));
+        self::assertSame('closed', $this->pollStatus($b), 'Siirrytty pois aktiivisesta: suljetaan');
+        self::assertSame('open', $this->pollStatus($a), 'Muu näytöllä oleva pysyy auki');
 
         self::assertTrue($this->live->activate($this->eventId, null));
         self::assertNull($this->live->activeId($this->eventId));
