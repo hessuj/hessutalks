@@ -178,6 +178,35 @@ const after = await box();
 if (after.top < scrolled - 2 - (before.sh - after.sh)) throw new Error('Vieritys hyppäsi: ' + JSON.stringify({ scrolled, after }));
 step(`Avoimet vastaukset (10 pitkää, 1280×720): ruutu vierittyy (${before.sh} px / ${before.ch} px), vierityspalkki ${before.bar} px näkyvissä, vanhin vastaus esiin vierittämällä, asento säilyy päivityksessä`);
 
+// Bugi luennolta: rivin klikkaus ja Seuraava sulkivat muut kysymykset, joten kaksi avointa onnistui vain välillä.
+const staged = () => admin.js(`[...document.querySelectorAll('.run-row.staged .run-prompt')].map((e) => e.textContent).sort().join(' | ')`);
+const askOpen = () => admin.js(`[...document.querySelectorAll('.run-list li')].find((li) => li.innerText.includes('Ask anything')).querySelector('.badge').textContent`);
+await admin.js(`[...document.querySelectorAll('.run-row')].find((r) => r.querySelector('.run-prompt').textContent === 'Which risk worries you most?').click(), true`);
+await admin.waitFor(`document.querySelector('.live-now strong')?.textContent === 'Which risk worries you most?'`, 'rivin klikkaus aktiiviseksi');
+await admin.click('Avaa vastauksille', 'Which risk worries you most?');
+await admin.waitFor(`document.querySelectorAll('.run-row.staged .badge.open').length === 2`, 'kaksi auki rivin klikkauksen jälkeen', 8000);
+if ((await staged()) !== 'Ask anything for tomorrow | Which risk worries you most?') throw new Error('Näytöllä: ' + (await staged()));
+await admin.click('Seuraava →');
+await admin.waitFor(`document.querySelector('.live-now strong')?.textContent === 'One word for security?'`, 'Seuraava');
+await admin.waitFor(`document.querySelectorAll('.run-row.staged').length === 2`, 'kaksi näytöllä Seuraavan jälkeen', 8000);
+if ((await staged()) !== 'Ask anything for tomorrow | One word for security?' || (await askOpen()) !== 'Auki') throw new Error('Seuraava sulki muun: ' + (await staged()) + ' / ' + (await askOpen()));
+await stage.waitFor(`document.querySelectorAll('.tile-poll').length === 2`, 'kaksi ruutua projektorilla', 8000);
+step('Rivin klikkaus lisää kysymyksen muiden rinnalle (kaksi auki), ja Seuraava vaihtaa vain aktiivisen: toinen avoin pysyy auki');
+
+// Markdown-raportti koko luennosta: tulokset ja viestit, ei nimimerkkejä. Blob napataan latauksen sijaan.
+await mode(admin, 'prep');
+await admin.js(`(() => { window.__md = null; const orig = URL.createObjectURL; URL.createObjectURL = (b) => { window.__md = b; return orig.call(URL, new Blob(['x'])); }; return true; })()`);
+await admin.click('Vie Markdown');
+await admin.waitFor(`!!window.__md`, 'raportti', 15000);
+const md = await admin.js(`window.__md.text()`, true);
+for (const part of ['# E2E Stage multi', '## M1 · M1 Warm-up', '### 1. Which risk worries you most?', '| Ransomware | 1 | 100 % |', '| trust | 1 |',
+  '### 4. Ask anything for tomorrow', '- Answer 1: how should we balance', '### Feedback', '- Great pace, more demos please']) {
+  if (!md.includes(part)) throw new Error('Raportista puuttuu: ' + part + '\n' + md.slice(0, 1500));
+}
+if (md.includes('Tester_9')) throw new Error('Raportissa nimimerkki');
+if (md.includes('Answer 10:')) throw new Error('Piilotettu vastaus raportissa');
+step(`Vie Markdown: koko luennon raportti (${md.split('\n').length} riviä): sarjat, taulukot, avoimet vastaukset ja palautteet; ei nimimerkkejä eikä piilotettuja`);
+
 const errs = [...admin.logs, ...part.logs, ...stage.logs];
 if (errs.length) { console.log('Selaimen virheet:\n' + errs.join('\n')); process.exit(1); }
 process.exit(0);

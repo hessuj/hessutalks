@@ -34,9 +34,9 @@ row makes that question active). The live mode has no edit or delete buttons.
    set are left out of the Next/Previous order, but their answers are kept.
 2. One or more questions can be **on screen** at the same time: the projector shows them as a grid, and participants
    see them one below the other and can answer every open one. In the lecture mode list, *+ Näytölle* (to screen) adds a
-   question next to the others and *✓ Näytöllä* (on screen) removes it. Clicking a row, *Seuraava →* and *← Edellinen*
-   (next/previous) put a single question on screen. *Avaa vastauksille* (open for answers) brings the question on screen
-   next to the others. *Pois näytöltä* (off screen) closes the question, and *Odotusnäkymä* (waiting screen) removes all. Answers are always kept.
+   question next to the others and *✓ Näytöllä* (on screen) removes it. Clicking a row and *Avaa vastauksille* (open for answers)
+   also bring the question next to the others. *Seuraava →* and *← Edellinen* (next/previous) change only the active question; the others stay open.
+   Others close only with *Pois näytöltä* (off screen, one) and *Odotusnäkymä* (waiting screen, all). Answers are always kept.
    The question brought on screen last is the **active** one: keyboard shortcuts and the phone remote control it, and the
    other questions on screen have their own rows in the control bar (*Aktiiviseksi* (make active), *Avaa vastauksille*,
    *Näytä tulokset*, …). A question in draft state is shown on the projector, but participants see it only after you open it
@@ -67,6 +67,8 @@ replaces the earlier one until the poll is closed.
 - **Vie CSV** (export CSV, whole lecture) and a set's **CSV**: question, option or text, answer count and timestamp, no participant identifiers.
   Answers are decrypted in your browser, so the server does not see the file contents. Separator `;` and UTF-8 BOM, so Excel opens the file directly.
   Texts starting like a formula (`=`, `+`, `-`, `@`) are prefixed with an apostrophe (CSV injection prevention).
+- **Vie Markdown** (export Markdown): a report (`.md`) of the whole lecture or lecture series: sets, questions and results as tables, correct answers,
+  open answers and the participants' questions and feedback. No nicknames; hidden and archived items are left out. Decrypted in your browser.
 
 #### Import and export as JSON
 
@@ -155,7 +157,7 @@ key has both languages.
 | Message confidentiality | libsodium `crypto_box_seal` (X25519 + XSalsa20-Poly1305) in the browser |
 | Private key | Unlocked in the browser with a passkey (WebAuthn PRF) or, as a fallback, a passphrase (Argon2id, 64 MiB). The server sees neither |
 | Admin sign-in | Passkey (WebAuthn), user verification required, no passwords |
-| Session | `__Host-` cookie, `HttpOnly`, `Secure`, `SameSite=Strict`, 30 min idle / 8 h maximum |
+| Session | `__Host-` cookie, `HttpOnly`, `Secure`, `SameSite=Strict`, 3 h idle / 8 h maximum |
 | CSRF | Origin and `Sec-Fetch-Site` check + CSRF token (admin) / stateless HMAC form token (participant) |
 | XSS | Strict CSP without `unsafe-inline`, decrypted messages inserted into the DOM only with `textContent` |
 | Abuse | Per-nickname and per-lecture limits, single-use challenges, security log |

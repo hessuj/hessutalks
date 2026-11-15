@@ -34,9 +34,9 @@ aktiivisen). Luennolla-tilassa ei ole muokkaus- eikä poistonappeja.
    kysymykset jäävät pois Seuraava/Edellinen-järjestyksestä, mutta niiden vastaukset säilyvät.
 2. **Näytöllä** voi olla yksi tai useampi kysymys yhtä aikaa: projektori näyttää ne ruudukkona, ja osallistujat
    näkevät ne allekkain ja voivat vastata kaikkiin avoimiin. Luennolla-tilan listassa *+ Näytölle* lisää kysymyksen
-   muiden rinnalle ja *✓ Näytöllä* poistaa sen. Rivin klikkaus, *Seuraava →* ja *← Edellinen* vaihtavat näytölle
-   vain yhden kysymyksen. *Avaa vastauksille* tuo kysymyksen näytölle muiden rinnalle. *Pois näytöltä* sulkee
-   kysymyksen, ja *Odotusnäkymä* poistaa kaikki. Vastaukset säilyvät aina.
+   muiden rinnalle ja *✓ Näytöllä* poistaa sen. Myös rivin klikkaus ja *Avaa vastauksille* tuovat kysymyksen muiden
+   rinnalle. *Seuraava →* ja *← Edellinen* vaihtavat vain aktiivisen kysymyksen; muut pysyvät auki. Muut sulkeutuvat
+   vain napeista *Pois näytöltä* (yksi) ja *Odotusnäkymä* (kaikki). Vastaukset säilyvät aina.
    Viimeksi näytölle tuotu on **aktiivinen**: pikanäppäimet ja puhelinohjain ohjaavat sitä, ja muut näytöllä
    olevat ovat ohjauspalkissa omilla riveillään (*Aktiiviseksi*, *Avaa vastauksille*, *Näytä tulokset*, …).
    Luonnos-tilainen kysymys näkyy projektorilla, mutta osallistujat näkevät sen vasta, kun avaat sen
@@ -67,6 +67,8 @@ korvaa aiemman, kunnes kysely suljetaan.
 - **Vie CSV** (koko luento) ja sarjan **CSV**: kysymys, vaihtoehto tai teksti, vastausmäärä ja aikaleima, ei osallistujatunnisteita.
   Vastaukset puretaan selaimessasi, joten palvelin ei näe tiedoston sisältöä. Erotin `;` ja UTF-8-BOM, jolloin Excel avaa tiedoston suoraan.
   Kaavana alkavat tekstit (`=`, `+`, `-`, `@`) saavat eteensä heittomerkin (CSV-injektion esto).
+- **Vie Markdown**: koko luennon tai luentosarjan raportti (`.md`): sarjat, kysymykset ja tulokset taulukkoina, oikeat vastaukset,
+  avoimet vastaukset sekä osallistujien kysymykset ja palaute. Ei nimimerkkejä; piilotetut ja arkistoidut jäävät pois. Puretaan selaimessasi.
 
 #### Tuonti ja vienti JSON-tiedostona
 
@@ -155,7 +157,7 @@ avaimella on molemmat kielet.
 | Viestien luottamuksellisuus | libsodium `crypto_box_seal` (X25519 + XSalsa20-Poly1305) selaimessa |
 | Yksityinen avain | Avataan selaimessa passkeylla (WebAuthn PRF) tai varakeinona tunnuslauseella (Argon2id, 64 MiB). Palvelin ei näe kumpaakaan |
 | Ylläpitäjän kirjautuminen | Passkey (WebAuthn), käyttäjän varmennus pakollinen, ei salasanoja |
-| Istunto | `__Host-`-eväste, `HttpOnly`, `Secure`, `SameSite=Strict`, 30 min toimettomuus / 8 h enintään |
+| Istunto | `__Host-`-eväste, `HttpOnly`, `Secure`, `SameSite=Strict`, 3 h toimettomuus / 8 h enintään |
 | CSRF | Origin- ja `Sec-Fetch-Site`-tarkistus + CSRF-token (ylläpito) / tilaton HMAC-lomaketoken (osallistuja) |
 | XSS | Tiukka CSP ilman `unsafe-inline`-sääntöä, puretut viestit DOMiin vain `textContent`illa |
 | Väärinkäyttö | Nimimerkki- ja luentokohtaiset rajat, haasteiden kertakäyttöisyys, tietoturvaloki |

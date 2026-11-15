@@ -27,7 +27,9 @@ final class Config
         public readonly string $setupTokenHash,
         public readonly string $adminName = 'Hessu',
         public readonly bool $cookieSecure = true,
-        public readonly int $adminIdleTimeout = 1800,
+        // Toimettomuus 3 h: luennoitsija esittää välillä PowerPointia, ja hallinnan välilehti on silloin taustalla
+        // ilman pyyntöjä (Hessun palaute luennolta: istunto katkesi, vaatimus vähintään 2 h).
+        public readonly int $adminIdleTimeout = 10800,
         public readonly int $adminAbsoluteTimeout = 28800,
     ) {
         if (strlen($appSecret) < 64 || !ctype_xdigit($appSecret)) {
@@ -59,7 +61,7 @@ final class Config
             setupTokenHash: $str('setup_token_hash', ''),
             adminName: $str('admin_name', 'Hessu'),
             cookieSecure: (bool) ($c['cookie_secure'] ?? true),
-            adminIdleTimeout: (int) ($c['admin_idle_timeout'] ?? 1800),
+            adminIdleTimeout: (int) ($c['admin_idle_timeout'] ?? 10800),
             adminAbsoluteTimeout: (int) ($c['admin_absolute_timeout'] ?? 28800),
         );
     }

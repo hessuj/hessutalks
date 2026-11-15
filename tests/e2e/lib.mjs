@@ -136,9 +136,16 @@ export async function mode(admin, which) {
   await admin.waitFor(`document.querySelector('.mode-btn[aria-pressed="true"]')?.textContent === ${JSON.stringify(label)}`, 'tila ' + label);
 }
 
-/** Luennolla-tilassa: kysymyksen rivi aktiiviseksi ja ohjauspalkista auki vastauksille. */
+/**
+ * Luennolla-tilassa: vain tämä kysymys näytölle ja auki vastauksille. Rivin klikkaus lisää kysymyksen muiden
+ * rinnalle, joten näyttö tyhjennetään ensin (Odotusnäkymä): testit olettavat yhden kysymyksen kerrallaan.
+ */
 export async function openPoll(admin, prompt) {
   await mode(admin, 'live');
+  if (await admin.js(`[...document.querySelectorAll('.live-control button')].some((b) => b.textContent === 'Odotusnäkymä')`)) {
+    await admin.click('Odotusnäkymä');
+    await admin.waitFor(`!document.querySelector('.run-row.staged')`, 'näyttö tyhjä');
+  }
   await admin.js(`(() => {
     const row = [...document.querySelectorAll('.run-row')].find((r) => r.querySelector('.run-prompt').textContent.includes(${JSON.stringify(prompt)}));
     if (!row) throw new Error('rivi puuttuu: ' + ${JSON.stringify(prompt)});

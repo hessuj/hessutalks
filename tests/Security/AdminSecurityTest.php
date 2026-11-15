@@ -103,6 +103,17 @@ final class AdminSecurityTest extends AppTestCase
         self::assertSame(401, $this->request('GET', '/admin/api/state')->status, 'Absoluuttinen aikaraja');
     }
 
+    /** Hessun palaute luennolta: istunto katkesi PowerPoint-esityksen aikana. Vaatimus: vähintään 2 h ilman toimintaa. */
+    public function testSessionSurvivesTwoHoursWithoutActivity(): void
+    {
+        self::assertSame(10800, $this->config->adminIdleTimeout, 'Oletus 3 h');
+        $file = (string) file_get_contents(dirname(__DIR__, 2) . '/src/Config.php');
+        self::assertStringContainsString("(\$c['admin_idle_timeout'] ?? 10800)", $file, 'Asetustiedoston oletus sama');
+        $this->loginAdmin();
+        $this->clock->advance(2 * 3600 + 60);
+        self::assertSame(200, $this->request('GET', '/admin/api/state')->status, '2 h ilman pyyntöjä');
+    }
+
     public function testLogoutDestroysSession(): void
     {
         $csrf = $this->loginAdmin();

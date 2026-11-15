@@ -12,7 +12,8 @@ use HessuTalks\Database;
  * - Näytöllä voi olla useita kysymyksiä yhtä aikaa (Hessun koeajo luennolla). Vain näytöllä oleva voi olla auki.
  *   Näytöltä poistettu kysymys suljetaan, jos se oli auki. Vastaukset säilyvät aina.
  * - Aktiivinen kysymys on näytöllä olevista se, jota pikanäppäimet ja puhelinohjain ohjaavat.
- * - Seuraava/Edellinen ja aktivointi vaihtavat näytölle yhden kysymyksen: muut poistetaan näytöltä.
+ * - Kysymys poistuu näytöltä vain Pois näytöltä- ja Odotusnäkymä-toiminnoilla. Seuraava/Edellinen vaihtaa vain
+ *   aktiivisen kysymyksen; muut näytöllä olevat pysyvät auki.
  * - Luonnos-tilainen kysymys näkyy esittäjälle, mutta osallistujat eivät näe sitä ennen avaamista.
  * - Seuraava/Edellinen kulkee sarjojen ja kysymysten järjestyksessä ja ohittaa ohitetut sarjat.
  * - live_version kasvaa jokaisesta osallistujille näkyvästä muutoksesta. Osallistujan selain
@@ -115,23 +116,18 @@ final class LiveRepository
     }
 
     /**
-     * Vaihtaa näytölle vain tämän kysymyksen ja tekee siitä aktiivisen (null = odotusnäkymä).
-     * Muut näytöltä poistuvat suljetaan, jos ne olivat auki. false = kysely ei kuulu luennolle.
+     * Tuo kysymyksen näytölle muiden rinnalle ja tekee siitä aktiivisen. null = odotusnäkymä: kaikki pois
+     * näytöltä, ja auki olleet suljetaan. false = kysely ei kuulu luennolle.
+     * Hessun palaute luennolta: rivin klikkaus sulki aiemmin muut kysymykset, joten kaksi avointa onnistui vain välillä.
      */
     public function activate(int $eventId, ?int $pollId): bool
     {
-        if ($pollId !== null && !$this->belongs($eventId, $pollId)) {
-            return false;
-        }
-        $this->db->exec(
-            "UPDATE polls SET status = 'closed' WHERE event_id = ? AND on_stage = 1 AND status = 'open' AND id IS NOT ?",
-            [$eventId, $pollId],
-        );
-        $this->db->exec('UPDATE polls SET on_stage = CASE WHEN id IS ? THEN 1 ELSE 0 END WHERE event_id = ?', [$pollId, $eventId]);
-        $this->db->exec('UPDATE events SET active_poll_id = ? WHERE id = ?', [$pollId, $eventId]);
         if ($pollId !== null) {
-            $this->hideBigQr($eventId);
+            return $this->stage($eventId, $pollId, true);
         }
+        $this->db->exec("UPDATE polls SET status = 'closed' WHERE event_id = ? AND on_stage = 1 AND status = 'open'", [$eventId]);
+        $this->db->exec('UPDATE polls SET on_stage = 0 WHERE event_id = ?', [$eventId]);
+        $this->db->exec('UPDATE events SET active_poll_id = NULL WHERE id = ?', [$eventId]);
         $this->bump($eventId);
         return true;
     }
@@ -208,7 +204,11 @@ final class LiveRepository
         $i = is_int($i) ? $i + $dir : ($dir > 0 ? 0 : count($ids) - 1);
         for (; $i >= 0 && $i < count($ids); $i += $dir) {
             if ((int) $rows[$i]['skipped'] === 0) {
-                $this->activate($eventId, $ids[$i]);
+                // Vain aktiivinen vaihtuu: se pois näytöltä (suljetaan, jos auki), muut näytöllä olevat pysyvät.
+                if ($current !== null && $current !== $ids[$i]) {
+                    $this->db->exec("UPDATE polls SET on_stage = 0, status = CASE WHEN status = 'open' THEN 'closed' ELSE status END WHERE id = ?", [$current]);
+                }
+                $this->stage($eventId, $ids[$i], true);
                 return $ids[$i];
             }
         }
