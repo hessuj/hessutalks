@@ -226,6 +226,25 @@ final class LiveRepository
         return true;
     }
 
+    /**
+     * Palauttaa julkaistun kysymyksen luonnokseksi (issue #39): pois näytöltä ja osallistujilta, tulokset ja
+     * paljastus piiloon, jotta oikeat vastaukset eivät näy uudelleenjulkaisussa ennen uutta paljastusta.
+     * Annetut vastaukset säilyvät ja näkyvät tuloksissa, kun kysymys julkaistaan uudelleen.
+     */
+    public function toDraft(int $eventId, int $pollId): bool
+    {
+        if (!$this->belongs($eventId, $pollId)) {
+            return false;
+        }
+        $this->db->exec(
+            "UPDATE polls SET status = 'draft', on_stage = 0, results_visible = 0, revealed = 0 WHERE id = ?",
+            [$pollId],
+        );
+        $this->refocus($eventId, $pollId);
+        $this->bump($eventId);
+        return true;
+    }
+
     /** Poistaa aktiivisuuden, jos aktiivinen kysymys on poistumassa (kysely tai sen sarja poistetaan). */
     public function forgetPoll(int $eventId, int $pollId): void
     {

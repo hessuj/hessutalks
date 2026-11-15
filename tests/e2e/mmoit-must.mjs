@@ -81,4 +81,20 @@ await part.waitFor(`[...document.querySelectorAll('.poll-choice')].some((e) => e
 const onPhone = await part.js(`(() => { const e = [...document.querySelectorAll('.poll-choice')].find((x) => x.textContent.includes(${JSON.stringify(longest)})); const r = e.getBoundingClientRect(); return { full: e.scrollWidth <= e.clientWidth + 1, inside: r.left >= 0 && r.right <= window.innerWidth, overflow: document.documentElement.scrollWidth - window.innerWidth, lines: Math.round(r.height / parseFloat(getComputedStyle(e).lineHeight || 20)) }; })()`);
 if (!onStage.full || !onStage.inside || !onPhone.full || !onPhone.inside || onPhone.overflow > 0) throw new Error('R11: ' + JSON.stringify({ onStage, onPhone }));
 step(`R11: ${onStage.len} merkin vaihtoehto näkyy kokonaan projektorilla (1920×1080) ja puhelimessa (360 px), ei vaakavieritystä`);
+
+// Issue #39: julkaistu kysymys luonnokseksi ja takaisin. Vastaus säilyy, oikea vastaus piilotetaan uudelleen.
+await part.cdp('Emulation.clearDeviceMetricsOverride');
+await part.js(`(() => { document.querySelector('form.poll input').click(); document.querySelector('form.poll').requestSubmit(); return true; })()`);
+await part.waitFor(`!!document.querySelector('form.poll .notice.ok')`, 'vastaus M4/2');
+await admin.waitFor(`document.querySelector('.live-now')?.innerText.includes('1 vastaus')`, 'yksi vastaus M4/2', 8000);
+await mode(admin, 'prep');
+const card = `[...document.querySelectorAll('article.poll-card')].find((c) => c.querySelector('.poll-card-prompt').textContent.includes('Stage 2: The vulnerability'))`;
+await admin.js(`[...${card}.querySelectorAll('button')].find((b) => b.textContent === 'Palauta luonnokseksi').click(), true`);
+await admin.waitFor(`${card}?.dataset.status === 'draft'`, 'luonnos-tila', 8000);
+await part.waitFor(`!document.querySelector('form.poll')`, 'kysymys pois osallistujalta', 8000);
+await stage.waitFor(`![...document.querySelectorAll('.res-label')].some((e) => e.textContent.includes(${JSON.stringify(longest)}))`, 'pois projektorilta', 8000);
+await openPoll(admin, 'Stage 2: The vulnerability');
+await part.waitFor(`!!document.querySelector('form.poll')`, 'julkaistu uudelleen', 8000);
+await admin.waitFor(`document.querySelector('.live-now')?.innerText.includes('1 vastaus')`, 'vastaus säilyi', 8000);
+step('Issue #39: Palauta luonnokseksi poisti kysymyksen osallistujalta ja projektorilta; uudelleenjulkaisun jälkeen annettu vastaus säilyi (1)');
 process.exit(0);

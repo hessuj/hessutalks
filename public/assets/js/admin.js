@@ -1199,6 +1199,9 @@
             sel.addEventListener('change', function () { if (sel.value) act(poll, 'set', { set_id: parseInt(sel.value, 10) }); });
             return sel;
           })() : null,
+          poll.status !== 'draft' ? h('button.btn.ghost.small', { type: 'button', text: 'Palauta luonnokseksi',
+            title: 'Pois näytöltä ja osallistujilta; vastaukset säilyvät, ja oikea vastaus piilotetaan uudelleen',
+            onclick: function () { act(poll, 'status', { status: 'draft' }); } }) : null,
           h('button.btn.ghost.small', { type: 'button', text: 'Tyhjennä vastaukset', onclick: function () {
             act(poll, 'reset', {}, 'Tyhjennetäänkö kyselyn "' + poll.prompt + '" kaikki vastaukset pysyvästi?');
           } }),

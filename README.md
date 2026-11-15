@@ -41,6 +41,8 @@ aktiivisen). Luennolla-tilassa ei ole muokkaus- eikä poistonappeja.
    olevat ovat ohjauspalkissa omilla riveillään (*Aktiiviseksi*, *Avaa vastauksille*, *Näytä tulokset*, …).
    Luonnos-tilainen kysymys näkyy projektorilla, mutta osallistujat näkevät sen vasta, kun avaat sen
    (siihen asti *Waiting for the next question…*). Vain näytöllä oleva kysymys voi olla auki.
+   Valmistelu-tilan *Palauta luonnokseksi* vie julkaistun kysymyksen pois näytöltä ja osallistujilta ja piilottaa
+   tulokset ja oikean vastauksen. Annetut vastaukset säilyvät, ja kysymyksen voi julkaista uudelleen.
 3. Osallistujat käyttävät koko ajan samaa luennon QR-koodia tai linkkiä. Näkymä vaihtuu itsestään noin
    sekunnin viiveellä ilman sivun päivitystä. Yhteyskatkon jälkeen sivu yhdistää uudelleen, ja oma vastaus säilyy myös uudelleenlatauksessa.
 4. **Tulokset ja paljastus:** tulokset ovat aluksi piilossa (projektorilla kysymys, vaihtoehdot ja vastausmäärä).

@@ -523,6 +523,33 @@ final class PollSecurityTest extends AppTestCase
 
     // ------------------------------------------------------------ tulokset ja paljastus (vaihe 5)
 
+    /** Issue #39: julkaistu kysymys luonnokseksi ja takaisin. */
+    public function testDraftHidesPollAndAnswerKeyButKeepsAnswers(): void
+    {
+        $h = ['X-CSRF-Token' => $this->loginAdmin()];
+        $quiz = $this->poll('open', 'single', ['options' => ['A', 'B', 'C'], 'correct' => [1], 'explanations' => ['Ei', 'Kyllä – oikein', 'Ei']]);
+        self::assertSame(201, $this->answer($quiz)->status);
+        self::assertSame(200, $this->request('POST', '/admin/api/polls/' . $quiz . '/results', ['visible' => true], $h)->status);
+        self::assertSame(200, $this->request('POST', '/admin/api/polls/' . $quiz . '/reveal', ['revealed' => true], $h)->status);
+
+        self::assertSame(200, $this->request('POST', '/admin/api/polls/' . $quiz . '/status', ['status' => 'draft'], $h)->status);
+        $body = $this->request('GET', '/api/live?code=' . $this->code)->body;
+        self::assertSame([], $this->json($this->request('GET', '/api/live?code=' . $this->code))['polls'], 'Luonnos ei näy osallistujille');
+        self::assertStringNotContainsString('Kysymys?', $body);
+        self::assertStringNotContainsString('Kyllä – oikein', $body);
+        self::assertSame(409, $this->answer($quiz, ['voter' => self::voter('toinen')])->status, 'Luonnokseen ei voi vastata');
+
+        // Uudelleenjulkaisu: vanha vastaus säilyy, oikea vastaus pysyy piilossa ennen uutta paljastusta.
+        self::assertSame(200, $this->request('POST', '/admin/api/polls/' . $quiz . '/status', ['status' => 'open'], $h)->status);
+        $live = $this->json($this->request('GET', '/api/live?code=' . $this->code));
+        self::assertSame([$quiz], array_column($live['polls'], 'id'));
+        self::assertNull($live['polls'][0]['reveal']);
+        self::assertNull($live['polls'][0]['results']);
+        self::assertStringNotContainsString('Kyllä – oikein', $this->request('GET', '/api/live?code=' . $this->code)->body);
+        $answers = $this->json($this->request('GET', '/admin/api/events/' . $this->eventId . '/poll-answers?after=0'));
+        self::assertCount(1, $answers['answers'], 'Annettu vastaus säilyy');
+    }
+
     public function testRevealSendsAnswerKeyOnlyAfterReveal(): void
     {
         $h = ['X-CSRF-Token' => $this->loginAdmin()];

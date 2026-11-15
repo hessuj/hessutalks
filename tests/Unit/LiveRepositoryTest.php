@@ -102,6 +102,28 @@ final class LiveRepositoryTest extends TestCase
     }
 
     /** Hessun koeajo luennolla: edellisen luennon iso QR jäi päälle ja peitti näytölle tuodut kysymykset. */
+    public function testToDraftTakesQuestionOffScreenAndHidesReveal(): void
+    {
+        $s = $this->set('M1');
+        $a = $this->poll($s);
+        $b = $this->poll($s);
+        $this->live->open($this->eventId, $a);
+        $this->live->open($this->eventId, $b);
+        $this->db->exec('UPDATE polls SET results_visible = 1, revealed = 1 WHERE id = ?', [$b]);
+
+        self::assertTrue($this->live->toDraft($this->eventId, $b));
+        self::assertSame('draft', $this->pollStatus($b));
+        self::assertSame([$a], $this->live->stageIds($this->eventId), 'Muut näytöllä olevat pysyvät');
+        self::assertSame($a, $this->live->activeId($this->eventId));
+        self::assertSame('open', $this->pollStatus($a));
+        self::assertFalse($this->live->answerable($this->eventId, $b));
+        self::assertSame(['results_visible' => 0, 'revealed' => 0], $this->db->one('SELECT results_visible, revealed FROM polls WHERE id = ?', [$b]));
+
+        self::assertTrue($this->live->open($this->eventId, $b), 'Luonnoksesta voi julkaista uudelleen');
+        self::assertSame('open', $this->pollStatus($b));
+        self::assertFalse($this->live->toDraft($this->eventId + 1, $a), 'Toisen luennon kysymys');
+    }
+
     public function testBringingAQuestionOnScreenHidesTheBigQr(): void
     {
         $s = $this->set('M1');
