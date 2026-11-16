@@ -23,6 +23,7 @@ final class DocsTranslationTest extends TestCase
             'uhkamalli' => ['docs/uhkamalli.md', 'docs/threat-model.md'],
             'poikkeama' => ['docs/poikkeama-esitysnaytto.md', 'docs/incident-presenter.md'],
             'tuontimuoto' => ['docs/tuontimuoto.md', 'docs/import-format.md'],
+            'käyttöohje' => ['docs/kayttoohje.md', 'docs/user-guide.md'],
         ];
     }
 
@@ -46,7 +47,8 @@ final class DocsTranslationTest extends TestCase
         $shape = static function (string $text): array {
             $lines = explode("\n", $text);
             return [
-                'otsikot' => array_map(static fn (string $l): int => strspn($l, '#'), preg_grep('/^#{1,6} /', $lines) ?: []),
+                // Otsikkotasot järjestyksessä (ei rivinumeroita: käännös saa olla eri mittainen).
+                'otsikot' => array_values(array_map(static fn (string $l): int => strspn($l, '#'), preg_grep('/^#{1,6} /', $lines) ?: [])),
                 'taulukkorivit' => count(preg_grep('/^\|/', $lines) ?: []),
                 'koodilohkot' => count(preg_grep('/^\s*```/', $lines) ?: []),
             ];

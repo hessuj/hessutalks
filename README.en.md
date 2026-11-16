@@ -8,6 +8,8 @@ Only the lecturer can read the messages.
 
 Address: <https://hessujarvinen.com/hessutalks/>
 
+**User guide with screenshots:** [docs/user-guide.md](docs/user-guide.md)
+
 ## How it works
 
 1. The lecturer creates a lecture in the admin view. The app gives a 6-character code and a QR code. The title can be edited later (*Muokkaa otsikkoa*, edit title), and the code stays the same.
