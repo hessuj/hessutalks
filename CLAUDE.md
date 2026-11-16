@@ -48,6 +48,7 @@ node --test tests/js/*.test.mjs
 scripts/verify-vendor.sh
 scripts/e2e.sh                         # selaintestit; aja käyttöliittymämuutosten jälkeen
 scripts/e2e.sh load.mjs                # kuormitus: 150 osallistujaa, viive esitysnäkymään (ei oletusajossa)
+scripts/e2e.sh "docs-screenshots.mjs fi" "docs-screenshots.mjs en"   # käyttöohjeen kuvat (docs/kuvat/), aja UI-muutosten jälkeen
 node scripts/load-test.mjs <linkki>    # osallistujasimulaatio mihin tahansa ympäristöön (tuotanto: --production, vain testiluento)
 ```
 Lisää jokaiselle uudelle ominaisuudelle testit, myös tietoturvatestit (`tests/Security`).

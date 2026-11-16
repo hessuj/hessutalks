@@ -23,6 +23,7 @@ final class DocsTranslationTest extends TestCase
             'uhkamalli' => ['docs/uhkamalli.md', 'docs/threat-model.md'],
             'poikkeama' => ['docs/poikkeama-esitysnaytto.md', 'docs/incident-presenter.md'],
             'tuontimuoto' => ['docs/tuontimuoto.md', 'docs/import-format.md'],
+            'käyttöohje' => ['docs/kayttoohje.md', 'docs/user-guide.md'],
         ];
     }
 
