@@ -14,12 +14,11 @@ Ohjeen kuvissa punainen kehys osoittaa kuvatun painikkeen tai alueen. Kehyksen n
 2. [Luennon luominen](#2-luennon-luominen)
 3. [Kysymysten valmistelu](#3-kysymysten-valmistelu)
 4. [Osallistujan näkymä](#4-osallistujan-näkymä)
-5. [Luennolla: kysymykset näytölle](#5-luennolla-kysymykset-näytölle)
+5. [Luennolla: kysymykset taululle](#5-luennolla-kysymykset-taululle)
 6. [Tulokset ja moderointi](#6-tulokset-ja-moderointi)
-7. [Osallistujien kysymykset ja palaute](#7-osallistujien-kysymykset-ja-palaute)
-8. [Puhelinohjain](#8-puhelinohjain)
-9. [Asetukset ja kirjautuminen](#9-asetukset-ja-kirjautuminen)
-10. [Pikanäppäimet](#10-pikanäppäimet)
+7. [Vapaat kysymykset ja palautteet](#7-vapaat-kysymykset-ja-palautteet)
+8. [Asetukset ja kirjautuminen](#8-asetukset-ja-kirjautuminen)
+9. [Pikanäppäimet](#9-pikanäppäimet)
 
 Hallinta on aina suomeksi. Osallistujan sivut ja projektorin tekstit ovat suomeksi tai englanniksi luennon kielen mukaan.
 
@@ -79,10 +78,9 @@ Yksi luento voi kattaa koko kurssin: osallistujat käyttävät samaa koodia ja n
 ![Työkalupalkki](kuvat/fi/05-tyokalupalkki.png)
 
 1. **Muokkaa otsikkoa**: korjaa luennon nimen. Koodi ja QR-koodi pysyvät samoina, joten diojen linkit toimivat edelleen.
-2. **Ohjain**: puhelinohjain (ks. [luku 8](#8-puhelinohjain)).
-3. **Kaikki luennot**: luentolista.
-4. **Asetukset**: passkeyt, salausavain ja tietoturvaloki (ks. [luku 9](#9-asetukset-ja-kirjautuminen)).
-5. **Kirjaudu ulos**.
+2. **Kaikki luennot**: luentolista.
+3. **Asetukset**: passkeyt, salausavain ja tietoturvaloki (ks. [luku 8](#8-asetukset-ja-kirjautuminen)).
+4. **Kirjaudu ulos**.
 
 ![Otsikon muokkaus](kuvat/fi/06-muokkaa-otsikkoa.png)
 
@@ -98,20 +96,18 @@ Yksi luento voi kattaa koko kurssin: osallistujat käyttävät samaa koodia ja n
 
 ## 3. Kysymysten valmistelu
 
-Luennon kysymykset ovat **kysymyssarjoissa**, esimerkiksi yksi sarja moduulia tai luentokertaa kohden.
-Valmistele sarjat ennen luentoa **Valmistelu**-tilassa.
+Ennalta laaditut kysymykset ovat **Kysymykset**-välilehdellä **kysymyssarjoissa**, esimerkiksi yksi sarja moduulia tai
+luentokertaa kohden. Valmistele sarjat ennen luentoa. Samasta listasta näytät kysymykset luennolla (ks. [luku 5](#5-luennolla-kysymykset-taululle)).
 
-### 3.1 Valmistelun työkalut
+### 3.1 Kysymykset-välilehden työkalut
 
-![Valmistelun työkalut](kuvat/fi/11-valmistelu-tyokalut.png)
+![Kysymykset-välilehden työkalut](kuvat/fi/11-kysymykset-tyokalut.png)
 
-1. **Valmistelu**: sarjojen ja kysymysten luonti ja muokkaus.
-2. **▶ Luennolla**: luennon aikainen tila (ks. [luku 5](#5-luennolla-kysymykset-näytölle)).
-3. **Tuo JSON**: sarjat tiedostosta (ks. [3.5](#35-tuonti-ja-vienti)).
-4. **Vie JSON**: kaikki sarjat tiedostoon, esimerkiksi seuraavaa toteutusta varten.
-5. **Vie CSV**: tulokset taulukkona (Excel avaa suoraan).
-6. **Vie Markdown**: raportti luennosta: kysymykset, tulokset ja osallistujien viestit.
-7. **Uusi sarja**.
+1. **Uusi sarja**.
+2. **Tuo JSON**: sarjat tiedostosta (ks. [3.5](#35-tuonti-ja-vienti)).
+3. **Vie JSON**: kaikki sarjat tiedostoon, esimerkiksi seuraavaa toteutusta varten.
+4. **Vie CSV**: tulokset taulukkona (Excel avaa suoraan).
+5. **Vie Markdown**: raportti luennosta: kysymykset, tulokset ja osallistujien viestit.
 
 ### 3.2 Uusi kysymyssarja
 
@@ -133,7 +129,7 @@ Paina sarjan rivillä **Uusi kysymys**.
 3. **Vaihtoehdot**: yksi vaihtoehto riville, 2–10 kpl.
 4. **Oikeat vastaukset**: vaihtoehtojen numerot, esim. `1` tai `1, 3`. Jätä tyhjäksi, jos oikeaa vastausta ei ole.
 5. **Selitykset**: valinnainen selitys jokaiselle vaihtoehdolle omalle rivilleen. Näytetään, kun paljastat oikean vastauksen.
-6. **Luo kysymys**. Uusi kysymys on **luonnos**: osallistujat eivät näe sitä ennen kuin avaat sen.
+6. **Luo kysymys**. Uusi kysymys on **luonnos**: osallistujat eivät näe sitä ennen kuin näytät sen taululla.
 
 Oikeat vastaukset ja selitykset eivät lähde osallistujille ennen paljastusta.
 
@@ -158,28 +154,33 @@ Avoimella tekstillä on omat asetuksensa:
 
 ![Sarjan painikkeet](kuvat/fi/12-sarjan-painikkeet.png)
 
-1. **↑ ↓**: siirrä sarjaa ylös tai alas.
-2. **Ohita**: jättää sarjan pois *Seuraava*/*Edellinen*-järjestyksestä luennon aikana. Vastaukset säilyvät. *Palauta* tuo sarjan takaisin.
+1. **Uusi kysymys**.
+2. **Sarja ▾**: näyttää tai piilottaa sarjan työkalut.
 3. **Muokkaa**: tunniste ja nimi.
-4. **Vie**: sarja JSON-tiedostoon.
-5. **CSV**: sarjan tulokset taulukkona.
-6. **Monista**: kopio sarjasta kysymyksineen ilman vastauksia.
-7. **Uusi kysymys**.
-8. **Poista**: sarja, sen kysymykset ja vastaukset pysyvästi.
+4. **↑ ↓**: siirrä sarjaa ylös tai alas.
+5. **Vie JSON**: sarja tiedostoon.
+6. **Vie CSV**: sarjan tulokset taulukkona.
+7. **Monista**: kopio sarjasta kysymyksineen ilman vastauksia.
+8. **Poista sarja**: sarja, sen kysymykset ja vastaukset pysyvästi.
 
-![Kysymyksen painikkeet](kuvat/fi/13-kysymyskortti.png)
+Kysymyksen muokkaus on kysymyksen alla. Klikkaa kysymyksen riviä, niin sen tulokset ja muokkausnapit avautuvat:
 
-1. **↑ ↓**: siirrä kysymystä sarjan sisällä.
-2. **Esikatsele**: kysymys osallistujan ulkoasussa (puhelimen kokoinen ikkuna). Vastausta ei lähetetä.
-3. **Esikatsele projektorilla**: kysymys esitysnäkymässä omassa ikkunassaan.
-4. **Muokkaa**: kysymysteksti, vaihtoehdot ja oikeat vastaukset. Tyyppiä ei voi vaihtaa.
-5. **Siirrä sarjaan…**: siirtää kysymyksen toiseen sarjaan vastauksineen.
-6. **Tyhjennä vastaukset**: poistaa kysymyksen vastaukset varmistuksen jälkeen. Vain Valmistelu-tilassa.
-7. **Poista**: kysymys ja sen vastaukset pysyvästi.
-8. Oikeat vastaukset näkyvät vain sinulle (*Oikea: 1 · selitykset*).
+![Kysymyksen muokkaus](kuvat/fi/13-kysymyksen-muokkaus.png)
 
-Julkaistulla kysymyksellä on lisäksi **Palauta luonnokseksi**: kysymys poistuu näytöltä ja osallistujilta, ja tulokset
-ja oikea vastaus piilotetaan. Annetut vastaukset säilyvät.
+1. **Kysymyksen rivi**: klikkaus avaa ja sulkee alla olevan osan.
+2. Oikeat vastaukset näkyvät vain sinulle (*Oikea: 1 · selitykset*).
+3. **Piilota**: sulkee osan.
+4. **Esikatsele**: kysymys osallistujan ulkoasussa (puhelimen kokoinen ikkuna). Vastausta ei lähetetä.
+5. **Esikatsele projektorilla**: kysymys esitysnäkymässä omassa ikkunassaan.
+6. **Muokkaa**: kysymysteksti, vaihtoehdot ja oikeat vastaukset. Tyyppiä ei voi vaihtaa.
+7. **↑ ↓**: siirrä kysymystä sarjan sisällä.
+8. **Siirrä sarjaan…**: siirtää kysymyksen toiseen sarjaan vastauksineen.
+9. **Tyhjennä vastaukset**: poistaa kysymyksen vastaukset varmistuksen jälkeen.
+10. **Poista**: kysymys ja sen vastaukset pysyvästi varmistuksen jälkeen.
+
+Vastausten tyhjennys ja poisto ovat vain täällä, jotta luennon aikana annettuja vastauksia ei poisteta vahingossa.
+Taululla käyneellä kysymyksellä on lisäksi **Palauta luonnokseksi**: kysymys poistuu taululta ja osallistujilta, ja
+tulokset ja oikea vastaus piilotetaan. Annetut vastaukset säilyvät.
 
 <img src="kuvat/fi/14-esikatselu.png" alt="Esikatselu osallistujan ulkoasussa" width="260">
 
@@ -250,67 +251,57 @@ Kun näytät tulokset ja paljastat oikean vastauksen, osallistuja näkee ne omas
 
 <img src="kuvat/fi/26-osallistuja-tulokset.png" alt="Tulokset osallistujalle" width="260">
 
-Jos näytöllä on useita kysymyksiä, ne ovat allekkain, ja osallistuja voi vastata kaikkiin avoimiin:
+Jos taululla on useita kysymyksiä, ne ovat allekkain, ja osallistuja voi vastata kaikkiin avoimiin:
 
 <img src="kuvat/fi/31-osallistuja-useita.png" alt="Useita kysymyksiä" width="260">
 
-## 5. Luennolla: kysymykset näytölle
+## 5. Luennolla: kysymykset taululle
 
-### 5.1 Esitysnäyttö
+Luennon aikana kaikki tehdään kahdessa paikassa: **taulurivillä** luennon sivun yläosassa ja **kysymyksen rivillä**
+Kysymykset-välilehdellä. Erillisiä tiloja tai aktiivista kysymystä ei ole.
+
+### 5.1 Taulu ja esitysnäyttö
 
 Esitysnäyttö on oma ikkunansa projektorille tai Teams-jakoon. Kytke projektori jatketuksi näytöksi (ei peilaus),
 jolloin hallinta jää läppärin näytölle.
 
-![Esitysnäytön painikkeet](kuvat/fi/19-esitysnayttopalkki.png)
+![Taulurivi](kuvat/fi/19-taulu.png)
 
-1. **Avaa esitysnäyttö**: avaa ikkunan. Chrome ja Edge siirtävät sen toiselle näytölle (selain kysyy kerran luvan).
+1. Tila kertoo, onko esitysnäyttö yhdistetty.
+2. **Avaa esitysnäyttö**: avaa ikkunan. Chrome ja Edge siirtävät sen toiselle näytölle (selain kysyy kerran luvan).
    Muissa selaimissa raahaa ikkuna projektorille. Kaksoisklikkaus tai **F** vaihtaa koko näytön tilaan.
-2. **Kysymykset projektorille**: osallistujien kysymykset listana näytölle.
-3. **Palautteet projektorille**: palautteet listana näytölle.
-4. **QR isona**: iso QR-koodi koko näytölle (myös **Q**).
-5. **Tyhjennä näyttö**: kaikki pois näytöltä. Vastaukset säilyvät.
-6. Tila kertoo, onko esitysnäyttö yhdistetty.
+   Myös **Näytä taululla** avaa ikkunan, jos se ei ole auki.
+3. **QR isona**: iso QR-koodi koko näytölle (myös **Q**). Se väistyy, kun tuot jotain taululle.
+4. **Tyhjennä taulu**: kaikki pois taululta. Taululla olleet kysymykset suljetaan, ja vastaukset säilyvät.
+5. Mitä taululla on nyt.
 
-Kun näytöllä ei ole mitään, siinä on QR-koodi ja liittymisohje:
+Kun taululla ei ole mitään, siinä on QR-koodi ja liittymisohje:
 
 ![Esitysnäyttö odottaa](kuvat/fi/20-esitysnaytto-odotus.png)
 
 ![Iso QR-koodi](kuvat/fi/34-iso-qr.png)
 
-### 5.2 Luennolla-tila
+### 5.2 Kysymyksen rivi
 
-![Luennolla-tila](kuvat/fi/21-tila-luennolla.png)
+![Kysymyslista](kuvat/fi/21-kysymyslista.png)
 
-1. **▶ Luennolla**: tiivis lista kaikista kysymyksistä. Muokkaus- ja poistonapit ovat piilossa, joten mitään ei poisteta vahingossa.
-2. **Rivin klikkaus**: tuo kysymyksen näytölle ja tekee siitä aktiivisen.
-3. **+ Näytölle**: lisää kysymyksen näytölle muiden rinnalle. *✓ Näytöllä* poistaa sen.
-4. **Ohita**: jättää sarjan pois *Seuraava*/*Edellinen*-järjestyksestä.
+1. **Kysymykset**-välilehti: ennalta laaditut kysymykset sarjoittain ja numeroituina.
+2. **Kysymyksen rivi**: klikkaus avaa tulokset ja muokkauksen rivin alle (ks. [luku 6](#6-tulokset-ja-moderointi)).
+3. **Näytä taululla**: kysymys projektorille muiden rinnalle ja auki vastauksille yhdellä napilla.
 
-### 5.3 Ohjauspalkki
+Kun kysymys on taululla, rivin napit vaihtuvat:
 
-Ohjauspalkki ohjaa **aktiivista kysymystä**, eli viimeksi näytölle tuotua.
+![Kysymys taululla](kuvat/fi/22-rivi-taululla.png)
 
-![Ohjauspalkki](kuvat/fi/22-ohjauspalkki-luonnos.png)
-
-1. Aktiivinen kysymys, sen tila (*Luonnos*, *Auki* tai *Suljettu*), sarja ja vastausmäärä.
-2. **← Edellinen**: vaihtaa aktiivisen kysymyksen edelliseen.
-3. **Seuraava →**: vaihtaa aktiivisen kysymyksen seuraavaan. Muut näytöllä olevat pysyvät.
-4. **Avaa vastauksille**: osallistujat näkevät kysymyksen ja voivat vastata. Luonnos näkyy projektorilla, mutta ei osallistujille ennen avaamista.
+1. **Taululla** ja tila (*Auki* tai *Suljettu*).
+2. Vastausmäärä.
+3. **Sulje**: vastauksia ei enää oteta vastaan. Kysymys jää taululle, ja **Avaa vastauksille** avaa sen uudelleen.
+4. **Poista taululta**: kysymys pois projektorilta ja osallistujien puhelimista. Vastaukset säilyvät, ja
+   **Näytä taululla** avaa kysymyksen uudelleen.
 5. **Näytä tulokset**: tulokset projektorille ja osallistujien puhelimiin. Tulokset ovat aluksi piilossa.
 6. **Paljasta oikea vastaus**: korostaa oikeat vaihtoehdot ja näyttää selitykset. Nappi näkyy vain, jos kysymyksellä on oikea vastaus.
-7. **Pois näytöltä**: kysymys pois projektorilta ja osallistujilta. Vastaukset säilyvät.
-8. **Odotusnäkymä**: kaikki kysymykset pois näytöltä.
 
-Kun kysymys on auki, napit vaihtuvat:
-
-![Ohjauspalkki, kysymys auki](kuvat/fi/27-ohjauspalkki-auki.png)
-
-1. Tila **Auki**.
-2. **Sulje vastaukset**: uusia vastauksia ei enää oteta vastaan.
-3. **Piilota tulokset**.
-4. **Piilota oikea vastaus**.
-
-### 5.4 Projektorilla
+### 5.3 Projektorilla
 
 Avoin kysymys projektorilla. Tulokset ovat piilossa, kunnes näytät ne:
 
@@ -325,16 +316,14 @@ Tulokset ja paljastettu oikea vastaus:
 
 1. Oikea vaihtoehto on korostettu, ja selitykset näkyvät vaihtoehtojen alla.
 
-### 5.5 Useita kysymyksiä näytöllä
+### 5.4 Useita kysymyksiä taululla
 
-Voit pitää näytöllä useita kysymyksiä yhtä aikaa, esimerkiksi aloituskyselyn ja sanapilven. Lisää ne listasta
-**+ Näytölle** -napilla.
+Voit pitää taululla useita kysymyksiä yhtä aikaa, esimerkiksi aloituskyselyn ja sanapilven. Paina **Näytä taululla**
+kunkin kysymyksen riviltä. Jokaista ohjataan sen omista napeista.
 
-![Useita kysymyksiä ohjauspalkissa](kuvat/fi/29-useita-naytolla.png)
+![Useita kysymyksiä taululla](kuvat/fi/29-useita-taululla.png)
 
-1. Aktiivinen kysymys: pikanäppäimet ja puhelinohjain ohjaavat sitä.
-2. **Muut näytöllä**: jokaisella on omat napit (avaa, sulje, tulokset, paljastus, pois näytöltä).
-3. **Aktiiviseksi**: tekee kysymyksestä aktiivisen.
+Kuvassa kolme kysymystä (1–3) on taululla ja auki. **Sulje** ja **Poista taululta** koskevat vain omaa kysymystään.
 
 Projektori näyttää kysymykset ruudukkona (enintään 12), ja tekstikoko sovitetaan ruudun kokoon:
 
@@ -343,10 +332,12 @@ Projektori näyttää kysymykset ruudukkona (enintään 12), ja tekstikoko sovit
 ## 6. Tulokset ja moderointi
 
 Tulokset lasketaan sinun selaimessasi, koska vastaukset ovat salattuja. Pidä hallinta auki luennon ajan.
+Klikkaa kysymyksen riviä, niin tulokset avautuvat sen alle:
 
 ![Tulokset hallinnassa](kuvat/fi/28-tulokset-hallinnassa.png)
 
-Valmistelu-tilassa kunkin kysymyksen tulokset ovat kortin kohdassa *Tulokset*.
+1. Tulokset. Hallinnassa luvut ja oikeat vastaukset näkyvät aina, myös kun ne ovat projektorilla piilossa.
+2. **Piilota**: sulkee tulokset. Kysymys pysyy taululla.
 
 ### 6.1 Sanapilvi
 
@@ -365,39 +356,23 @@ Valmistelu-tilassa kunkin kysymyksen tulokset ovat kortin kohdassa *Tulokset*.
 
 Piilotukset tallennetaan palvelimelle salattuina, joten ne säilyvät, vaikka lataat sivun uudelleen.
 
-## 7. Osallistujien kysymykset ja palaute
+## 7. Vapaat kysymykset ja palautteet
 
-![Kysymykset ja palaute](kuvat/fi/35-viestit.png)
+Osallistujien vapaat kysymykset ja palautteet ovat omilla välilehdillään, uusin ensin.
 
-1. **Kysymykset ja palaute** -välilehti. Merkki kertoo uusien viestien määrän.
-2. **Suodattimet**: *Käsiteltävät* (uudet ja vastatut), *Uudet*, *Vastatut*, *Arkisto* ja *Kaikki*.
-3. **Näytä projektorilla**: viesti isona näytölle muun sisällön rinnalle. Viesti merkitään samalla vastatuksi.
-4. **Merkitse vastatuksi**. *Palauta uudeksi* peruu merkinnän.
-5. **Arkistoi**: piilottaa viestin listalta. Arkistoidut eivät näy projektorin listoilla eivätkä raporteissa.
-6. **Poista**: viesti pysyvästi.
+![Vapaat kysymykset](kuvat/fi/35-viestit.png)
 
-Viesti ja palautelista projektorilla:
+1. **Vapaat kysymykset** -välilehti. Merkki kertoo uusien määrän. **Palautteet**-välilehti toimii samoin.
+2. **Näytä taululla**: viesti isona projektorille muun sisällön rinnalle. **Poista taululta** vie sen pois.
+   Taululla voi olla enintään 6 viestiä kerrallaan.
+3. **Merkitse vastatuksi** (palautteella **Merkitse käsitellyksi**). **Palauta uudeksi** peruu merkinnän.
+4. **Poista**: viesti pysyvästi.
+
+Kysymys ja palaute projektorilla:
 
 ![Viestit projektorilla](kuvat/fi/36-esitysnaytto-viestit.png)
 
-## 8. Puhelinohjain
-
-Puhelinohjaimella ohjaat aktiivista kysymystä kävellessäsi salissa. Kirjaudu hallintaan puhelimella. Ohjain ei
-pura viestejä, joten salausavainta ei tarvita.
-
-<img src="kuvat/fi/39-avaa-kysymykset.png" alt="Avausnäkymä puhelimessa" width="260">
-
-1. **Avaa passkeylla**: avaa viestit (ei tarvita ohjaimeen).
-2. **Puhelinohjain**: valitse luento ja paina *Ohjaa*.
-3. **Avaa tunnuslauseella**: varakeino, jos passkey ei pysty avaamaan avainta.
-
-<img src="kuvat/fi/40-puhelinohjain.png" alt="Puhelinohjain" width="260">
-
-1. Aktiivinen kysymys, tila ja vastausmäärä. Isot napit vastaavat ohjauspalkin nappeja.
-
-Projektoria ohjaava läppäri huomaa ohjaimen muutokset parissa sekunnissa. Ohjaimen saa myös luennon sivun napista **Ohjain**.
-
-## 9. Asetukset ja kirjautuminen
+## 8. Asetukset ja kirjautuminen
 
 ![Asetukset](kuvat/fi/38-asetukset.png)
 
@@ -406,6 +381,13 @@ Projektoria ohjaava läppäri huomaa ohjaimen muutokset parissa sekunnissa. Ohja
 3. **Lataa avaimen varmuuskopio**.
 4. **Vaihda tunnuslause**: kirjoita uusi tunnuslause kahdesti. Uusi varmuuskopio ladataan.
 5. **Tietoturvaloki**: kirjautumiset ja hallinnan muutokset.
+
+Kun avaat hallinnan uudessa ikkunassa tai toisella laitteella, viestit avataan ensin:
+
+<img src="kuvat/fi/39-avaa-kysymykset.png" alt="Avausnäkymä puhelimessa" width="260">
+
+1. **Avaa passkeylla**: avaa viestit, jos passkey tukee avausta (PRF).
+2. **Avaa tunnuslauseella**: varakeino, jos passkey ei pysty avaamaan avainta.
 
 Kirjautuminen:
 
@@ -417,18 +399,13 @@ Kirjautuminen:
 Istunto päättyy 3 tunnin toimettomuuden jälkeen ja viimeistään 8 tunnin kuluttua. Esitysnäyttö tyhjenee, kun kirjaudut ulos
 tai suljet hallinnan.
 
-## 10. Pikanäppäimet
+## 9. Pikanäppäimet
 
-Pikanäppäimet toimivat hallinnassa ja esitysikkunassa (eivät lomakekentissä). Ne ohjaavat aktiivista kysymystä.
+Kysymyksiä ohjataan niiden riviltä. Pikanäppäimiä on kolme (eivät toimi lomakekentissä):
 
 | Näppäin | Toiminto |
 |---|---|
-| → / PageDown | Seuraava kysymys (myös langaton esitysohjain) |
-| ← / PageUp | Edellinen kysymys |
-| Välilyönti | Avaa tai sulje vastaukset |
-| R | Näytä tai piilota tulokset |
-| A | Paljasta oikea vastaus |
-| Q | Iso QR-koodi |
+| Q | Iso QR-koodi (hallinnassa ja esitysikkunassa) |
 | T | Vaalea tai tumma teema (esitysikkuna) |
 | F tai kaksoisklikkaus | Koko näyttö (esitysikkuna) |
 

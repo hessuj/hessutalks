@@ -2,7 +2,7 @@
 // Osallistuja näkee laskurin (esim. 2400/3500), liian pitkä vastaus estetään selaimessa, hallinta näyttää
 // koko tekstin ja projektori pitkistä vastauksista vain alun.
 // Ajo: scripts/e2e.sh long-open.mjs  (tai node tests/e2e/long-open.mjs <cdp-port> <app-url>)
-import { tab, attach, step, setupAdmin, createEvent, openParticipant, openPoll, mode } from './lib.mjs';
+import { tab, attach, step, setupAdmin, createEvent, openParticipant, openPoll, expand } from './lib.mjs';
 
 const [port, app] = [process.argv[2], process.argv[3]];
 const PROMPT = 'Biggest risk at the national, organisational and individual level?';
@@ -23,8 +23,10 @@ if ((await admin.js(`document.querySelector('#poll-open-max').value`)) !== '280'
 await admin.fill('#poll-open-max', '3500');
 await admin.fill('#poll-prompt', PROMPT);
 await admin.submit('#poll-prompt');
-await admin.waitFor(admin.hasText('Avoin teksti · enintään 3500 merkkiä'), 'kysymys ja raja kortissa');
-step('Avoin kysymys enimmäispituudella 3500 merkkiä; kortissa "enintään 3500 merkkiä"');
+await admin.waitFor(admin.hasText(PROMPT), 'kysymys listassa');
+await expand(admin, PROMPT);
+await admin.waitFor(admin.hasText('Avoin teksti · enintään 3500 merkkiä'), 'raja avautuvassa osassa');
+step('Avoin kysymys enimmäispituudella 3500 merkkiä; avautuvassa osassa "enintään 3500 merkkiä"');
 
 const part = await openParticipant(port, admin);
 await part.waitFor(part.hasText('Waiting for the next question'), 'odotusnäkymä');

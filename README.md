@@ -16,7 +16,7 @@ Osoite: <https://hessujarvinen.com/hessutalks/>
 2. Osallistuja avaa sivun, valitsee nimimerkin ja kirjoittaa kysymyksen tai palautteen.
 3. Viesti ja nimimerkki salataan osallistujan selaimessa luennoitsijan julkisella avaimella.
 4. Luennoitsija avaa viestit omassa selaimessaan passkeylla tai tunnuslauseella. Ne päivittyvät reaaliaikaisesti,
-   ja QR-koodin, yksittäisen kysymyksen tai kysymyslistan voi näyttää projektorilla.
+   ja QR-koodin, kysymyksiä tuloksineen ja yksittäisiä viestejä voi näyttää taululla (projektorilla).
 
 ### Kyselyt ja kysymyssarjat
 
@@ -24,37 +24,40 @@ Luento koostuu **kysymyssarjoista** (esim. moduulit `M1`, `M4`), joissa on kysym
 Kysymystyypit: monivalinta (yksi tai useita vastauksia), avoin teksti (oletus 280 merkkiä, pohdintatehtäviin enintään 3 500 eli noin 500 sanaa, valinnaisesti useita vastauksia), sanapilvi (1–3 sanaa, 30 merkkiä), Likert-asteikko (5 tai 7 kohtaa) ja asteikko 0–10.
 
 Yksi luento voi kattaa koko kurssin tai luentosarjan: sarjat jakavat sen luentoihin (esim. `L1`–`L4`), ja osallistujat
-käyttävät samaa koodia ja nimimerkkiä koko kurssin ajan. Hallinnan luentosivulla on kaksi välilehteä, *Kyselyt* ja
-*Kysymykset ja palaute*. Ohjauspalkki näkyy kummallakin, ja viestivälilehti kertoo uusien viestien määrän.
+käyttävät samaa koodia ja nimimerkkiä koko kurssin ajan. Hallinnan luentosivulla on kolme välilehteä: *Kysymykset*
+(ennalta laaditut kysymykset sarjoittain), *Vapaat kysymykset* ja *Palautteet*. Viestivälilehdet kertovat uusien määrän.
 
-Kyselyillä on kaksi tilaa: **Valmistelu** (kortit: luonti, muokkaus, järjestys, esikatselu, poisto) ja **▶ Luennolla**
-(ohjauspalkki, aktiivisen kysymyksen tulokset ja moderointi sekä tiivis numeroitu lista; rivin klikkaus tekee kysymyksestä
-aktiivisen). Luennolla-tilassa ei ole muokkaus- eikä poistonappeja.
+Hallinnassa ei ole erillisiä tiloja eikä aktiivista kysymystä: jokaisen kysymyksen ja viestin toiminnot ovat sen rivillä
+([#60](https://github.com/hessuj/hessutalks/issues/60)).
 
-1. Luo luennon sivulla sarjat (*Uusi sarja*) ja niihin kysymykset (*Uusi kysymys*) valmiiksi ennen luentoa.
-   Sarjoja ja kysymyksiä voi siirtää nuolilla, ja sarjan voi **ohittaa** kesken luennon. Ohitetun sarjan
-   kysymykset jäävät pois Seuraava/Edellinen-järjestyksestä, mutta niiden vastaukset säilyvät.
-2. **Näytöllä** voi olla yksi tai useampi kysymys yhtä aikaa: projektori näyttää ne ruudukkona, ja osallistujat
-   näkevät ne allekkain ja voivat vastata kaikkiin avoimiin. Luennolla-tilan listassa *+ Näytölle* lisää kysymyksen
-   muiden rinnalle ja *✓ Näytöllä* poistaa sen. Myös rivin klikkaus ja *Avaa vastauksille* tuovat kysymyksen muiden
-   rinnalle. *Seuraava →* ja *← Edellinen* vaihtavat vain aktiivisen kysymyksen; muut pysyvät auki. Muut sulkeutuvat
-   vain napeista *Pois näytöltä* (yksi) ja *Odotusnäkymä* (kaikki). Vastaukset säilyvät aina.
-   Viimeksi näytölle tuotu on **aktiivinen**: pikanäppäimet ja puhelinohjain ohjaavat sitä, ja muut näytöllä
-   olevat ovat ohjauspalkissa omilla riveillään (*Aktiiviseksi*, *Avaa vastauksille*, *Näytä tulokset*, …).
-   Luonnos-tilainen kysymys näkyy projektorilla, mutta osallistujat näkevät sen vasta, kun avaat sen
-   (siihen asti *Waiting for the next question…*). Vain näytöllä oleva kysymys voi olla auki.
-   Valmistelu-tilan *Palauta luonnokseksi* vie julkaistun kysymyksen pois näytöltä ja osallistujilta ja piilottaa
-   tulokset ja oikean vastauksen. Annetut vastaukset säilyvät, ja kysymyksen voi julkaista uudelleen.
-3. Osallistujat käyttävät koko ajan samaa luennon QR-koodia tai linkkiä. Näkymä vaihtuu itsestään noin
+1. Luo sarjat (*Uusi sarja*) ja niihin kysymykset (*Uusi kysymys*) tai tuo ne JSON-tiedostosta ennen luentoa. Sarjan
+   otsikkorivin *Sarja ▾* avaa sarjan muokkauksen, järjestyksen, viennin, monistuksen ja poiston.
+2. **Kysymyksen rivillä** ovat luennon aikaiset toiminnot:
+   - *Näytä taululla* tuo kysymyksen projektorille muiden rinnalle ja avaa sen vastauksille yhdellä napilla.
+   - *Sulje* lopettaa vastausten vastaanoton, ja kysymys jää taululle (*Avaa vastauksille* avaa sen uudelleen).
+   - *Poista taululta* vie kysymyksen pois projektorilta ja osallistujien puhelimista. Vastaukset säilyvät, ja
+     uudelleen näyttäminen avaa kysymyksen taas.
+   - *Näytä tulokset* ja *Paljasta oikea vastaus* (ks. kohta 6).
+3. **Rivin klikkaus** avaa kysymyksen alle sen tulokset ja moderoinnin sekä muokkauksen: *Esikatsele*, *Muokkaa*,
+   järjestys, *Siirrä sarjaan…*, *Palauta luonnokseksi*, *Tyhjennä vastaukset* ja *Poista*. *Piilota* sulkee osan.
+   Vastausten tyhjennys ja poisto ovat vain täällä vahvistuksella, jotta luennon aikana annettuja vastauksia ei poisteta vahingossa.
+4. **Taululla** voi olla useita kysymyksiä ja viestejä yhtä aikaa: projektori näyttää ne ruudukkona, ja osallistujat
+   näkevät kysymykset allekkain ja voivat vastata kaikkiin avoimiin. Vain taululla oleva kysymys voi olla auki.
+   *Palauta luonnokseksi* vie julkaistun kysymyksen pois taululta ja osallistujilta ja piilottaa tulokset ja oikean
+   vastauksen. Annetut vastaukset säilyvät, ja kysymyksen voi näyttää uudelleen.
+5. Osallistujat käyttävät koko ajan samaa luennon QR-koodia tai linkkiä. Näkymä vaihtuu itsestään noin
    sekunnin viiveellä ilman sivun päivitystä. Yhteyskatkon jälkeen sivu yhdistää uudelleen, ja oma vastaus säilyy myös uudelleenlatauksessa.
-4. **Tulokset ja paljastus:** tulokset ovat aluksi piilossa (projektorilla kysymys, vaihtoehdot ja vastausmäärä).
+6. **Tulokset ja paljastus:** tulokset ovat aluksi piilossa (projektorilla kysymys, vaihtoehdot ja vastausmäärä).
    *Näytä tulokset* tuo ne projektorille ja tuloskoosteena myös osallistujien puhelimiin (monivalinnat ja asteikot).
    *Paljasta oikea vastaus* korostaa oikeat vaihtoehdot ja näyttää selitykset, jos kysymykselle on määritelty oikea vastaus.
    Oikeat vastaukset ja selitykset annetaan kysymyslomakkeella tai JSON-tiedostossa, eikä niitä lähetetä osallistujille ennen paljastusta.
-5. **Esitysnäyttö** on yksi ikkuna (*Avaa esitysnäyttö* luennon sivun yläosassa), ja se näyttää kaiken näytölle valitun
-   yhtä aikaa: kysymykset tuloksineen, *Kysymykset projektorille*- ja *Palautteet projektorille*-listat sekä viestin,
-   jonka valitset *Näytä projektorilla* -napilla. Jos näytöllä ei ole mitään, siinä on luennon QR-koodi.
-6. **Moderointi:** avoimen vastauksen voi piilottaa *Piilota*-napilla ja sanapilven sanan klikkaamalla sitä. Piilotus katoaa projektorilta heti.
+7. **Vapaat kysymykset ja palautteet** näkyvät omilla välilehdillään uusin ensin. Viestin rivillä ovat *Näytä taululla* /
+   *Poista taululta* (taululla enintään 6 viestiä kerrallaan), *Merkitse vastatuksi* (palaute: *Merkitse käsitellyksi*),
+   jonka *Palauta uudeksi* peruu, sekä *Poista*.
+8. **Taulu:** luennon sivun yläosan rivillä ovat *Avaa esitysnäyttö* (ja yhteyden tila), *QR isona* ja *Tyhjennä taulu*.
+   Esitysnäyttö on yksi ikkuna, joka näyttää kaiken taululle valitun. Jos taululla ei ole mitään, siinä on luennon QR-koodi.
+9. **Moderointi:** avoimen vastauksen voi piilottaa *Piilota*-napilla ja sanapilven sanan klikkaamalla sitä kysymyksen
+   avautuvassa osassa. Piilotus katoaa projektorilta heti.
    Kirosanasuodatin (englanti ja suomi) piilottaa osumat automaattisesti, ja ne odottavat hyväksyntää (⚠ … ✓).
    Piilotukset tallennetaan palvelimelle salattuina luennoitsijan avaimella, joten ne säilyvät uudelleenlatauksen yli.
 
@@ -64,11 +67,11 @@ korvaa aiemman, kunnes kysely suljetaan.
 
 #### Esikatselu, monistus, siirto ja CSV
 
-- **Esikatsele** avaa kysymyksen osallistujan ulkoasussa (puhelimen kokoinen ikkuna, vastausta ei lähetetä) ja
-  **Esikatsele projektorilla** esitysnäkymässä ennen avaamista.
+- **Esikatsele** (kysymyksen avautuvassa osassa) avaa kysymyksen osallistujan ulkoasussa (puhelimen kokoinen ikkuna,
+  vastausta ei lähetetä) ja **Esikatsele projektorilla** esitysnäkymässä ennen avaamista.
 - **Monista** kopioi sarjan kysymyksineen ilman vastauksia (tunniste saa jatkeen `-2`). Kysymyksen voi siirtää toiseen sarjaan
   valikosta *Siirrä sarjaan…*. Vastaukset säilyvät.
-- **Vie CSV** (koko luento) ja sarjan **CSV**: kysymys, vaihtoehto tai teksti, vastausmäärä ja aikaleima, ei osallistujatunnisteita.
+- **Vie CSV** (koko luento tai sarjan *Sarja ▾* -valikosta): kysymys, vaihtoehto tai teksti, vastausmäärä ja aikaleima, ei osallistujatunnisteita.
   Vastaukset puretaan selaimessasi, joten palvelin ei näe tiedoston sisältöä. Erotin `;` ja UTF-8-BOM, jolloin Excel avaa tiedoston suoraan.
   Kaavana alkavat tekstit (`=`, `+`, `-`, `@`) saavat eteensä heittomerkin (CSV-injektion esto).
 - **Vie Markdown**: koko luennon tai luentosarjan raportti (`.md`): sarjat, kysymykset ja tulokset taulukkoina, oikeat vastaukset,
@@ -79,7 +82,7 @@ korvaa aiemman, kunnes kysely suljetaan.
 *Tuo JSON* lukee sarjat tiedostosta, ja kysymykset voi pitää versionhallinnassa ja kopioida tulevia
 kursseja varten. Ennen tallennusta sovellus näyttää yhteenvedon: tuotavat sarjat, ohitettavat kysymykset ja virheet.
 Tuonti on kaikki tai ei mitään. Virhe (myös luennolla jo oleva sarjan tunniste) estää koko tuonnin.
-*Vie JSON* (koko luento) ja sarjan *Vie* lataavat saman muodon takaisin. Esimerkki: [tests/fixtures/mmoit-2026.json](tests/fixtures/mmoit-2026.json).
+*Vie JSON* (koko luento tai sarjan *Sarja ▾* -valikosta) lataa saman muodon takaisin. Esimerkki: [tests/fixtures/mmoit-2026.json](tests/fixtures/mmoit-2026.json).
 Tiedostomuodon tarkka kuvaus: [docs/tuontimuoto.md](docs/tuontimuoto.md). Kun annat tekoälylle oppimateriaalin ja
 tämän kuvauksen, se voi tuottaa tuontitiedoston suoraan materiaalista.
 
@@ -103,7 +106,7 @@ tämän kuvauksen, se voi tuottaa tuontitiedoston suoraan materiaalista.
 Osallistuja voi silti vaihtaa kieltä FI/EN-kytkimestä. Projektorin omat tekstit (esim. vastausmäärä ja "Tulokset näytetään
 myöhemmin") seuraavat samaa valintaa: *English* → englanti, *Suomi* ja *selaimen kielen mukaan* → suomi. Hallinta on aina suomeksi.
 
-### Esitysnäkymä, pikanäppäimet ja puhelinohjain
+### Esitysnäkymä ja pikanäppäimet
 
 Esitysnäyttö on luennon esitysnäkymä Teams-jakoon ja salin projektorille. Alareunassa ovat aina QR-koodi ja
 liittymiskoodi, ja jokaisessa kysymyksessä sen vastausmäärä. Jos vastauksia on enemmän kuin mahtuu, ruutu vierittyy. Yksi kysymys täyttää näytön (kysymys yli 40 px 1080p:llä).
@@ -111,26 +114,17 @@ Useampi jaetaan ruudukoksi (enintään 12), ja fontit pienenevät ruudun koon mu
 
 | Näppäin | Toiminto |
 |---|---|
-| → / PageDown | Seuraava kysymys (myös langaton esitysohjain) |
-| ← / PageUp | Edellinen kysymys |
-| Välilyönti | Avaa / sulje vastaukset |
-| R | Näytä / piilota tulokset |
-| A | Paljasta oikea vastaus |
-| Q | Iso QR-koodi koko näytön peitoksi (väistyy, kun tuot jotain näytölle) |
+| Q | Iso QR-koodi koko näytön peitoksi (väistyy, kun tuot jotain taululle). Toimii myös hallinnassa. |
 | T | Vaalea / tumma teema (esitysikkuna) |
 | F tai kaksoisklikkaus | Koko näyttö (esitysikkuna) |
 
-Näppäimet toimivat esitysikkunassa ja hallinnassa (ei lomakekentissä). Esitysikkuna ei käytä rajapintaa itse,
-vaan lähettää komennon hallintaikkunalle.
-
-**Puhelinohjain:** kirjaudu puhelimella hallintaan ja valitse *Puhelinohjain* (avausnäkymässä) tai luennon *Ohjain*.
-Isot napit ohjaavat aktiivista kysymystä kävellessä salissa. Ohjain ei pura viestejä, joten salausavainta ei tarvita.
-Projektoria ohjaava läppäri huomaa muutokset parissa sekunnissa.
+Kysymysten ohjaus näppäimillä (Seuraava/Edellinen, avaus, tulokset, paljastus) ja puhelinohjain poistettiin hallinnan
+yksinkertaistuksessa ([#60](https://github.com/hessuj/hessutalks/issues/60)): toiminnot ovat kysymyksen rivillä.
 
 ### Esitys projektorilla
 
 Kun projektori on kytketty jatketuksi näytöksi (ei peilaus), *Avaa esitysnäyttö* avaa esitysikkunan.
-Myös *+ Näytölle*, *…projektorille* ja *Näytä projektorilla* avaavat sen, jos se ei ole auki. Hallintanäkymä jää
+Myös *Näytä taululla* avaa sen, jos se ei ole auki. Hallintanäkymä jää
 läppärin näytölle. Luennon sivun yläosa kertoo, onko esitysnäyttö yhdistetty (● yhdistetty).
 
 - Chrome ja Edge sijoittavat ikkunan automaattisesti (Window Management API). Ensimmäisellä kerralla
@@ -139,8 +133,8 @@ läppärin näytölle. Luennon sivun yläosa kertoo, onko esitysnäyttö yhdiste
 - Kaksoisklikkaus tai F-näppäin vaihtaa koko näytön tilaan, Esc palauttaa.
 - Esitysikkunoita on vain yksi: kaikki näytölle valittu näkyy siinä. Listat ja tulokset päivittyvät automaattisesti.
 - Yhteys palautuu itsestään, jos esitysikkuna tai hallinta ladataan uudelleen (hallinnassa avaimen avauksen jälkeen).
-- *Tyhjennä näyttö* poistaa kaiken näytöltä (näkyviin jää QR-koodi). Näyttö tyhjenee myös uloskirjautuessa ja
-  hallintasivun sulkeutuessa.
+- *Tyhjennä taulu* poistaa kaiken taululta (näkyviin jää QR-koodi). Taululla olleet kysymykset suljetaan, ja vastaukset
+  säilyvät. Näyttö tyhjenee myös uloskirjautuessa ja hallintasivun sulkeutuessa.
 
 ### Ei henkilötietoja
 

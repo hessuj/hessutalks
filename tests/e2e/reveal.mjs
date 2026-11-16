@@ -1,6 +1,6 @@
 // Vaihe 5: tulosten näyttö/piilotus, oikean vastauksen paljastus ja tuloskooste osallistujille (P2).
 // Ajo: scripts/e2e.sh reveal.mjs  (tai node tests/e2e/reveal.mjs <cdp-port> <app-url>)
-import { tab, attach, step, setupAdmin, createEvent, openParticipant, openPoll, mode } from './lib.mjs';
+import { tab, attach, step, setupAdmin, createEvent, openParticipant, openPoll, pollItem, expand } from './lib.mjs';
 
 const [port, app] = [process.argv[2], process.argv[3]];
 
@@ -28,6 +28,7 @@ await question('single', 'What is your FIRST action?', async () => {
   await admin.fill('#poll-explanations', 'Important, but not first.\nSafety first – blades and people.\nDo this right after.');
 });
 await question('likert', 'Security slows down development.', async () => {});
+await expand(admin, 'What is your FIRST action?');
 if (!(await admin.js(admin.hasText('Oikea: 2 · selitykset')))) throw new Error('Oikea vastaus ei tallentunut lomakkeelta');
 step('Visakysymys luotu lomakkeella: oikea vastaus 2 ja selitykset');
 
@@ -47,31 +48,29 @@ if (!(await stage.js(`!!document.querySelector('.results.res-hidden') && [...doc
 if (await part.js(part.hasText('Safety first'))) throw new Error('Selitys näkyi osallistujalle ennen paljastusta');
 step('Ennen näyttämistä: projektorilla vaihtoehdot ja vastausmäärä ilman lukuja, osallistujalla ei selityksiä');
 
-await admin.click('Näytä tulokset');
+await admin.click('Näytä tulokset', 'What is your FIRST action?');
 await stage.waitFor(`[...document.querySelectorAll('.res-row')].some((r) => r.innerText.includes('Stop the mowers') && r.innerText.includes('100 % (1)'))`, 'tulokset projektorilla');
 await part.waitFor(`!document.querySelector('.poll-results-box').hidden && document.querySelector('.poll-results-box').innerText.includes('100 % (1)')`, 'tulokset osallistujalle', 8000);
 step('Näytä tulokset: pylväät projektorilla ja tuloskooste osallistujalla (100 % (1))');
 
-await admin.click('Paljasta oikea vastaus');
+await admin.click('Paljasta oikea vastaus', 'What is your FIRST action?');
 await stage.waitFor(`document.querySelector('.res-row.correct')?.innerText.includes('✓ Stop the mowers') && document.body.innerText.includes('Safety first – blades and people.')`, 'paljastus projektorilla');
 await part.waitFor(`document.querySelector('.poll-choice.correct')?.innerText.includes('Stop the mowers') && document.body.innerText.includes('Safety first – blades and people.')`, 'paljastus osallistujalla', 8000);
 step('Paljasta oikea vastaus: ✓ ja selitykset projektorilla ja osallistujalla');
 
-await admin.click('Piilota tulokset');
+await admin.click('Piilota tulokset', 'What is your FIRST action?');
 await part.waitFor(`document.querySelector('.poll-results-box').hidden`, 'kooste piiloon');
 await stage.waitFor(`!!document.querySelector('.results.res-hidden')`, 'projektori piiloon');
 step('Piilota tulokset: kooste katoaa osallistujalta ja luvut projektorilta');
 
 // Asteikko: keskiarvo osallistujalle
-await admin.click('Seuraava →');
-await admin.waitFor(`document.querySelector('.live-control').innerText.includes('Security slows down development.')`, 'aktiivinen asteikko');
-await admin.click('Avaa vastauksille');
+await openPoll(admin, 'Security slows down development.');
 await part.waitFor(part.hasText('Security slows down development.'), 'asteikko osallistujalle');
 await part.js(`(() => { [...document.querySelectorAll('.poll-choice')].find((l) => l.innerText.trim() === '4').querySelector('input').click(); document.querySelector('form.poll').requestSubmit(); return true; })()`);
 await part.waitFor(`document.querySelector('form.poll .notice.ok')`, 'kuittaus 2');
-await admin.click('Näytä tulokset');
+await admin.click('Näytä tulokset', 'Security slows down development.');
 await part.waitFor(`document.querySelector('.poll-results-box')?.innerText.includes('Average 4')`, 'keskiarvo osallistujalle', 10000);
-if (await admin.js(admin.hasText('Paljasta oikea vastaus'))) throw new Error('Paljastusnappi näkyi kysymyksessä ilman oikeaa vastausta');
+if (await admin.js(`${pollItem('Security slows down development.')}.innerText.includes('oikea vastaus')`)) throw new Error('Paljastusnappi näkyi kysymyksessä ilman oikeaa vastausta');
 step('Asteikko: osallistuja näkee jakauman ja keskiarvon (Average 4); ei paljastusnappia ilman oikeaa vastausta');
 
 const errs = [...admin.logs, ...part.logs, ...stage.logs];

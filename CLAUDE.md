@@ -80,7 +80,11 @@ on toteutettu vaiheittain PR:inä #8–#17. Tila ja hyväksymistestit: docs/hyva
 Kuormitustesti (H13) läpi tuotannossa 29.10.: 150 osallistujaa, 0 virhettä, tila staattisesta tiedostosta (200 osallistujan SHOULD siirretty).
 Jäljellä: koeajo oikeilla laitteilla ja Teamsilla (H1, H15, issue #47). Backlog: GitHub Issues.
 Ensimmäinen koeajo luennolla: esitysnäyttö uusittu (PR #40, #41). Yksi esitysikkuna (BroadcastChannel, tunniste URL:n #-osassa) näyttää
-ruudukkona kaiken näytölle valitun, ja näytöllä voi olla useita kysymyksiä auki (`polls.on_stage`). Annettuja vastauksia
-ei poisteta luennon aikana: tyhjennys vain Valmistelu-tilassa.
-Selaintestit (scripts/e2e.sh) ajetaan aina käyttöliittymämuutosten jälkeen. Sarjojen haku testeissä otsikon mukaan
-(valikot sisältävät muiden sarjojen nimiä).
+ruudukkona kaiken taululle valitun, ja taululla voi olla useita kysymyksiä auki (`polls.on_stage`) ja viestejä.
+Hallinta yksinkertaistettiin (issue #60): ei tiloja eikä aktiivista kysymystä, toiminnot kysymyksen tai viestin rivillä,
+rivin klikkaus avaa tulokset ja muokkauksen. Annettuja vastauksia ei poisteta vahingossa: tyhjennys ja poisto vain
+avautuvassa osassa vahvistuksella.
+Selaintestit (scripts/e2e.sh) ajetaan aina käyttöliittymämuutosten jälkeen. Kysymysrivit ja sarjat haetaan testeissä
+otsikon mukaan (`pollItem`, `expand`, `setTools` tiedostossa tests/e2e/lib.mjs; valikot sisältävät muiden sarjojen nimiä).
+Englanninkielinen kuva-ajo (`docs-screenshots.mjs en`) ei voi ylikirjoittaa kuvia tämän koneen hiekkalaatikossa (EPERM):
+poista `docs/kuvat/en/*.png` ensin.

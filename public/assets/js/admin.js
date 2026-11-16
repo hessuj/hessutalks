@@ -370,8 +370,6 @@
     mount(h('h1', { text: 'Avaa kysymykset' }),
       h('p', null, 'Avaimen sormenjälki ', h('span.fingerprint', { text: state.keys.fingerprint })),
       pendingPrf ? null : h('p', null, prfBtn),
-      state.events && state.events.length ? h('p', null, h('button.btn.ghost.small', { type: 'button', text: 'Puhelinohjain',
-        title: 'Ohjaa aktiivista kysymystä avaamatta salausavainta', onclick: showRemotePicker })) : null,
       h('form', { onsubmit: function (ev) {
         ev.preventDefault();
         out.replaceChildren(notice('Avataan…'));
@@ -472,7 +470,6 @@
       h('option', { value: 'fi', text: 'Suomi', selected: value === 'fi' }));
   }
 
-  var STATUS_LABEL = { 'new': 'Uusi', answered: 'Vastattu', archived: 'Arkistoitu' };
 
   function qrDataUrl(text, cell) {
     var qr = window.qrcode(0, 'M');
@@ -512,27 +509,19 @@
   var stageStatus = h('span.stage-status');
   var stageSource = null;     // nykyisen luentonäkymän näyttösisältö (funktio -> board-viesti tai null)
   var liveRefresh = null;     // nykyisen luentonäkymän päivitysfunktio (tick kutsuu)
-  var liveCommand = null;     // nykyisen luentonäkymän ohjausfunktio (pikanäppäimet ja esitysikkunan komennot)
+  var liveCommand = null;     // nykyisen luentonäkymän komento (Q: iso QR) hallinnasta ja esitysikkunasta
   var eventTab = 'polls';     // luentonäkymän valittu välilehti (säilyy luentojen välillä tämän sivun ajan)
-  var pollMode = null;        // kyselyjen tila: 'prep' (valmistelu) tai 'live' (luennolla); null = valitaan tilanteen mukaan
 
-  // Pikanäppäimet (hallinta ja esitysikkuna). Esitysohjaimet lähettävät yleensä PageUp/PageDown.
-  var COMMAND_KEYS = {
-    ArrowRight: 'next', PageDown: 'next', ArrowLeft: 'prev', PageUp: 'prev',
-    ' ': 'toggle', r: 'results', R: 'results', a: 'reveal', A: 'reveal', q: 'qr', Q: 'qr'
-  };
-  var COMMANDS = { next: 1, prev: 1, toggle: 1, results: 1, reveal: 1, qr: 1 };
+  // Ainoa pikanäppäin on Q (iso QR-koodi). Kysymysten ohjauksen näppäimet (Seuraava/Edellinen, avaus,
+  // tulokset, paljastus) poistettiin hallinnan yksinkertaistuksessa (issue #60): toiminnot ovat listassa.
+  var COMMANDS = { qr: 1 };
   document.addEventListener('keydown', function (e) {
     if (!liveCommand || e.ctrlKey || e.metaKey || e.altKey || e.repeat) return;
     var t = e.target;
-    // Lomakkeissa näppäimet toimivat normaalisti. Ohjauspalkin napeissa pikanäppäin voittaa: muuten
-    // hiirellä painettu (fokukseen jäänyt) Seuraava-nappi painuisi välilyönnistä uudelleen.
-    var inControl = t && t.closest && t.closest('.live-control');
-    if (t && !inControl && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT|BUTTON|A|SUMMARY)$/.test(t.tagName))) return;
-    var cmd = COMMAND_KEYS[e.key];
-    if (!cmd) return;
+    if (t && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT|BUTTON|A|SUMMARY)$/.test(t.tagName))) return;
+    if (e.key !== 'q' && e.key !== 'Q') return;
     e.preventDefault();
-    liveCommand(cmd);
+    liveCommand('qr');
   });
   var lastTick = 0;
 
@@ -727,18 +716,16 @@
   function pollsPanel(eventId, getEvent, onChange, getMessages) {
     var sets = [];
     var polls = [];
-    var active = null;      // aktiivisen kysymyksen id tai null (odotusnäkymä)
     var showQr = false;     // projektorin iso QR-koodi
-    var version = null;     // ohjaustilan versio: muuttuu, kun toinen hallintaikkuna (esim. puhelin) ohjaa
+    var version = null;     // ohjaustilan versio: muuttuu, kun toinen hallintaikkuna (esim. toinen läppäri) ohjaa
     var answers = {};       // kyselyn id -> { vastaaja: vastaus }
     var invalid = {};       // kyselyn id -> hylättyjen vastausten määrä
     var generations = {};   // kyselyn id -> sukupolvi (kasvaa, kun vastaukset tyhjennetään)
     var mods = {};          // kyselyn id -> moderointi (piilotetut/hyväksytyt), tallennetaan salattuna palvelimelle
-    var expanded = {};      // kyselyn id -> tulokset auki
+    var expanded = {};      // kyselyn id -> rivin alle avattu (tulokset ja muokkaus)
     var lastAnswerId = 0;
     var lastTs = {};        // kyselyn id -> viimeisimmän vastauksen aikaleima (CSV)
     var views = {};         // kyselyn id -> tuloselementti (säilyy, jotta kaaviot animoituvat)
-    var controlEl = h('div.live-control');
     var setsEl = h('div.set-list');
     var formEl = h('div');
     var outEl = h('div');
@@ -749,26 +736,15 @@
       if (file.size > 60000) { outEl.replaceChildren(notice('Tiedosto on liian suuri (enintään 60 kt).', 'error')); return; }
       file.text().then(previewImport).catch(fail);
     } });
-    // Kaksi tilaa (Hessun palaute 29.10.: aktivointi oli sekavaa, kun valmistelu ja esittäminen olivat samoissa korteissa):
-    // Valmistelu = kortit ja muokkaus, Luennolla = ohjauspalkki, aktiivisen tulokset ja tiivis lista (rivi = aktivoi).
-    var modeButtons = {
-      prep: h('button.btn.small.mode-btn', { type: 'button', text: 'Valmistelu', onclick: function () { setMode('prep'); } }),
-      live: h('button.btn.small.mode-btn', { type: 'button', text: '▶ Luennolla', onclick: function () { setMode('live'); } })
-    };
-    var prepTools = h('span.prep-tools.actions', null,
-      h('button.btn.ghost.small', { type: 'button', text: 'Tuo JSON', title: 'Tuo sarjat JSON-tiedostosta', onclick: function () { fileInput.click(); } }),
-      h('button.btn.ghost.small', { type: 'button', text: 'Vie JSON', title: 'Lataa kaikki sarjat JSON-tiedostona', onclick: function () { exportJson(null); } }),
-      h('button.btn.ghost.small', { type: 'button', text: 'Vie CSV', title: 'Tulokset taulukkona (puretaan tässä selaimessa)', onclick: function () { exportCsv(null); } }),
-      h('button.btn.ghost.small', { type: 'button', text: 'Vie Markdown', title: 'Luennon kysymykset, tulokset ja osallistujien viestit raporttina (puretaan tässä selaimessa)', onclick: exportMarkdown }),
-      h('button.btn.small', { type: 'button', text: 'Uusi sarja', onclick: function () { showSetForm(null); } }));
     var el = h('section.polls-admin', null, fileInput,
-      h('div.toolbar', null, h('h2', { text: 'Kysymyssarjat' }),
-        h('span.mode-switch', { role: 'group', 'aria-label': 'Tila' }, modeButtons.prep, modeButtons.live),
-        h('span.spacer'), prepTools),
+      h('div.toolbar', null, h('h2', { text: 'Kysymykset' }), h('span.spacer'),
+        h('span.actions', null,
+          h('button.btn.small', { type: 'button', text: 'Uusi sarja', onclick: function () { showSetForm(null); } }),
+          h('button.btn.ghost.small', { type: 'button', text: 'Tuo JSON', title: 'Tuo sarjat JSON-tiedostosta', onclick: function () { fileInput.click(); } }),
+          h('button.btn.ghost.small', { type: 'button', text: 'Vie JSON', title: 'Lataa kaikki sarjat JSON-tiedostona', onclick: function () { exportJson(null); } }),
+          h('button.btn.ghost.small', { type: 'button', text: 'Vie CSV', title: 'Tulokset taulukkona (puretaan tässä selaimessa)', onclick: function () { exportCsv(null); } }),
+          h('button.btn.ghost.small', { type: 'button', text: 'Vie Markdown', title: 'Luennon kysymykset, tulokset ja osallistujien viestit raporttina (puretaan tässä selaimessa)', onclick: exportMarkdown }))),
       outEl, formEl, setsEl);
-
-    function mode() { return pollMode || (active ? 'live' : 'prep'); }
-    function setMode(m) { pollMode = m; formEl.replaceChildren(); renderAll(); }
 
     function findPoll(pid) {
       for (var i = 0; i < polls.length; i++) if (polls[i].id === pid) return polls[i];
@@ -781,7 +757,7 @@
     function fail(e) { if (e.message !== '401') outEl.replaceChildren(notice(e.message, 'error')); }
 
     function applyState(r) {
-      sets = r.sets; polls = r.polls; active = r.active;
+      sets = r.sets; polls = r.polls;
       if (typeof r.version === 'number') version = r.version;
       if (typeof r.show_qr === 'boolean') showQr = r.show_qr;
       polls.forEach(function (p) { mods[p.id] = readModeration(p.moderation); });
@@ -872,24 +848,15 @@
       });
     }
 
-    /** Ohjauskomento pikanäppäimestä, esitysikkunasta tai napista. */
-    function command(cmd) {
-      var poll = findPoll(active);
-      switch (cmd) {
-        case 'next': return liveAct({ action: 'next' });
-        case 'prev': return liveAct({ action: 'prev' });
-        case 'toggle': if (poll) act(poll, 'status', { status: poll.status === 'open' ? 'closed' : 'open' }); return;
-        case 'results': if (poll) act(poll, 'results', { visible: !poll.results_visible }); return;
-        case 'reveal': if (poll && Array.isArray(poll.config.correct)) act(poll, 'reveal', { revealed: !poll.revealed }); return;
-        case 'qr':
-          api('POST', 'events/' + eventId + '/qr', { show: !showQr }).then(load).catch(fail);
-      }
+    /** Iso QR-koodi projektorille päälle tai pois (nappi tai Q hallinnassa ja esitysikkunassa). */
+    function toggleQr() {
+      return api('POST', 'events/' + eventId + '/qr', { show: !showQr }).then(load).catch(fail);
     }
 
     /** Hakee uudet salatut vastaukset, purkaa ja tarkistaa ne. */
     function refreshAnswers() {
       return api('GET', 'events/' + eventId + '/poll-answers?after=' + lastAnswerId).then(function (r) {
-        // Toinen hallintaikkuna (puhelimen ohjain) muutti tilaa: ladataan kysymykset ja ohjaustila.
+        // Toinen hallintaikkuna muutti tilaa: ladataan kysymykset ja taulun tila.
         if (typeof r.version === 'number' && version !== null && r.version !== version) {
           return load().then(function () { return refreshAnswers(); });
         }
@@ -1024,11 +991,6 @@
           renderHidden(poll);
         }
       });
-      renderControlCount();
-      controlEl.querySelectorAll('.stage-count').forEach(function (c) {
-        var p = findPoll(parseInt(c.getAttribute('data-count'), 10));
-        if (p) c.textContent = tallyFor(p).voters + ' vastausta';
-      });
       setsEl.querySelectorAll('.run-count').forEach(function (c) {
         var p = findPoll(parseInt(c.getAttribute('data-count'), 10));
         if (p) c.textContent = String(tallyFor(p).voters);
@@ -1089,76 +1051,43 @@
       api('POST', 'sets/' + set.id + '/' + action, body || {}).then(applyState).catch(fail);
     }
 
-    // ---------------------------------------------------------------- ohjauspalkki
+    // ---------------------------------------------------------------- kysymyslista (issue #60)
+    //
+    // Yksi lista ilman tiloja ja aktiivista kysymystä: jokaisen kysymyksen toiminnot ovat sen rivillä.
+    // Näytä taululla tuo projektorille ja avaa vastauksille, Sulje lopettaa vastaanoton (jää taululle),
+    // Poista taululta vie pois projektorilta ja puhelimista. Tulokset ja oikea vastaus ovat omat nappinsa.
+    // Rivin klikkaus avaa alle tulokset (moderointi) sekä muokkauksen; vastausten tyhjennys ja poisto
+    // vain sieltä vahvistuksella, jotta annettuja vastauksia ei poisteta vahingossa luennon aikana.
 
-    var controlCount = h('span.hint');
-    function renderControlCount() {
-      var poll = findPoll(active);
-      controlCount.textContent = poll ? tallyFor(poll).voters + ' vastausta' : '';
+    var setTools = {};      // sarjan id -> työkalurivi auki
+
+    /** Näytä taululla: projektorille muiden rinnalle ja auki vastauksille (avaa esitysikkunan tarvittaessa). */
+    function showOnBoard(poll) {
+      ensureStage();
+      act(poll, 'status', { status: 'open' });
     }
 
-    /** Näytölle tai pois näytöltä. Näytölle lisäys avaa esitysikkunan, jos se ei ole auki. */
-    function toggleStage(poll) {
-      if (!poll.on_stage) ensureStage();
-      act(poll, 'stage', { on: !poll.on_stage });
-    }
-
-    function pollButtons(poll) {
+    function boardButtons(poll) {
+      var shown = poll.status !== 'draft' || poll.on_stage;
       return [
-        poll.status === 'open'
-          ? h('button.btn.small', { type: 'button', text: 'Sulje vastaukset', onclick: function () { act(poll, 'status', { status: 'closed' }); } })
-          : h('button.btn.small', { type: 'button', text: 'Avaa vastauksille', onclick: function () { act(poll, 'status', { status: 'open' }); } }),
-        h('button.btn.small' + (poll.results_visible ? '' : '.ghost'), { type: 'button', 'aria-pressed': String(poll.results_visible),
-          text: poll.results_visible ? 'Piilota tulokset' : 'Näytä tulokset', title: 'Tulokset projektorille ja osallistujille (R)',
-          onclick: function () { act(poll, 'results', { visible: !poll.results_visible }); } }),
-        Array.isArray(poll.config.correct) ? h('button.btn.small' + (poll.revealed ? '' : '.ghost'), { type: 'button', 'aria-pressed': String(poll.revealed),
-          text: poll.revealed ? 'Piilota oikea vastaus' : 'Paljasta oikea vastaus', title: 'Oikea vastaus ja selitykset (A)',
-          onclick: function () { act(poll, 'reveal', { revealed: !poll.revealed }); } }) : null,
-        h('button.btn.ghost.small', { type: 'button', text: 'Pois näytöltä', title: 'Poistaa projektorilta ja osallistujilta ja sulkee vastaukset (vastaukset säilyvät)',
-          onclick: function () { act(poll, 'stage', { on: false }); } })];
+        poll.on_stage
+          ? (poll.status === 'open'
+            ? h('button.btn.small', { type: 'button', text: 'Sulje', title: 'Lopettaa vastausten vastaanoton. Kysymys jää taululle.',
+              onclick: function () { act(poll, 'status', { status: 'closed' }); } })
+            : h('button.btn.ghost.small', { type: 'button', text: 'Avaa vastauksille', onclick: function () { act(poll, 'status', { status: 'open' }); } }))
+          : h('button.btn.small.board-btn', { type: 'button', text: 'Näytä taululla', title: 'Projektorille muiden rinnalle ja auki vastauksille',
+            onclick: function () { showOnBoard(poll); } }),
+        poll.on_stage ? h('button.btn.ghost.small.board-btn', { type: 'button', text: 'Poista taululta',
+          title: 'Pois projektorilta ja osallistujien puhelimista. Vastaukset säilyvät.',
+          onclick: function () { act(poll, 'stage', { on: false }); } }) : null,
+        shown ? h('button.btn.small' + (poll.results_visible ? '' : '.ghost'), { type: 'button', 'aria-pressed': String(poll.results_visible),
+          text: poll.results_visible ? 'Piilota tulokset' : 'Näytä tulokset', title: 'Tulokset projektorille ja osallistujille',
+          onclick: function () { act(poll, 'results', { visible: !poll.results_visible }); } }) : null,
+        shown && Array.isArray(poll.config.correct) ? h('button.btn.small' + (poll.revealed ? '' : '.ghost'), { type: 'button', 'aria-pressed': String(poll.revealed),
+          text: poll.revealed ? 'Piilota oikea vastaus' : 'Paljasta oikea vastaus', title: 'Oikea vastaus ja selitykset projektorille ja osallistujille',
+          onclick: function () { act(poll, 'reveal', { revealed: !poll.revealed }); } }) : null
+      ];
     }
-
-    // Ohjauspalkki: aktiivinen kysymys (pikanäppäimet ohjaavat sitä) ja muut näytöllä olevat omine nappeineen.
-    // Vastausten tyhjennys on vain Valmistelu-tilassa: luennon aikana annettuja vastauksia ei poisteta (Hessun koeajo luennolla).
-    function renderControl() {
-      var poll = findPoll(active);
-      var set = poll ? findSet(poll.set_id) : null;
-      var order = polls.filter(function (p) { return !p.skipped || p.id === active; });
-      var index = poll ? order.indexOf(poll) + 1 : 0;
-      var others = staged().filter(function (p) { return p.id !== active; });
-      controlEl.replaceChildren();
-      append(controlEl, [
-        h('div.live-now', null,
-          h('span.eyebrow', { text: 'Aktiivinen kysymys' + (poll ? ' ' + index + '/' + order.length : '') }),
-          poll ? h('span.badge.' + poll.status, { text: POLL_STATUS_LABEL[poll.status] || poll.status }) : null,
-          poll && set ? h('span.code', { text: set.slug }) : null,
-          h('strong', { text: poll ? poll.prompt : 'Ei aktiivista: osallistujat näkevät odotusnäkymän.' }),
-          controlCount),
-        h('div.q-actions', null,
-          h('button.btn.ghost.small', { type: 'button', text: '← Edellinen', onclick: function () { liveAct({ action: 'prev' }); } }),
-          h('button.btn.small', { type: 'button', text: 'Seuraava →', title: 'Vaihtaa aktiivisen kysymyksen seuraavaan (muut näytöllä olevat pysyvät)', onclick: function () { liveAct({ action: 'next' }); } }),
-          poll ? pollButtons(poll) : null,
-          staged().length ? h('button.btn.ghost.small', { type: 'button', text: 'Odotusnäkymä', title: 'Kaikki kysymykset pois näytöltä', onclick: function () { liveAct({ action: 'activate', poll: null }); } }) : null),
-        others.length ? h('p.eyebrow', { text: 'Muut näytöllä (' + others.length + ')' }) : null,
-        others.map(function (p) {
-          var s2 = findSet(p.set_id);
-          return h('div.stage-row', { 'data-poll': String(p.id) },
-            s2 ? h('span.code', { text: s2.slug }) : null,
-            h('span.badge.' + p.status, { text: POLL_STATUS_LABEL[p.status] || p.status }),
-            h('strong', { text: p.prompt }),
-            h('span.hint.stage-count', { 'data-count': String(p.id), text: tallyFor(p).voters + ' vastausta' }),
-            h('span.q-actions', null,
-              h('button.btn.ghost.small', { type: 'button', text: 'Aktiiviseksi', title: 'Pikanäppäimet ja puhelinohjain ohjaavat tätä', onclick: function () { act(p, 'stage', { on: true }); } }),
-              pollButtons(p)));
-        }),
-        h('p.hint.shortcuts', { text: 'Pikanäppäimet (myös esitysikkunassa) ohjaavat aktiivista: → / PageDown seuraava · ← / PageUp edellinen · välilyönti avaa/sulkee · R tulokset · A oikea vastaus · Q iso QR' }),
-        poll && poll.status === 'draft'
-          ? h('p.hint', { text: 'Luonnos: kysymys näkyy projektorilla, mutta osallistujat näkevät sen vasta, kun avaat sen vastauksille.' })
-          : null]);
-      renderControlCount();
-    }
-
-    // ---------------------------------------------------------------- sarjat ja kyselyt
 
     /** Oikeat vastaukset hallinnalle (osallistujat eivät saa niitä ennen paljastusta). */
     function correctHint(poll) {
@@ -1169,29 +1098,25 @@
         text: 'Oikea: ' + c.map(function (i) { return String(i + 1); }).join(', ') + (poll.config.explanations ? ' · selitykset' : '') });
     }
 
-    function pollCard(poll, i, count) {
+    /** Rivin alle avautuva osa: tulokset ja moderointi sekä kysymyksen muokkaus. */
+    function pollDetail(poll, i, count) {
       var view = views[poll.id] || (views[poll.id] = { el: h('div'), count: h('span'), hidden: h('div.poll-hidden'), details: null });
-      var isActive = poll.id === active;
-      var details = h('details.poll-results', null, h('summary', null, 'Tulokset · ', view.count), view.el, view.hidden);
-      details.open = isActive || !!expanded[poll.id];
-      details.addEventListener('toggle', function () { expanded[poll.id] = details.open; updateResults(); });
-      view.details = details;
-      return h('article.poll-card' + (isActive ? '.active' : ''), { 'data-status': poll.status },
-        h('div.poll-card-head', null,
-          h('span.code', { text: String(i + 1) }),
-          h('span.badge.' + poll.status, { text: POLL_STATUS_LABEL[poll.status] || poll.status }),
-          isActive ? h('span.badge.live', { text: 'Aktiivinen' }) : null,
-          poll.results_visible ? h('span.badge.open', { text: 'Tulokset näkyvissä' }) : null,
-          poll.revealed ? h('span.badge.open', { text: 'Paljastettu' }) : null,
+      view.details = { open: true };
+      return h('div.poll-detail', null,
+        h('div.poll-detail-head', null,
           h('span.hint', { text: (TYPE_LABEL[poll.type] || poll.type) + (poll.type === 'open' && HessuResults.openMax(poll) !== HessuResults.OPEN_MAX ? ' · enintään ' + HessuResults.openMax(poll) + ' merkkiä' : '') }),
-          correctHint(poll)),
-        h('p.poll-card-prompt', { text: poll.prompt }),
-        h('div.q-actions', null,
-          h('button.btn.ghost.small', { type: 'button', text: '↑', title: 'Siirrä ylös', disabled: i === 0, onclick: function () { act(poll, 'move', { dir: -1 }); } }),
-          h('button.btn.ghost.small', { type: 'button', text: '↓', title: 'Siirrä alas', disabled: i === count - 1, onclick: function () { act(poll, 'move', { dir: 1 }); } }),
+          correctHint(poll),
+          h('span.hint', null, view.count),
+          h('span.spacer'),
+          h('button.btn.ghost.small.collapse-btn', { type: 'button', text: 'Piilota', title: 'Sulje tulokset (kysymys pysyy taululla)',
+            onclick: function () { delete expanded[poll.id]; renderAll(); } })),
+        view.el, view.hidden,
+        h('div.q-actions.poll-manage', null,
           h('button.btn.ghost.small', { type: 'button', text: 'Esikatsele', title: 'Osallistujan näkymä', onclick: function () { previewParticipant(poll); } }),
           h('button.btn.ghost.small', { type: 'button', text: 'Esikatsele projektorilla', onclick: function () { previewStage(poll); } }),
           h('button.btn.ghost.small', { type: 'button', text: 'Muokkaa', onclick: function () { showForm(poll, findSet(poll.set_id)); } }),
+          h('button.btn.ghost.small', { type: 'button', text: '↑', title: 'Siirrä ylös', disabled: i === 0, onclick: function () { act(poll, 'move', { dir: -1 }); } }),
+          h('button.btn.ghost.small', { type: 'button', text: '↓', title: 'Siirrä alas', disabled: i === count - 1, onclick: function () { act(poll, 'move', { dir: 1 }); } }),
           sets.length > 1 ? (function () {
             var sel = h('select.move-set', { 'aria-label': 'Siirrä toiseen sarjaan' },
               h('option', { value: '', text: 'Siirrä sarjaan…' }),
@@ -1200,103 +1125,65 @@
             return sel;
           })() : null,
           poll.status !== 'draft' ? h('button.btn.ghost.small', { type: 'button', text: 'Palauta luonnokseksi',
-            title: 'Pois näytöltä ja osallistujilta; vastaukset säilyvät, ja oikea vastaus piilotetaan uudelleen',
+            title: 'Pois taululta ja osallistujilta; vastaukset säilyvät, ja oikea vastaus piilotetaan uudelleen',
             onclick: function () { act(poll, 'status', { status: 'draft' }); } }) : null,
           h('button.btn.ghost.small', { type: 'button', text: 'Tyhjennä vastaukset', onclick: function () {
-            act(poll, 'reset', {}, 'Tyhjennetäänkö kyselyn "' + poll.prompt + '" kaikki vastaukset pysyvästi?');
+            act(poll, 'reset', {}, 'Tyhjennetäänkö kysymyksen "' + poll.prompt + '" kaikki vastaukset pysyvästi?');
           } }),
           h('button.btn.danger.small', { type: 'button', text: 'Poista', onclick: function () {
-            act(poll, 'delete', {}, 'Poistetaanko kysely "' + poll.prompt + '" ja sen vastaukset pysyvästi?');
-          } })),
-        details);
+            act(poll, 'delete', {}, 'Poistetaanko kysymys "' + poll.prompt + '" ja sen vastaukset pysyvästi?');
+          } })));
     }
 
-    /** Luennolla-tila: aktiivisen kysymyksen tulokset ja moderointi sekä tiivis lista, jossa rivi tekee kysymyksestä aktiivisen. */
-    function renderRun() {
-      // Näytöllä olevien tulokset (aktiivinen ensin): moderointi ja seuranta luennon aikana.
-      staged().sort(function (x, y) { return (y.id === active) - (x.id === active); }).forEach(function (poll) {
-        var view = views[poll.id] || (views[poll.id] = { el: h('div'), count: h('span'), hidden: h('div.poll-hidden'), details: null });
-        var details = h('details.poll-results.run-results', null, h('summary', null, 'Tulokset · ' + poll.prompt + ' · ', view.count), view.el, view.hidden);
-        details.open = true;
-        details.addEventListener('toggle', function () { updateResults(); });
-        view.details = details;
-        setsEl.appendChild(details);
-      });
-      if (!sets.length) {
-        setsEl.appendChild(h('p.empty', { text: 'Ei kysymyksiä. Lisää kysymyssarjat Valmistelu-tilassa.' }));
-        return;
-      }
-      var n = 0;
-      sets.forEach(function (set) {
-        var inSet = polls.filter(function (p) { return p.set_id === set.id; });
-        var list = h('ol.run-list', { start: String(n + 1) });
-        inSet.forEach(function (p) {
-          n++;
-          var isActive = p.id === active;
-          list.appendChild(h('li', null, h('button.run-row' + (isActive ? '.active' : '') + (p.on_stage ? '.staged' : ''), {
-            type: 'button', 'aria-current': isActive ? 'true' : null, 'data-poll': String(p.id),
-            title: isActive ? 'Aktiivinen kysymys' : 'Näytölle muiden rinnalle ja aktiiviseksi (avaa vastauksille ohjauspalkista)',
-            onclick: function () { if (!isActive) liveAct({ action: 'activate', poll: p.id }); }
-          },
+    function pollItem(poll, n, i, count) {
+      var open = !!expanded[poll.id];
+      if (!open && views[poll.id]) views[poll.id].details = null;
+      return h('li.poll-item' + (poll.on_stage ? '.staged' : '') + (open ? '.expanded' : ''), { 'data-poll': String(poll.id), 'data-status': poll.status },
+        h('div.poll-row', null,
+          h('button.poll-toggle', { type: 'button', 'aria-expanded': String(open),
+            title: open ? 'Sulje tulokset' : 'Näytä tulokset ja muokkaus tämän alla',
+            onclick: function () { if (open) delete expanded[poll.id]; else expanded[poll.id] = true; renderAll(); } },
             h('span.run-num', { text: String(n) }),
-            h('span.run-type', { text: TYPE_SHORT[p.type] || p.type }),
-            h('span.run-prompt', { text: p.prompt }),
-            h('span.badge.' + p.status, { text: POLL_STATUS_LABEL[p.status] || p.status }),
-            h('span.run-count', { 'data-count': String(p.id), text: String(tallyFor(p).voters) })),
-            h('button.btn.small.stage-toggle' + (p.on_stage ? '' : '.ghost'), { type: 'button', 'aria-pressed': String(!!p.on_stage),
-              text: p.on_stage ? '✓ Näytöllä' : '+ Näytölle', title: p.on_stage ? 'Pois näytöltä (vastaukset säilyvät)' : 'Lisää näytölle muiden rinnalle',
-              onclick: function () { toggleStage(p); } })));
-        });
-        setsEl.appendChild(h('section.run-set' + (set.skipped ? '.skipped' : ''), null,
-          h('div.set-head', null,
-            h('span.code', { text: set.slug }),
-            h('h3', { text: set.title }),
-            set.skipped ? h('span.badge.closed', { text: 'Ohitettu' }) : null,
-            h('span.spacer'),
-            h('button.btn.ghost.small', { type: 'button', text: set.skipped ? 'Palauta' : 'Ohita',
-              title: set.skipped ? 'Palauta sarja Seuraava/Edellinen-järjestykseen' : 'Jätä sarja pois Seuraava/Edellinen-järjestyksestä (vastaukset säilyvät)',
-              onclick: function () { setAct(set, 'skip', { skipped: !set.skipped }); } })),
-          inSet.length ? list : h('p.empty', { text: 'Ei kysymyksiä.' })));
-      });
+            h('span.run-type', { text: TYPE_SHORT[poll.type] || poll.type }),
+            h('span.run-prompt', { text: poll.prompt }),
+            poll.on_stage ? h('span.badge.live', { text: 'Taululla' }) : null,
+            h('span.badge.' + poll.status, { text: POLL_STATUS_LABEL[poll.status] || poll.status }),
+            h('span.run-count', { 'data-count': String(poll.id), text: String(tallyFor(poll).voters) })),
+          h('span.q-actions.poll-actions', null, boardButtons(poll))),
+        open ? pollDetail(poll, i, count) : null);
     }
 
     function renderAll() {
-      var m = mode();
-      modeButtons.prep.setAttribute('aria-pressed', String(m === 'prep'));
-      modeButtons.live.setAttribute('aria-pressed', String(m === 'live'));
-      prepTools.hidden = m !== 'prep';
-      controlEl.hidden = m !== 'live';
-      renderControl();
       setsEl.replaceChildren();
-      if (m === 'live') { renderRun(); updateResults(); return; }
       if (!sets.length) {
-        setsEl.appendChild(h('p.empty', { text: 'Ei kysymyssarjoja. Luo sarja kullekin luennon moduulille (esim. M1) ja lisää siihen kysymykset.' }));
+        setsEl.appendChild(h('p.empty', { text: 'Ei kysymyksiä. Luo kysymyssarja (esim. M1) tai tuo kysymykset JSON-tiedostosta.' }));
       }
+      var n = 0;
       sets.forEach(function (set, si) {
         var inSet = polls.filter(function (p) { return p.set_id === set.id; });
-        var section = h('section.set-card' + (set.skipped ? '.skipped' : ''), null,
+        var list = h('ol.poll-list', { start: String(n + 1) });
+        inSet.forEach(function (poll, i) { n++; list.appendChild(pollItem(poll, n, i, inSet.length)); });
+        var toolsOpen = !!setTools[set.id];
+        setsEl.appendChild(h('section.set-card', { 'data-set': String(set.id) },
           h('div.set-head', null,
             h('span.code', { text: set.slug }),
             h('h3', { text: set.title }),
-            set.skipped ? h('span.badge.closed', { text: 'Ohitettu' }) : null,
             h('span.hint', { text: inSet.length + ' kysymystä' }),
             h('span.spacer'),
+            h('button.btn.small', { type: 'button', text: 'Uusi kysymys', onclick: function () { showForm(null, set); } }),
+            h('button.btn.ghost.small.set-tools-btn', { type: 'button', 'aria-expanded': String(toolsOpen), text: toolsOpen ? 'Sarja ▴' : 'Sarja ▾',
+              title: 'Sarjan muokkaus, järjestys, vienti ja poisto', onclick: function () { setTools[set.id] = !toolsOpen; renderAll(); } })),
+          toolsOpen ? h('div.q-actions.set-tools', null,
+            h('button.btn.ghost.small', { type: 'button', text: 'Muokkaa', onclick: function () { showSetForm(set); } }),
             h('button.btn.ghost.small', { type: 'button', text: '↑', title: 'Siirrä sarja ylös', disabled: si === 0, onclick: function () { setAct(set, 'move', { dir: -1 }); } }),
             h('button.btn.ghost.small', { type: 'button', text: '↓', title: 'Siirrä sarja alas', disabled: si === sets.length - 1, onclick: function () { setAct(set, 'move', { dir: 1 }); } }),
-            h('button.btn.ghost.small', { type: 'button', text: set.skipped ? 'Palauta' : 'Ohita',
-              title: set.skipped ? 'Palauta sarja Seuraava/Edellinen-järjestykseen' : 'Jätä sarja pois Seuraava/Edellinen-järjestyksestä (vastaukset säilyvät)',
-              onclick: function () { setAct(set, 'skip', { skipped: !set.skipped }); } }),
-            h('button.btn.ghost.small', { type: 'button', text: 'Muokkaa', onclick: function () { showSetForm(set); } }),
-            h('button.btn.ghost.small', { type: 'button', text: 'Vie', title: 'Lataa sarja JSON-tiedostona', onclick: function () { exportJson(set); } }),
-            h('button.btn.ghost.small', { type: 'button', text: 'CSV', title: 'Sarjan tulokset taulukkona', onclick: function () { exportCsv(set); } }),
+            h('button.btn.ghost.small', { type: 'button', text: 'Vie JSON', title: 'Lataa sarja JSON-tiedostona', onclick: function () { exportJson(set); } }),
+            h('button.btn.ghost.small', { type: 'button', text: 'Vie CSV', title: 'Sarjan tulokset taulukkona', onclick: function () { exportCsv(set); } }),
             h('button.btn.ghost.small', { type: 'button', text: 'Monista', title: 'Kopio sarjasta ja sen kysymyksistä ilman vastauksia', onclick: function () { setAct(set, 'duplicate'); } }),
-            h('button.btn.small', { type: 'button', text: 'Uusi kysymys', onclick: function () { showForm(null, set); } }),
-            h('button.btn.danger.small', { type: 'button', text: 'Poista', onclick: function () {
+            h('button.btn.danger.small', { type: 'button', text: 'Poista sarja', onclick: function () {
               setAct(set, 'delete', {}, 'Poistetaanko sarja ' + set.slug + ' "' + set.title + '", sen ' + inSet.length + ' kysymystä ja kaikki vastaukset pysyvästi?');
-            } })));
-        if (!inSet.length) section.appendChild(h('p.empty', { text: 'Ei kysymyksiä.' }));
-        inSet.forEach(function (poll, i) { section.appendChild(pollCard(poll, i, inSet.length)); });
-        setsEl.appendChild(section);
+            } })) : null,
+          inSet.length ? list : h('p.empty', { text: 'Ei kysymyksiä.' })));
       });
       updateResults();
     }
@@ -1477,7 +1364,7 @@
     }
 
     return {
-      el: el, control: controlEl, load: load, refresh: refreshAnswers, command: command,
+      el: el, load: load, refresh: refreshAnswers, toggleQr: toggleQr,
       stageTiles: function () { return staged().map(pollTile); },
       staged: staged,
       showQr: function () { return showQr; },
@@ -1489,85 +1376,70 @@
     var event = null;
     var items = [];          // {id, status, created_at, nickname_id, msg}
     var lastId = 0;
-    var filter = 'open';     // open = uudet + vastatut, new, answered, archived, all
-    var listEl = h('ul.questions');
+    var lists = { question: h('ul.questions'), feedback: h('ul.questions') };
     var headEl = h('div');
-    var countEl = h('span.hint');
     var panel = pollsPanel(id, function () { return event; }, function () { renderStageBar(); updateScreens(); }, function () { return items; });
 
-    // Mitä näytöllä on kyselyjen lisäksi: kysymys- ja palautelista ja yksittäinen viesti. Muistetaan tämän
-    // välilehden ajan (uudelleenlataus). Viestistä vain id: purettu teksti ei jää selaimen tallennukseen.
-    var DISPLAY_KEY = 'hessutalks.display.' + id;
-    var display = { question: false, feedback: false, spotlight: null };
+    // Taululla olevat viestit (vapaat kysymykset ja palautteet) muistetaan tämän välilehden ajan
+    // (uudelleenlataus). Vain id:t: purettu teksti ei jää selaimen tallennukseen.
+    var DISPLAY_KEY = 'hessutalks.board.' + id;
+    var MAX_ON_BOARD = 6;
+    var onBoard = [];
     try {
-      var saved = JSON.parse(window.sessionStorage.getItem(DISPLAY_KEY) || 'null');
-      if (saved && typeof saved === 'object') {
-        display.question = saved.question === true;
-        display.feedback = saved.feedback === true;
-        display.spotlight = Number.isInteger(saved.spotlight) ? saved.spotlight : null;
-      }
-    } catch (e) { /* oletukset */ }
-    function setDisplay(change) {
-      Object.keys(change).forEach(function (k) { display[k] = change[k]; });
-      try { window.sessionStorage.setItem(DISPLAY_KEY, JSON.stringify(display)); } catch (e) { /* vain muistissa */ }
+      var saved = JSON.parse(window.sessionStorage.getItem(DISPLAY_KEY) || '[]');
+      if (Array.isArray(saved)) onBoard = saved.filter(Number.isSafeInteger).slice(0, MAX_ON_BOARD);
+    } catch (e) { /* tyhjä taulu */ }
+    function setBoard(ids) {
+      onBoard = ids.slice(-MAX_ON_BOARD);
+      try { window.sessionStorage.setItem(DISPLAY_KEY, JSON.stringify(onBoard)); } catch (e) { /* vain muistissa */ }
       renderStageBar();
-      renderList();
+      renderLists();
       updateScreens();
     }
-    // Näytölle tuotu sisältö tulee näkyviin: iso QR peittäisi sen (kysymyksille sama tehdään palvelimella).
-    function hideBigQr() {
-      if (panel.showQr()) panel.command('qr');
+    function isOnBoard(it) { return onBoard.indexOf(it.id) !== -1; }
+    function toggleBoard(it) {
+      if (isOnBoard(it)) { setBoard(onBoard.filter(function (x) { return x !== it.id; })); return; }
+      ensureStage();
+      // Taululle tuotu sisältö tulee näkyviin: iso QR peittäisi sen (kysymyksille sama tehdään palvelimella).
+      if (panel.showQr()) panel.toggleQr();
+      setBoard(onBoard.concat([it.id]));
     }
-    function spotlightItem() {
-      if (display.spotlight === null) return null;
-      var it = items.filter(function (x) { return x.id === display.spotlight; })[0];
-      return it && it.msg && typeof it.msg.t === 'string' ? it : null;
+    function boardItems() {
+      return onBoard.map(function (mid) { return items.filter(function (x) { return x.id === mid; })[0]; })
+        .filter(function (it) { return it && it.msg && typeof it.msg.t === 'string' && it.msg.e === event.code; });
     }
 
-    /** Näytön sisältö: viesti, näytöllä olevat kyselyt ja listat. Tyhjä = QR-koodi ja liittymisohje. */
+    /** Taulun sisältö: viestit ja taululla olevat kysymykset. Tyhjä = QR-koodi ja liittymisohje. */
     function boardMessage() {
       if (!event) return null;
-      var tiles = [];
-      var spot = spotlightItem();
-      if (spot) tiles.push({ kind: 'question', nick: typeof spot.msg.n === 'string' ? spot.msg.n : '?', text: String(spot.msg.t) });
-      tiles = tiles.concat(panel.stageTiles());
-      if (display.question) tiles.push(listMessage('question'));
-      if (display.feedback) tiles.push(listMessage('feedback'));
-      return { type: 'board', code: event.code, url: event.url, bigQr: panel.showQr(), tiles: tiles };
+      var tiles = boardItems().map(function (it) {
+        return { kind: 'question', id: it.id, nick: typeof it.msg.n === 'string' ? it.msg.n : '?', text: String(it.msg.t) };
+      });
+      return { type: 'board', code: event.code, url: event.url, bigQr: panel.showQr(), tiles: tiles.concat(panel.stageTiles()) };
     }
 
-    var stageBarEl = h('div.stage-bar', { 'aria-label': 'Esitysnäyttö' });
-    function displayToggle(text, on, title, onclick) {
-      return h('button.btn.small' + (on ? '' : '.ghost'), { type: 'button', 'aria-pressed': String(on), text: text, title: title, onclick: onclick });
-    }
+    // Esitysnäytöstä yksi rivi: ikkunan avaus ja yhteyden tila, iso QR ja taulun tyhjennys (issue #60).
+    var stageBarEl = h('div.stage-bar', { 'aria-label': 'Taulu' });
     function renderStageBar() {
       if (!event) return;
-      var polls = panel.staged();
+      var polls = panel.staged().length;
+      var msgs = boardItems().length;
       var parts = [];
-      if (spotlightItem()) parts.push('viesti');
-      if (polls.length) parts.push(polls.length === 1 ? '1 kysymys' : polls.length + ' kysymystä');
-      if (display.question) parts.push('kysymyslista');
-      if (display.feedback) parts.push('palautteet');
+      if (polls) parts.push(polls === 1 ? '1 kysymys' : polls + ' kysymystä');
+      if (msgs) parts.push(msgs === 1 ? '1 viesti' : msgs + ' viestiä');
       stageBarEl.replaceChildren();
       append(stageBarEl, [
         h('div.q-actions', null,
-          h('strong', { text: 'Esitysnäyttö' }), stageStatus,
-          h('button.btn.small', { type: 'button', text: 'Avaa esitysnäyttö', title: 'Yksi ikkuna projektorille: kaikki näytölle valittu näkyy siinä yhtä aikaa', onclick: ensureStage }),
-          displayToggle('Kysymykset projektorille', display.question, 'Osallistujien kysymykset listana näytölle (päälle/pois)', function () {
-            if (!display.question) { ensureStage(); hideBigQr(); }
-            setDisplay({ question: !display.question });
-          }),
-          displayToggle('Palautteet projektorille', display.feedback, 'Palautteet listana näytölle (päälle/pois)', function () {
-            if (!display.feedback) { ensureStage(); hideBigQr(); }
-            setDisplay({ feedback: !display.feedback });
-          }),
-          displayToggle(panel.showQr() ? 'QR pieneksi' : 'QR isona', panel.showQr(), 'Iso QR-koodi projektorille (Q)', function () { panel.command('qr'); }),
-          h('button.btn.ghost.small', { type: 'button', text: 'Tyhjennä näyttö', title: 'Kaikki pois näytöltä: näytöllä QR-koodi ja liittymisohje. Kysymykset suljetaan, vastaukset säilyvät.', onclick: function () {
-            setDisplay({ question: false, feedback: false, spotlight: null });
+          h('strong', { text: 'Taulu' }), stageStatus,
+          h('button.btn.small', { type: 'button', text: 'Avaa esitysnäyttö', title: 'Ikkuna projektorille: kaikki taululle valittu näkyy siinä yhtä aikaa', onclick: ensureStage }),
+          h('button.btn.small' + (panel.showQr() ? '' : '.ghost'), { type: 'button', 'aria-pressed': String(panel.showQr()),
+            text: panel.showQr() ? 'QR pieneksi' : 'QR isona', title: 'Iso QR-koodi projektorille (Q)', onclick: function () { panel.toggleQr(); } }),
+          h('button.btn.ghost.small', { type: 'button', text: 'Tyhjennä taulu', title: 'Kaikki pois taululta: näytöllä QR-koodi ja liittymisohje. Kysymykset suljetaan, vastaukset säilyvät.', onclick: function () {
+            setBoard([]);
             panel.clear();
-          } })),
-        h('p.hint', { text: parts.length ? 'Näytöllä: ' + parts.join(', ') + '.' : 'Näytöllä: QR-koodi ja liittymisohje.' }),
-        panel.showQr() ? notice('Iso QR-koodi peittää nyt koko näytön. Paina QR pieneksi tai Q, niin näytön sisältö tulee näkyviin.', 'warn') : null,
+          } }),
+          h('span.hint', { text: parts.length ? 'Taululla: ' + parts.join(', ') : 'Taululla: QR-koodi ja liittymisohje' })),
+        panel.showQr() ? notice('Iso QR-koodi peittää nyt koko näytön. Paina QR pieneksi tai Q, niin taulun sisältö tulee näkyviin.', 'warn') : null,
         h('p.hint', null, presenterNote)]);
       renderStageStatus();
     }
@@ -1595,7 +1467,6 @@
       headEl.replaceChildren(
         toolbar(event.title, [
           h('button.btn.ghost.small', { type: 'button', text: 'Muokkaa otsikkoa', onclick: function () { editingTitle = true; renderHead(); } }),
-          h('button.btn.ghost.small', { type: 'button', text: 'Ohjain', title: 'Puhelinohjain: isot napit aktiivisen kysymyksen ohjaukseen', onclick: function () { showRemote(id); } }),
           h('button.btn.ghost.small', { type: 'button', text: 'Kaikki luennot', onclick: function () { loadState().then(function () { showEvents(); }); } })]),
         h('div.share', null,
           h('img', { src: qrDataUrl(url, 4), alt: 'QR-koodi luennon kysymyssivulle' }),
@@ -1623,65 +1494,43 @@
       if (editingTitle) headEl.insertBefore(titleForm(), headEl.children[1]);
     }
 
-    // Projektorin lista (kysymykset tai palautteet omana ruutunaan): käsiteltävät viestit, uusin ensin.
-    // Lista päivittyy projektorille automaattisesti uusien viestien tullessa.
-    var LIST_MAX = 10;
-    function listMessage(kind) {
-      var bad = nickConflicts();
-      var shown = items.filter(function (it) {
-        var m = it.msg;
-        return m && (m.k === 'feedback') === (kind === 'feedback') && m.e === event.code && typeof m.t === 'string' &&
-          typeof m.n === 'string' && !bad[it.nickname_id] && (it.status === 'new' || it.status === 'answered');
-      }).slice(-LIST_MAX).reverse();
-      return {
-        kind: 'list', list: kind, title: event.title + ' · ' + (kind === 'feedback' ? (screenLang === 'en' ? 'Feedback' : 'Palautteet') : (screenLang === 'en' ? 'Questions' : 'Kysymykset')),
-        items: shown.map(function (it) { return { nick: it.msg.n, text: it.msg.t }; })
-      };
-    }
-
-    function filterButton(key, label) {
-      return h('button.btn.ghost.small', { type: 'button', 'aria-pressed': String(filter === key), text: label, onclick: function () {
-        filter = key; filtersEl.replaceChildren.apply(filtersEl, filterButtons()); renderList();
-      } });
-    }
-    function filterButtons() {
-      return [filterButton('open', 'Käsiteltävät'), filterButton('new', 'Uudet'), filterButton('answered', 'Vastatut'),
-        filterButton('archived', 'Arkisto'), filterButton('all', 'Kaikki'), countEl];
-    }
-    var filtersEl = h('div.filters');
-
-    // Välilehdet: kurssissa voi olla useita luentoja ja kymmeniä kysymyksiä, jolloin viestit hautautuivat
-    // sarjojen alle (Hessun USTP-kurssi 29.10.). Ohjauspalkki pysyy välilehtien yläpuolella, ja
-    // viestivälilehti näyttää uusien viestien määrän. Nuolinäppäimet jäävät pikanäppäimille.
-    var messagesEl = h('section.messages-admin', { id: 'tab-messages', role: 'tabpanel', 'aria-labelledby': 'tab-btn-messages' },
-      h('h2', { text: 'Kysymykset ja palaute' }), filtersEl, listEl);
-    panel.el.id = 'tab-polls';
-    panel.el.setAttribute('role', 'tabpanel');
-    panel.el.setAttribute('aria-labelledby', 'tab-btn-polls');
-    var tabEls = { polls: panel.el, messages: messagesEl };
+    // Välilehdet (issue #60): ennalta määritellyt kysymykset, vapaat kysymykset ja palautteet omillaan.
+    // Viestivälilehdet näyttävät uusien määrän.
+    var TABS = {
+      polls: { label: 'Kysymykset', el: panel.el },
+      question: { label: 'Vapaat kysymykset', el: h('section.messages-admin', null, h('h2', { text: 'Vapaat kysymykset' }), lists.question) },
+      feedback: { label: 'Palautteet', el: h('section.messages-admin', null, h('h2', { text: 'Palautteet' }), lists.feedback) }
+    };
     var tabButtons = {};
-    ['polls', 'messages'].forEach(function (key) {
-      tabButtons[key] = h('button.tab', { type: 'button', role: 'tab', id: 'tab-btn-' + key, 'aria-controls': tabEls[key].id,
+    Object.keys(TABS).forEach(function (key) {
+      var panelEl = TABS[key].el;
+      panelEl.id = 'tab-' + key;
+      panelEl.setAttribute('role', 'tabpanel');
+      panelEl.setAttribute('aria-labelledby', 'tab-btn-' + key);
+      tabButtons[key] = h('button.tab', { type: 'button', role: 'tab', id: 'tab-btn-' + key, 'aria-controls': panelEl.id,
         onclick: function () { selectTab(key); } });
     });
-    var tabsEl = h('div.tabs', { role: 'tablist', 'aria-label': 'Luennon näkymät' }, tabButtons.polls, tabButtons.messages);
+    var tabsEl = h('div.tabs', { role: 'tablist', 'aria-label': 'Luennon näkymät' }, tabButtons.polls, tabButtons.question, tabButtons.feedback);
 
     function selectTab(key) {
+      if (!TABS[key]) key = 'polls';
       eventTab = key;
-      Object.keys(tabEls).forEach(function (k) {
+      Object.keys(TABS).forEach(function (k) {
         tabButtons[k].setAttribute('aria-selected', String(k === key));
-        tabEls[k].hidden = k !== key;
+        TABS[k].el.hidden = k !== key;
       });
     }
+    function kindOf(it) { return it.msg && it.msg.k === 'feedback' ? 'feedback' : 'question'; }
     function renderTabs() {
-      var fresh = items.filter(function (it) { return it.status === 'new'; }).length;
-      tabButtons.polls.textContent = 'Kyselyt';
-      tabButtons.messages.replaceChildren();
-      append(tabButtons.messages, ['Kysymykset ja palaute', fresh ? h('span.badge', { text: fresh + ' uutta' }) : null]);
+      Object.keys(TABS).forEach(function (key) {
+        var fresh = key === 'polls' ? 0 : items.filter(function (it) { return it.status === 'new' && kindOf(it) === key; }).length;
+        tabButtons[key].replaceChildren();
+        append(tabButtons[key], [TABS[key].label, fresh ? h('span.badge', { text: fresh + ' uutta' }) : null]);
+      });
     }
 
     function setStatus(item, status) {
-      api('POST', 'questions/' + item.id + '/status', { status: status }).then(function () { item.status = status; renderList(); });
+      api('POST', 'questions/' + item.id + '/status', { status: status }).then(function () { item.status = status; renderLists(); });
     }
 
     // Tunnistaa, jos sama nimimerkkivaraus on käyttänyt eri nimimerkkiä salatun viestin sisällä
@@ -1697,53 +1546,53 @@
       return bad;
     }
 
-    function renderList() {
+    // Viestin tila: uusi tai käsitelty (vastattu). Vanhat arkistoidut näkyvät käsiteltyinä.
+    var DONE_LABEL = { question: 'Vastattu', feedback: 'Käsitelty' };
+    function messageItem(it, kind, bad) {
+      var m = it.msg;
+      var done = it.status !== 'new';
+      var warn = !m || m.e !== event.code || typeof m.t !== 'string' || bad[it.nickname_id];
+      var shown = isOnBoard(it);
+      return h('li.q' + (kind === 'feedback' ? '.feedback' : '') + (warn ? '.warn' : '') + (shown ? '.staged' : ''), { 'data-status': it.status, 'data-id': String(it.id) },
+        h('div.q-head', null,
+          h('strong', { text: m && typeof m.n === 'string' ? m.n : '?' }),
+          h('span', { text: fmtTime(it.created_at) }),
+          shown ? h('span.badge.live', { text: 'Taululla' }) : null,
+          done ? h('span.badge.closed', { text: DONE_LABEL[kind] }) : h('span.badge.open', { text: 'Uusi' })),
+        !m ? notice('Viestiä ei voitu purkaa. Se on vioittunut tai salattu toisella avaimella.', 'error') : null,
+        m && m.e !== event.code ? notice('Viesti on salattu toiselle luennolle. Se on voitu siirtää tietokannassa.', 'error') : null,
+        bad[it.nickname_id] ? notice('Sama nimimerkkivaraus on käyttänyt eri nimimerkkejä.', 'error') : null,
+        m ? h('p.q-text', { text: String(m.t) }) : null,
+        h('div.q-actions', null,
+          m && !warn ? h('button.btn.small.board-btn' + (shown ? '.ghost' : ''), { type: 'button', text: shown ? 'Poista taululta' : 'Näytä taululla',
+            title: shown ? 'Pois projektorilta' : 'Viesti isona projektorille muun sisällön rinnalle', onclick: function () { toggleBoard(it); } }) : null,
+          done
+            ? h('button.btn.ghost.small', { type: 'button', text: 'Palauta uudeksi', onclick: function () { setStatus(it, 'new'); } })
+            : h('button.btn.ghost.small', { type: 'button', text: kind === 'feedback' ? 'Merkitse käsitellyksi' : 'Merkitse vastatuksi',
+              onclick: function () { setStatus(it, 'answered'); } }),
+          h('button.btn.danger.small', { type: 'button', text: 'Poista', onclick: function () {
+            if (!window.confirm('Poistetaanko viesti pysyvästi?')) return;
+            api('POST', 'questions/' + it.id + '/delete', {}).then(function () {
+              items = items.filter(function (x) { return x.id !== it.id; });
+              if (isOnBoard(it)) setBoard(onBoard.filter(function (x) { return x !== it.id; })); else renderLists();
+            });
+          } })));
+    }
+
+    function renderLists() {
       var bad = nickConflicts();
-      var visible = items.filter(function (it) {
-        if (filter === 'all') return true;
-        if (filter === 'open') return it.status === 'new' || it.status === 'answered';
-        return it.status === filter;
-      }).slice().reverse();
-      countEl.textContent = visible.length + ' / ' + items.length + ' viestiä';
       renderTabs();
       updateScreens();
-      listEl.replaceChildren();
-      if (!visible.length) {
-        listEl.appendChild(h('li.empty', { text: items.length ? 'Ei viestejä tällä suodattimella.' : 'Ei vielä viestejä. Uudet viestit tulevat näkyviin automaattisesti.' }));
-        return;
-      }
-      visible.forEach(function (it) {
-        var m = it.msg;
-        var warn = !m || m.e !== event.code || typeof m.t !== 'string' || bad[it.nickname_id];
-        var li = h('li.q' + (m && m.k === 'feedback' ? '.feedback' : '') + (warn ? '.warn' : ''), { 'data-status': it.status },
-          h('div.q-head', null,
-            h('strong', { text: m && typeof m.n === 'string' ? m.n : '?' }),
-            h('span', { text: m && m.k === 'feedback' ? 'Palaute' : 'Kysymys' }),
-            h('span', { text: fmtTime(it.created_at) }),
-            h('span', { text: STATUS_LABEL[it.status] || it.status })),
-          !m ? notice('Viestiä ei voitu purkaa. Se on vioittunut tai salattu toisella avaimella.', 'error') : null,
-          m && m.e !== event.code ? notice('Viesti on salattu toiselle luennolle. Se on voitu siirtää tietokannassa.', 'error') : null,
-          bad[it.nickname_id] ? notice('Sama nimimerkkivaraus on käyttänyt eri nimimerkkejä.', 'error') : null,
-          m ? h('p.q-text', { text: String(m.t) }) : null,
-          h('div.q-actions', null,
-            m && display.spotlight === it.id ? h('button.btn.small', { type: 'button', text: 'Pois projektorilta', onclick: function () {
-              setDisplay({ spotlight: null });
-            } }) : m ? h('button.btn.small', { type: 'button', text: 'Näytä projektorilla', title: 'Viesti isona näytölle muun sisällön rinnalle', onclick: function () {
-              ensureStage();
-              hideBigQr();
-              setDisplay({ spotlight: it.id });
-              if (it.status === 'new') setStatus(it, 'answered');
-            } }) : null,
-            it.status !== 'answered' ? h('button.btn.ghost.small', { type: 'button', text: 'Merkitse vastatuksi', onclick: function () { setStatus(it, 'answered'); } }) : null,
-            it.status !== 'new' ? h('button.btn.ghost.small', { type: 'button', text: 'Palauta uudeksi', onclick: function () { setStatus(it, 'new'); } }) : null,
-            it.status !== 'archived' ? h('button.btn.ghost.small', { type: 'button', text: 'Arkistoi', onclick: function () { setStatus(it, 'archived'); } }) : null,
-            h('button.btn.danger.small', { type: 'button', text: 'Poista', onclick: function () {
-              if (!window.confirm('Poistetaanko viesti pysyvästi?')) return;
-              api('POST', 'questions/' + it.id + '/delete', {}).then(function () {
-                items = items.filter(function (x) { return x.id !== it.id; }); renderList();
-              });
-            } })));
-        listEl.appendChild(li);
+      renderStageBar();
+      ['question', 'feedback'].forEach(function (kind) {
+        var list = lists[kind];
+        var mine = items.filter(function (it) { return kindOf(it) === kind; }).slice().reverse();
+        list.replaceChildren();
+        if (!mine.length) {
+          list.appendChild(h('li.empty', { text: kind === 'feedback' ? 'Ei vielä palautteita. Uudet tulevat näkyviin automaattisesti.' : 'Ei vielä kysymyksiä. Uudet tulevat näkyviin automaattisesti.' }));
+          return;
+        }
+        mine.forEach(function (it) { list.appendChild(messageItem(it, kind, bad)); });
       });
     }
 
@@ -1765,7 +1614,7 @@
         items = items.filter(function (it) { return it.id > known || statuses[it.id] !== undefined; });
         items.forEach(function (it) { if (statuses[it.id] !== undefined) it.status = statuses[it.id]; });
         if (first) renderHead();
-        renderList();
+        renderLists();
       });
     }
 
@@ -1775,9 +1624,8 @@
       return poll().then(function () { return panel.refresh(); });
     }
 
-    mount(headEl, stageBarEl, panel.control, tabsEl, panel.el, messagesEl);
+    mount(headEl, stageBarEl, tabsEl, panel.el, TABS.question.el, TABS.feedback.el);
     stageSource = boardMessage;
-    filtersEl.replaceChildren.apply(filtersEl, filterButtons());
     renderTabs();
     selectTab(eventTab);
     poll().then(function () { return panel.load(); }).then(function () { return panel.refresh(); }).then(function () {
@@ -1788,73 +1636,12 @@
         busy = true;
         refreshAll().catch(function () {}).then(function () { busy = false; });
       };
-      liveCommand = panel.command;
+      liveCommand = function (cmd) { if (cmd === 'qr') panel.toggleQr(); };
       pollTimer = setInterval(function () {
         if (document.hidden) return;
         liveRefresh();
       }, POLL_MS);
     }).catch(function (e) { if (e.message !== '401') root.appendChild(notice(e.message, 'error')); });
-  }
-
-  // ================================================================ näkymä: puhelinohjain
-  //
-  // Ohjaa aktiivista kysymystä kävellessä salissa. Ei pura viestejä eikä vastauksia, joten se toimii
-  // myös avaamatta salausavainta. Projektoria ohjaava läppäri huomaa muutokset ohjaustilan versiosta.
-
-  function showRemote(eventId) {
-    var data = null;
-    var out = h('div');
-    var body = h('div.remote');
-    function find(pid) { return (data.polls || []).filter(function (p) { return p.id === pid; })[0] || null; }
-    function load() { return api('GET', 'events/' + eventId + '/polls').then(function (r) { data = r; render(); }); }
-    function post(path, b) {
-      return api('POST', path, b).then(function (r) { out.replaceChildren(); if (r && r.polls) { data = r; render(); } else return load(); })
-        .catch(function (e) { if (e.message !== '401') out.replaceChildren(notice(e.message, 'error')); });
-    }
-    function big(text, onclick, primary) { return h('button.btn.remote-btn' + (primary ? '' : '.ghost'), { type: 'button', text: text, onclick: onclick }); }
-    function render() {
-      var poll = find(data.active);
-      var order = data.polls.filter(function (p) { return !p.skipped || p.id === data.active; });
-      var set = poll ? (data.sets || []).filter(function (s) { return s.id === poll.set_id; })[0] : null;
-      body.replaceChildren();
-      append(body, [
-        h('div.remote-now', null,
-          h('p.eyebrow', { text: poll ? 'Aktiivinen ' + (order.indexOf(poll) + 1) + '/' + order.length + (set ? ' · ' + set.slug : '') : 'Ei aktiivista kysymystä' }),
-          h('p.remote-prompt', { text: poll ? poll.prompt : 'Osallistujat näkevät odotusnäkymän.' }),
-          poll ? h('p.hint', { text: (POLL_STATUS_LABEL[poll.status] || poll.status) + ' · ' + poll.answer_count + ' vastausta'
-            + (poll.results_visible ? ' · tulokset näkyvissä' : '') + (poll.revealed ? ' · paljastettu' : '') }) : null),
-        h('div.remote-grid', null,
-          big('← Edellinen', function () { post('events/' + eventId + '/live', { action: 'prev' }); }),
-          big('Seuraava →', function () { post('events/' + eventId + '/live', { action: 'next' }); }, true),
-          poll ? big(poll.status === 'open' ? 'Sulje vastaukset' : 'Avaa vastauksille', function () {
-            post('polls/' + poll.id + '/status', { status: poll.status === 'open' ? 'closed' : 'open' });
-          }, true) : null,
-          poll ? big(poll.results_visible ? 'Piilota tulokset' : 'Näytä tulokset', function () {
-            post('polls/' + poll.id + '/results', { visible: !poll.results_visible });
-          }) : null,
-          poll && Array.isArray(poll.config.correct) ? big(poll.revealed ? 'Piilota oikea vastaus' : 'Paljasta oikea vastaus', function () {
-            post('polls/' + poll.id + '/reveal', { revealed: !poll.revealed });
-          }) : null,
-          big(data.show_qr ? 'QR pieneksi' : 'QR isona', function () { post('events/' + eventId + '/qr', { show: !data.show_qr }); }),
-          poll ? big('Odotusnäkymä', function () { post('events/' + eventId + '/live', { action: 'activate', poll: null }); }) : null)
-      ]);
-    }
-    mount(h('div.toolbar', null, h('h1', { text: 'Ohjain' }), h('span.spacer'),
-      h('button.btn.ghost.small', { type: 'button', text: secretKey ? 'Luennon näkymä' : 'Takaisin', onclick: function () {
-        if (secretKey) showEvent(eventId); else start();
-      } })), out, body);
-    load().catch(function (e) { if (e.message !== '401') out.replaceChildren(notice(e.message, 'error')); });
-    pollTimer = setInterval(function () { if (!document.hidden) load().catch(function () {}); }, 2000);
-  }
-
-  function showRemotePicker() {
-    mount(h('div.toolbar', null, h('h1', { text: 'Ohjain' }), h('span.spacer'),
-      h('button.btn.ghost.small', { type: 'button', text: 'Takaisin', onclick: function () { start(); } })),
-      h('p', { text: 'Valitse luento. Ohjain ei avaa viestejä, joten salausavainta ei tarvita.' }),
-      h('ul.event-list', null, state.events.map(function (ev) {
-        return h('li', null, h('span.code', { text: ev.code }), h('strong', { text: ev.title }),
-          h('button.btn.small.open-btn', { type: 'button', text: 'Ohjaa', onclick: function () { showRemote(ev.id); } }));
-      })));
   }
 
   function stopPolling() {

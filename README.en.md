@@ -16,7 +16,7 @@ Address: <https://hessujarvinen.com/hessutalks/>
 2. The participant opens the page, chooses a nickname and writes a question or feedback.
 3. The message and nickname are encrypted in the participant's browser with the lecturer's public key.
 4. The lecturer unlocks the messages in their own browser with a passkey or passphrase. They update in real time,
-   and the QR code, a single question or the question list can be shown on the projector.
+   and the QR code, questions with their results and individual messages can be shown on the board (projector).
 
 ### Polls and question sets
 
@@ -24,37 +24,40 @@ A lecture consists of **question sets** (e.g. modules `M1`, `M4`) containing que
 Question types: multiple choice (one or several answers), open text (default 280 characters, up to 3,500 or about 500 words for reflection tasks, optionally several answers), word cloud (1–3 words, 30 characters), Likert scale (5 or 7 points) and a 0–10 scale.
 
 One lecture can cover a whole course or lecture series: the sets divide it into lectures (e.g. `L1`–`L4`), and participants
-use the same code and nickname throughout the course. The admin lecture page has two tabs, *Kyselyt* (polls) and
-*Kysymykset ja palaute* (questions and feedback). The control bar is visible on both, and the messages tab shows the number of new messages.
+use the same code and nickname throughout the course. The admin lecture page has three tabs: *Kysymykset* (prepared
+questions by set), *Vapaat kysymykset* (free-form questions) and *Palautteet* (feedback). The message tabs show the number of new ones.
 
-Polls have two modes: **Valmistelu** (preparation: cards for creating, editing, ordering, previewing and deleting) and
-**▶ Luennolla** (live: the control bar, the active question's results and moderation, and a compact numbered list; clicking a
-row makes that question active). The live mode has no edit or delete buttons.
+The admin view has no separate modes and no active question: the actions for each question and message are on its row
+([#60](https://github.com/hessuj/hessutalks/issues/60)).
 
-1. On the lecture page, create the sets (*Uusi sarja*, new set) and their questions (*Uusi kysymys*, new question) before the lecture.
-   Sets and questions can be moved with the arrows, and a set can be **skipped** during the lecture. The questions of a skipped
-   set are left out of the Next/Previous order, but their answers are kept.
-2. One or more questions can be **on screen** at the same time: the projector shows them as a grid, and participants
-   see them one below the other and can answer every open one. In the lecture mode list, *+ Näytölle* (to screen) adds a
-   question next to the others and *✓ Näytöllä* (on screen) removes it. Clicking a row and *Avaa vastauksille* (open for answers)
-   also bring the question next to the others. *Seuraava →* and *← Edellinen* (next/previous) change only the active question; the others stay open.
-   Others close only with *Pois näytöltä* (off screen, one) and *Odotusnäkymä* (waiting screen, all). Answers are always kept.
-   The question brought on screen last is the **active** one: keyboard shortcuts and the phone remote control it, and the
-   other questions on screen have their own rows in the control bar (*Aktiiviseksi* (make active), *Avaa vastauksille*,
-   *Näytä tulokset*, …). A question in draft state is shown on the projector, but participants see it only after you open it
-   (until then *Waiting for the next question…*). Only a question on screen can be open.
-   *Palauta luonnokseksi* (back to draft) in the Valmistelu (preparation) mode takes a published question off the screen and away
-   from participants and hides its results and correct answer. Given answers are kept, and the question can be published again.
-3. Participants use the same lecture QR code or link the whole time. The view changes by itself within about
+1. Create the sets (*Uusi sarja*, new set) and their questions (*Uusi kysymys*, new question), or import them from a JSON file,
+   before the lecture. *Sarja ▾* (set) on the set's title row opens editing, ordering, export, duplication and deletion of the set.
+2. **The question row** holds the actions used during the lecture:
+   - *Näytä taululla* (show on board) brings the question to the projector next to the others and opens it for answers with one button.
+   - *Sulje* (close) stops accepting answers, and the question stays on the board (*Avaa vastauksille*, open for answers, reopens it).
+   - *Poista taululta* (remove from board) takes the question off the projector and the participants' phones. Answers are kept,
+     and showing it again opens it again.
+   - *Näytä tulokset* (show results) and *Paljasta oikea vastaus* (reveal correct answer), see item 6.
+3. **Clicking the row** opens the question's results and moderation and its editing below it: *Esikatsele* (preview), *Muokkaa* (edit),
+   ordering, *Siirrä sarjaan…* (move to set), *Palauta luonnokseksi* (back to draft), *Tyhjennä vastaukset* (clear answers) and *Poista* (delete).
+   *Piilota* (hide) closes it. Clearing answers and deleting are only here, behind a confirmation, so that answers given during the lecture are not deleted by accident.
+4. **The board** can show several questions and messages at the same time: the projector shows them as a grid, and participants
+   see the questions one below the other and can answer every open one. Only a question on the board can be open.
+   *Palauta luonnokseksi* takes a published question off the board and away from participants and hides its results and correct
+   answer. Given answers are kept, and the question can be shown again.
+5. Participants use the same lecture QR code or link the whole time. The view changes by itself within about
    a second without reloading the page. After a connection loss the page reconnects, and the participant's own answer survives a reload.
-4. **Results and reveal:** results are hidden at first (the projector shows the question, the options and the answer count).
+6. **Results and reveal:** results are hidden at first (the projector shows the question, the options and the answer count).
    *Näytä tulokset* (show results) brings them to the projector and, as a summary, to the participants' phones (multiple choice and scales).
    *Paljasta oikea vastaus* (reveal correct answer) highlights the correct options and shows the explanations, if the question has a correct answer.
    Correct answers and explanations are entered in the question form or the JSON file, and they are not sent to participants before the reveal.
-5. The **presenter display** is a single window (*Avaa esitysnäyttö*, open presenter display, at the top of the lecture page), and it shows
-   everything chosen for the screen at once: questions with their results, the *Kysymykset projektorille* and *Palautteet projektorille*
-   (questions/feedback to projector) lists and a message picked with *Näytä projektorilla* (show on projector). Empty screen: the lecture QR code.
-6. **Moderation:** an open-text answer can be hidden with the *Piilota* (hide) button and a word-cloud word by clicking it. A hidden item disappears from the projector immediately.
+7. **Free-form questions and feedback** are shown on their own tabs, newest first. A message row has *Näytä taululla* /
+   *Poista taululta* (at most 6 messages on the board at a time), *Merkitse vastatuksi* (mark as answered; feedback: *Merkitse käsitellyksi*,
+   mark as handled), which *Palauta uudeksi* (back to new) undoes, and *Poista* (delete).
+8. **The board row** at the top of the lecture page has *Avaa esitysnäyttö* (open presenter display, with the connection status), *QR isona*
+   (large QR) and *Tyhjennä taulu* (clear board). The presenter display is a single window showing everything chosen for the board. Empty board: the lecture QR code.
+9. **Moderation:** an open-text answer can be hidden with the *Piilota* (hide) button and a word-cloud word by clicking it in the
+   question's expanded part. A hidden item disappears from the projector immediately.
    The profanity filter (English and Finnish) hides matches automatically, and they wait for approval (⚠ … ✓).
    Hidden items are stored on the server encrypted with the lecturer's key, so they persist across reloads.
 
@@ -64,11 +67,11 @@ replaces the earlier one until the poll is closed.
 
 #### Preview, duplicate, move and CSV
 
-- **Esikatsele** (preview) opens the question in the participant layout (a phone-sized window, no answer is sent) and
-  **Esikatsele projektorilla** (preview on projector) in the presenter view before opening it.
+- **Esikatsele** (preview, in the question's expanded part) opens the question in the participant layout (a phone-sized window,
+  no answer is sent) and **Esikatsele projektorilla** (preview on projector) in the presenter view before opening it.
 - **Monista** (duplicate) copies a set with its questions but without answers (the identifier gets the suffix `-2`). A question can be moved to another set
   from the *Siirrä sarjaan…* (move to set) menu. Answers are kept.
-- **Vie CSV** (export CSV, whole lecture) and a set's **CSV**: question, option or text, answer count and timestamp, no participant identifiers.
+- **Vie CSV** (export CSV, whole lecture or from the set's *Sarja ▾* menu): question, option or text, answer count and timestamp, no participant identifiers.
   Answers are decrypted in your browser, so the server does not see the file contents. Separator `;` and UTF-8 BOM, so Excel opens the file directly.
   Texts starting like a formula (`=`, `+`, `-`, `@`) are prefixed with an apostrophe (CSV injection prevention).
 - **Vie Markdown** (export Markdown): a report (`.md`) of the whole lecture or lecture series: sets, questions and results as tables, correct answers,
@@ -79,7 +82,7 @@ replaces the earlier one until the poll is closed.
 *Tuo JSON* (import JSON) reads sets from a file, so questions can be kept in version control and copied for future
 courses. Before saving, the app shows a summary: sets to import, questions to skip and errors.
 Import is all or nothing. An error (including a set identifier already used in the lecture) prevents the whole import.
-*Vie JSON* (export JSON, whole lecture) and a set's *Vie* (export) download the same format. Example: [tests/fixtures/mmoit-2026.json](tests/fixtures/mmoit-2026.json).
+*Vie JSON* (export JSON, whole lecture or from the set's *Sarja ▾* menu) downloads the same format. Example: [tests/fixtures/mmoit-2026.json](tests/fixtures/mmoit-2026.json).
 Full description of the file format: [docs/import-format.md](docs/import-format.md). When you give an AI your learning
 material and this description, it can produce an import file directly from the material.
 
@@ -103,7 +106,7 @@ material and this description, it can produce an import file directly from the m
 Participants can still switch language with the FI/EN toggle. The projector's own texts (e.g. the answer count and "Results will
 be shown later") follow the same choice: *English* → English, *Suomi* and *by browser language* → Finnish. The admin view is always in Finnish.
 
-### Presenter view, keyboard shortcuts and phone remote
+### Presenter view and keyboard shortcuts
 
 The presenter display is the lecture's presenter view for Teams sharing and the room projector. The bottom always shows the
 QR code and join code, and each question shows its answer count. If there are more answers than fit, the tile scrolls. A single question fills the screen (question over 40 px at 1080p).
@@ -111,26 +114,17 @@ Several are split into a grid (at most 12), and the fonts shrink with the tile s
 
 | Key | Action |
 |---|---|
-| → / PageDown | Next question (also a wireless presentation remote) |
-| ← / PageUp | Previous question |
-| Space | Open / close for answers |
-| R | Show / hide results |
-| A | Reveal correct answer |
-| Q | Large QR code covering the screen (moves aside when you bring something on screen) |
+| Q | Large QR code covering the screen (moves aside when you bring something to the board). Also works in the admin view. |
 | T | Light / dark theme (presenter window) |
 | F or double-click | Full screen (presenter window) |
 
-The keys work in the presenter window and the admin view (not in form fields). The presenter window does not use the API itself
-but sends the command to the admin window.
-
-**Phone remote:** sign in to the admin view on your phone and choose *Puhelinohjain* (phone remote, on the start view) or the lecture's *Ohjain* (remote).
-Large buttons control the active question while you walk around the room. The remote does not decrypt messages, so no encryption key is needed.
-The laptop driving the projector picks up the changes within a couple of seconds.
+Controlling questions with keys (next/previous, open, results, reveal) and the phone remote were removed when the admin view
+was simplified ([#60](https://github.com/hessuj/hessutalks/issues/60)): the actions are on the question's row.
 
 ### Projector presentation
 
 When the projector is connected as an extended display (not mirrored), *Avaa esitysnäyttö* opens the presenter window.
-*+ Näytölle*, *…projektorille* and *Näytä projektorilla* also open it if it is not open. The admin view stays on the laptop
+*Näytä taululla* (show on board) also opens it if it is not open. The admin view stays on the laptop
 screen. The top of the lecture page shows whether the presenter display is connected (● yhdistetty).
 
 - Chrome and Edge place the window automatically (Window Management API). The first time,
@@ -139,8 +133,8 @@ screen. The top of the lecture page shows whether the presenter display is conne
 - Double-click or the F key toggles full screen, Esc exits.
 - There is only one presenter window: everything chosen for the screen is shown in it. Lists and results update automatically.
 - The connection recovers by itself if the presenter window or the admin view is reloaded (in the admin view after unlocking the key).
-- *Tyhjennä näyttö* (clear screen) removes everything from the screen (the QR code remains). The display is also cleared on
-  sign-out and when the admin page is closed.
+- *Tyhjennä taulu* (clear board) removes everything from the board (the QR code remains). Questions on the board are closed,
+  and answers are kept. The display is also cleared on sign-out and when the admin page is closed.
 
 ### No personal data
 

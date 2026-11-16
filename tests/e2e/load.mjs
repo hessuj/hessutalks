@@ -1,7 +1,7 @@
 // Kuormitus (vaatimus 8, H13): 150 osallistujaa (scripts/load-test.mjs) ja oikea hallinta + esitysikkuna.
 // Mittaa: avatun kysymyksen näkyminen kaikille ja viive viimeisestä vastauksesta esitysnäkymän vastausmäärään.
 // Ajo: scripts/e2e.sh load.mjs  (ei oletusajossa: kestää noin minuutin)
-import { tab, attach, step, setupAdmin, createEvent, mode } from './lib.mjs';
+import { tab, attach, step, setupAdmin, createEvent } from './lib.mjs';
 import { start, report } from '../../scripts/load-test.mjs';
 
 const [port, app] = [process.argv[2], process.argv[3]];
@@ -24,7 +24,6 @@ await admin.submit('#poll-prompt');
 await admin.waitFor(admin.hasText('Which control matters most?'), 'kysymys');
 const url = await admin.js(`document.querySelector('.share .url a').href`);
 
-await mode(admin, 'live');
 await admin.click('Avaa esitysnäyttö');
 const stage = await attach(port, '/admin/esitys');
 await stage.cdp('Emulation.setDeviceMetricsOverride', { width: 1920, height: 1080, deviceScaleFactor: 1, mobile: false });
@@ -36,10 +35,8 @@ if (run.stats.joined < CLIENTS) throw new Error(`Liittyi vain ${run.stats.joined
 await sleep(2000);
 step(`${CLIENTS} osallistujaa liittyi ja kysyy tilaa 1,2 s välein`);
 
-await admin.click('Seuraava →');
-await admin.waitFor(`document.querySelector('.live-control').innerText.includes('Which control matters most?')`, 'aktiivinen');
 const opened = Date.now();
-await admin.click('Avaa vastauksille');
+await admin.click('Näytä taululla', 'Which control matters most?');
 const pollId = () => [...run.stats.seen.keys()][0];
 while ((run.stats.seen.get(pollId())?.length || 0) < CLIENTS && Date.now() - opened < 15000) await sleep(50);
 const seen = run.stats.seen.get(pollId()) || [];

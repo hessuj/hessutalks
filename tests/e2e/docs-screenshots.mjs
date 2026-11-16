@@ -9,7 +9,7 @@ import { mkdirSync, mkdtempSync, writeFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { tab, attach, connect, step, mode } from './lib.mjs';
+import { tab, attach, connect, step } from './lib.mjs';
 import { loadEventPage } from '../../scripts/load-test.mjs';
 import { createRequire } from 'node:module';
 
@@ -235,15 +235,15 @@ await shot(admin, '03-luo-luento', { area: q('main'), marks: [
   { el: q('#ev-title'), label: '1', box: true }, { el: q('#ev-hours'), label: '2', box: true },
   { el: q('#ev-lang'), label: '3', box: true }, { el: el('Luo luento'), label: '4' }] });
 await admin.submit('#ev-title');
-await admin.waitFor(admin.hasText('Kysymyssarjat'), 'luennon näkymä');
+await admin.waitFor(admin.has('#tab-polls'), 'luennon näkymä');
 const eventUrl = await admin.js(`document.querySelector('.share .url a').href`);
 
 await shot(admin, '04-luennon-sivu', { area: q('.share'), marks: [
   { el: q('.share img'), label: '1', box: true }, { el: q('.big-code'), label: '2', box: true }, { el: q('.share .url a'), label: '3', box: true },
   { el: el('Sulje kysymykset'), label: '4' }, { el: el('Poista luento'), label: '5' }, { el: q('#event-lang'), label: '6', box: true }] });
 await shot(admin, '05-tyokalupalkki', { area: q('.toolbar'), marks: [
-  { el: el('Muokkaa otsikkoa'), label: '1' }, { el: el('Ohjain'), label: '2' }, { el: el('Kaikki luennot'), label: '3' },
-  { el: el('Asetukset'), label: '4' }, { el: el('Kirjaudu ulos'), label: '5' }] });
+  { el: el('Muokkaa otsikkoa'), label: '1' }, { el: el('Kaikki luennot'), label: '2' },
+  { el: el('Asetukset'), label: '3' }, { el: el('Kirjaudu ulos'), label: '4' }] });
 await admin.click('Muokkaa otsikkoa');
 await admin.waitFor(admin.has('#event-title-edit'), 'otsikon muokkaus');
 await shot(admin, '06-muokkaa-otsikkoa', { area: q('.title-edit'), marks: [{ el: q('#event-title-edit'), label: '1', box: true }, { el: el('Tallenna otsikko'), label: '2' }] });
@@ -302,21 +302,27 @@ await admin.js(`document.querySelector('.polls-admin .notice')?.remove(); true`)
 rmSync(tmp, { recursive: true, force: true });
 
 await top(admin);
-await shot(admin, '11-valmistelu-tyokalut', { area: q('.polls-admin > .toolbar'), marks: [
-  { el: el('Valmistelu'), label: '1' }, { el: el('▶ Luennolla'), label: '2' }, { el: el('Tuo JSON'), label: '3' }, { el: el('Vie JSON'), label: '4' },
-  { el: el('Vie CSV'), label: '5' }, { el: el('Vie Markdown'), label: '6' }, { el: el('Uusi sarja'), label: '7' }] });
+await shot(admin, '11-kysymykset-tyokalut', { area: q('.polls-admin > .toolbar'), marks: [
+  { el: el('Uusi sarja'), label: '1' }, { el: el('Tuo JSON'), label: '2' }, { el: el('Vie JSON'), label: '3' },
+  { el: el('Vie CSV'), label: '4' }, { el: el('Vie Markdown'), label: '5' }] });
 const set1 = `[...document.querySelectorAll('section.set-card')].find((s) => s.querySelector('h3').textContent === ${lit(C.set1[1])})`;
+await admin.js(`${set1}.querySelector('.set-tools-btn').click(); true`);
+await admin.waitFor(`!!${set1}.querySelector('.set-tools')`, 'sarjan työkalut');
 await shot(admin, '12-sarjan-painikkeet', { area: `${set1}.querySelector('.set-head')`, marks: [
-  { el: `${set1}.querySelector('.set-head button')`, label: '1', box: true },
-  { el: el('Ohita', 'section.set-card'), label: '2' }, { el: el('Muokkaa', '.set-head'), label: '3' }, { el: el('Vie', '.set-head'), label: '4' },
-  { el: el('CSV', '.set-head'), label: '5' }, { el: el('Monista', '.set-head'), label: '6' }, { el: el('Uusi kysymys', '.set-head'), label: '7' },
-  { el: el('Poista', '.set-head'), label: '8' }] });
-const card1 = `[...document.querySelectorAll('article.poll-card')].find((c) => c.querySelector('.poll-card-prompt').textContent === ${lit(C.q1)})`;
-await shot(admin, '13-kysymyskortti', { area: card1, marks: [
-  { el: `${card1}.querySelector('.q-actions button')`, label: '1', box: true }, { el: el('Esikatsele', 'article.poll-card'), label: '2' },
-  { el: el('Esikatsele projektorilla', 'article.poll-card'), label: '3' }, { el: el('Muokkaa', 'article.poll-card'), label: '4' },
-  { el: `${card1}.querySelector('select.move-set')`, label: '5', box: true }, { el: el('Tyhjennä vastaukset', 'article.poll-card'), label: '6' },
-  { el: el('Poista', 'article.poll-card'), label: '7' }, { el: `${card1}.querySelector('.hint.correct')`, label: '8', box: true }] });
+  { el: el('Uusi kysymys', '.set-head'), label: '1' }, { el: `${set1}.querySelector('.set-tools-btn')`, label: '2' },
+  { el: el('Muokkaa', '.set-tools'), label: '3' }, { el: el('↑', '.set-tools'), label: '4' }, { el: el('Vie JSON', '.set-tools'), label: '5' },
+  { el: el('Vie CSV', '.set-tools'), label: '6' }, { el: el('Monista', '.set-tools'), label: '7' }, { el: el('Poista sarja', '.set-tools'), label: '8' }] });
+await admin.js(`${set1}.querySelector('.set-tools-btn').click(); true`);
+const item = (prompt) => `[...document.querySelectorAll('li.poll-item')].find((li) => li.querySelector('.run-prompt').textContent === ${lit(prompt)})`;
+const item1 = item(C.q1);
+await admin.js(`${item1}.querySelector('.poll-toggle').click(); true`);
+await admin.waitFor(`!!${item1}.querySelector('.poll-detail')`, 'kysymys avattu');
+await shot(admin, '13-kysymyksen-muokkaus', { area: item1, marks: [
+  { el: `${item1}.querySelector('.poll-toggle')`, label: '1', box: true }, { el: `${item1}.querySelector('.hint.correct')`, label: '2', box: true },
+  { el: el('Piilota', 'li.poll-item.expanded'), label: '3' }, { el: el('Esikatsele', 'li.poll-item.expanded'), label: '4' },
+  { el: el('Esikatsele projektorilla', 'li.poll-item.expanded'), label: '5' }, { el: el('Muokkaa', 'li.poll-item.expanded'), label: '6' },
+  { el: el('↑', 'li.poll-item.expanded'), label: '7' }, { el: `${item1}.querySelector('select.move-set')`, label: '8', box: true },
+  { el: el('Tyhjennä vastaukset', 'li.poll-item.expanded'), label: '9' }, { el: el('Poista', 'li.poll-item.expanded'), label: '10' }] });
 
 // Esikatselu osallistujan ulkoasussa (oma ikkuna)
 await admin.click('Esikatsele', C.q1);
@@ -325,6 +331,8 @@ await view(prev, 390, 700, true);
 await prev.waitFor(`!!document.querySelector('.poll-choice')`, 'esikatselu');
 await shot(prev, '14-esikatselu', { marks: [{ el: q('main .notice'), label: '1', box: true }] });
 await prev.cdp('Page.close').catch(() => {});
+await admin.click('Piilota', C.q1);
+await admin.waitFor(`!${item1}.querySelector('.poll-detail')`, 'kysymys suljettu');
 
 // ================================================================ 4. osallistuja liittyy
 
@@ -361,36 +369,27 @@ for (let i = 1; i < C.messages.length; i++) {
   await p.cdp('Page.close').catch(() => {});
 }
 
-// ================================================================ 5. luennolla
+// ================================================================ 5. luennolla: taulu ja kysymyksen rivi
 
 await top(admin);
 await admin.click('Avaa esitysnäyttö');
 const stage = await attach(port, '/admin/esitys#');
 await view(stage, 1280, 720);
 await stage.waitFor(`document.body.innerText.includes(${lit(code)})`, 'esitysnäyttö');
-await shot(admin, '19-esitysnayttopalkki', { area: q('.stage-bar'), marks: [
-  { el: el('Avaa esitysnäyttö'), label: '1' }, { el: el('Kysymykset projektorille'), label: '2' }, { el: el('Palautteet projektorille'), label: '3' },
-  { el: el('QR isona'), label: '4' }, { el: el('Tyhjennä näyttö'), label: '5' }, { el: q('.stage-status'), label: '6', box: true }] });
+await shot(admin, '19-taulu', { area: q('.stage-bar'), marks: [
+  { el: q('.stage-status'), label: '1', box: true }, { el: el('Avaa esitysnäyttö'), label: '2' }, { el: el('QR isona'), label: '3' },
+  { el: el('Tyhjennä taulu'), label: '4' }, { el: q('.stage-bar .q-actions .hint'), label: '5', box: true }] });
 await sleep(800);
 await shot(stage, '20-esitysnaytto-odotus');
 
-await mode(admin, 'live');
 await top(admin);
-const row1 = `[...document.querySelectorAll('.run-row')].find((r) => r.querySelector('.run-prompt').textContent === ${lit(C.q1)})`;
-await shot(admin, '21-tila-luennolla', { area: q('.polls-admin'), marks: [
-  { el: el('▶ Luennolla'), label: '1' }, { el: row1, label: '2', box: true }, { el: `${row1}.parentElement.querySelector('.stage-toggle')`, label: '3' },
-  { el: el('Ohita', 'section.run-set'), label: '4' }] });
+await shot(admin, '21-kysymyslista', { area: q('.polls-admin'), marks: [
+  { el: q('#tab-btn-polls'), label: '1', box: true }, { el: `${item1}.querySelector('.poll-toggle')`, label: '2', box: true },
+  { el: `${item1}.querySelector('.board-btn')`, label: '3' }] });
 
-// Kysymys näytölle, auki ja vastauksia
-await admin.js(`${row1}.click(); true`);
-await admin.waitFor(`document.querySelector('.live-now strong')?.textContent === ${lit(C.q1)}`, 'aktiivinen');
+// Kysymys taululle (näytetään ja avataan), vastauksia
+await admin.click('Näytä taululla', C.q1);
 await stage.waitFor(`document.querySelector('.poll-stage-prompt')?.textContent === ${lit(C.q1)}`, 'kysymys näytöllä');
-await shot(admin, '22-ohjauspalkki-luonnos', { area: q('.live-control'), marks: [
-  { el: q('.live-now'), label: '1', box: true }, { el: el('← Edellinen'), label: '2' }, { el: el('Seuraava →'), label: '3' },
-  { el: el('Avaa vastauksille', '.live-control'), label: '4' }, { el: el('Näytä tulokset', '.live-control'), label: '5' },
-  { el: el('Paljasta oikea vastaus', '.live-control'), label: '6' }, { el: el('Pois näytöltä', '.live-control'), label: '7' },
-  { el: el('Odotusnäkymä', '.live-control'), label: '8' }] });
-await admin.click('Avaa vastauksille');
 await part.waitFor(`!!document.querySelector('.poll-choice')`, 'kysymys osallistujalla');
 await part.js(`(() => { document.querySelectorAll('.poll-choice input')[0].click(); return true; })()`);
 await top(part);
@@ -399,99 +398,104 @@ await part.js(`document.querySelector('form.poll').requestSubmit(); true`);
 await part.waitFor(`document.querySelector('form.poll .notice.ok')`, 'kuittaus');
 const id1 = await pollId(admin, C.q1);
 await votes(eventUrl, id1, [0, 0, 0, 0, 0, 0, 0, 1, 1, 2, 0, 0, 1]);
-await admin.waitFor(`document.querySelector('.live-control').innerText.includes('14 vastausta')`, '14 vastausta', 15000);
+await admin.waitFor(`${item1}.querySelector('.run-count').textContent === '14'`, '14 vastausta', 15000);
 await stage.waitFor(`document.querySelector('.poll-stage-count')?.textContent.startsWith('14')`, 'vastausmäärä näytöllä', 8000);
+await into(admin, item1);
+await shot(admin, '22-rivi-taululla', { area: `${item1}.querySelector('.poll-row')`, marks: [
+  { el: `${item1}.querySelector('.badge.live')`, label: '1', box: true }, { el: `${item1}.querySelector('.run-count')`, label: '2', box: true },
+  { el: el('Sulje', 'li.poll-item.staged'), label: '3' }, { el: el('Poista taululta', 'li.poll-item.staged'), label: '4' },
+  { el: el('Näytä tulokset', 'li.poll-item.staged'), label: '5' }, { el: el('Paljasta oikea vastaus', 'li.poll-item.staged'), label: '6' }] });
 await shot(stage, '24-esitysnaytto-kysymys', { marks: [{ el: q('.poll-stage-count'), label: '1', box: true }, { el: q('.poll-stage-foot img'), label: '2', box: true }] });
-await admin.click('Näytä tulokset');
-await admin.click('Paljasta oikea vastaus');
+await admin.click('Näytä tulokset', C.q1);
+await admin.click('Paljasta oikea vastaus', C.q1);
 await stage.waitFor(`!!document.querySelector('.res-row.correct')`, 'paljastus näytöllä');
 await sleep(1200);
 await shot(stage, '25-esitysnaytto-tulokset', { marks: [{ el: q('.res-row.correct'), label: '1', box: true }] });
 await part.waitFor(`!!document.querySelector('#polls .res-row.correct, #polls .correct')`, 'paljastus osallistujalla', 8000);
 await top(part);
 await shot(part, '26-osallistuja-tulokset', { area: q('#polls-zone') });
-await admin.waitFor(`!!document.querySelector('.run-results .res-row')`, 'tulokset hallinnassa');
-await top(admin);
-await shot(admin, '27-ohjauspalkki-auki', { area: q('.live-control'), marks: [
-  { el: q('.live-now .badge'), label: '1', box: true }, { el: el('Sulje vastaukset', '.live-control'), label: '2' },
-  { el: el('Piilota tulokset', '.live-control'), label: '3' }, { el: el('Piilota oikea vastaus', '.live-control'), label: '4' }] });
-await into(admin, q('.run-results'));
-await shot(admin, '28-tulokset-hallinnassa', { area: q('.run-results') });
 
-// Useampi kysymys näytöllä: sanapilvi ja Likert muiden rinnalle
+// Tulokset hallinnassa: rivin klikkaus avaa ne kysymyksen alle.
+await admin.js(`${item1}.querySelector('.poll-toggle').click(); true`);
+await admin.waitFor(`!!${item1}.querySelector('.poll-detail .res-row')`, 'tulokset hallinnassa');
+await into(admin, item1);
+await shot(admin, '28-tulokset-hallinnassa', { area: item1, marks: [
+  { el: `${item1}.querySelector('.poll-detail .results')`, label: '1', box: true }, { el: el('Piilota', 'li.poll-item.expanded'), label: '2' }] });
+await admin.click('Piilota', C.q1);
+
+// Useampi kysymys taululla: sanapilvi ja Likert muiden rinnalle
 for (const prompt of [C.words, C.likert]) {
-  await admin.js(`[...document.querySelectorAll('.run-row')].find((r) => r.querySelector('.run-prompt').textContent === ${lit(prompt)}).parentElement.querySelector('.stage-toggle').click(); true`);
-  await admin.waitFor(`[...document.querySelectorAll('.run-row.staged .run-prompt')].some((e) => e.textContent === ${lit(prompt)})`, 'näytöllä: ' + prompt);
-  await admin.waitFor(`document.querySelector('.live-now strong')?.textContent === ${lit(prompt)}`, 'aktiivinen: ' + prompt);
-  await admin.js(`[...document.querySelectorAll('.live-control > .q-actions button')].find((b) => b.textContent === 'Avaa vastauksille').click(); true`);
-  await admin.waitFor(`document.querySelector('.live-now strong')?.textContent === ${lit(prompt)} && document.querySelector('.live-now .badge')?.textContent === 'Auki'`, 'auki: ' + prompt);
+  await admin.click('Näytä taululla', prompt);
+  await admin.waitFor(`${item(prompt)}?.matches('.staged[data-status="open"]')`, 'auki taululla: ' + prompt);
 }
 await votes(eventUrl, await pollId(admin, C.words), C.wordAnswers);
 await votes(eventUrl, await pollId(admin, C.likert), [4, 5, 3, 4, 4, 2, 5, 4, 3, 4]);
-// Aktiivisen napit ovat ohjauspalkin ylärivillä, muiden näytöllä olevien omilla riveillään.
-await admin.js(`[...document.querySelectorAll('.live-control > .q-actions button')].find((b) => b.textContent === 'Näytä tulokset').click(); true`);
-await admin.js(`[...[...document.querySelectorAll('.stage-row')].find((r) => r.innerText.includes(${lit(C.words)})).querySelectorAll('button')].find((b) => b.textContent === 'Näytä tulokset').click(); true`);
-await admin.waitFor(`document.querySelectorAll('.run-results').length === 3`, 'kolme tulosta');
+await admin.click('Näytä tulokset', C.likert);
+await admin.click('Näytä tulokset', C.words);
 await stage.waitFor(`document.querySelectorAll('.board .tile').length === 3 && !!document.querySelector('.res-cloud *')`, 'ruudukko', 10000);
 await sleep(1500);
 await top(admin);
-await shot(admin, '29-useita-naytolla', { area: q('.live-control'), marks: [
-  { el: q('.live-now'), label: '1', box: true }, { el: q('.stage-row'), label: '2', box: true }, { el: el('Aktiiviseksi', '.stage-row'), label: '3' }] });
+await shot(admin, '29-useita-taululla', { area: q('.set-list'), marks: [
+  { el: `document.querySelectorAll('li.poll-item.staged')[0]`, label: '1', box: true },
+  { el: `document.querySelectorAll('li.poll-item.staged')[1]`, label: '2', box: true },
+  { el: `document.querySelectorAll('li.poll-item.staged')[2]`, label: '3', box: true }] });
 await shot(stage, '30-esitysnaytto-ruudukko');
 await part.waitFor(`document.querySelectorAll('#polls form.poll, #polls .poll').length >= 2`, 'useita osallistujalla');
 await top(part);
 await shot(part, '31-osallistuja-useita', { area: q('#polls-zone') });
 
-// Moderointi: sanapilven sana ja kirosanasuodatin
-const wordsRes = `[...document.querySelectorAll('.run-results')].find((d) => d.querySelector('summary').textContent.includes(${lit(C.words)}))`;
-await admin.waitFor(`!!${wordsRes}?.querySelector('.poll-hidden button')`, 'suodattimen osuma', 8000);
-await into(admin, wordsRes);
-await shot(admin, '32-sanapilvi-moderointi', { area: wordsRes, marks: [
-  { el: `[...${wordsRes}.querySelectorAll('.res-word')].find((w) => w.textContent === ${lit(C.wordAnswers[3])})`, label: '1' },
-  { el: `${wordsRes}.querySelector('.poll-hidden')`, label: '2', box: true }] });
+// Moderointi: sanapilven sana ja kirosanasuodatin (kysymyksen avautuvassa osassa)
+const wordsItem = item(C.words);
+await admin.js(`${wordsItem}.querySelector('.poll-toggle').click(); true`);
+await admin.waitFor(`!!${wordsItem}.querySelector('.poll-hidden button')`, 'suodattimen osuma', 8000);
+await into(admin, wordsItem);
+await shot(admin, '32-sanapilvi-moderointi', { area: `${wordsItem}.querySelector('.poll-detail')`, marks: [
+  { el: `[...${wordsItem}.querySelectorAll('.res-word')].find((w) => w.textContent === ${lit(C.wordAnswers[3])})`, label: '1' },
+  { el: `${wordsItem}.querySelector('.poll-hidden')`, label: '2', box: true }] });
+await admin.click('Piilota', C.words);
 
 // Avoin kysymys: vastauksia, piilotus ja suodatin
-await admin.click('Odotusnäkymä');
-await admin.waitFor(`!document.querySelector('.run-row.staged')`, 'näyttö tyhjä');
-await admin.js(`[...document.querySelectorAll('.run-row')].find((r) => r.querySelector('.run-prompt').textContent === ${lit(C.open)}).click(); true`);
-await admin.waitFor(`document.querySelector('.live-now strong')?.textContent === ${lit(C.open)}`, 'avoin aktiivinen');
-await admin.click('Avaa vastauksille');
+await admin.click('Tyhjennä taulu');
+await admin.waitFor(`!document.querySelector('li.poll-item.staged')`, 'taulu tyhjä');
+await admin.click('Näytä taululla', C.open);
+await admin.waitFor(`${item(C.open)}?.matches('.staged[data-status="open"]')`, 'avoin auki');
 await votes(eventUrl, await pollId(admin, C.open), C.openAnswers);
-await admin.click('Näytä tulokset');
-const openRes = `document.querySelector('.run-results')`;
-await admin.waitFor(`!!${openRes}.querySelector('.res-open li button') && !!${openRes}.querySelector('.poll-hidden button')`, 'avoimet vastaukset', 10000);
-await into(admin, openRes);
-await shot(admin, '33-avoin-moderointi', { area: openRes, marks: [
-  { el: `${openRes}.querySelector('.res-open li button')`, label: '1' }, { el: `${openRes}.querySelector('.poll-hidden')`, label: '2', box: true }] });
+await admin.click('Näytä tulokset', C.open);
+const openItem = item(C.open);
+await admin.js(`${openItem}.querySelector('.poll-toggle').click(); true`);
+await admin.waitFor(`!!${openItem}.querySelector('.res-open li button') && !!${openItem}.querySelector('.poll-hidden button')`, 'avoimet vastaukset', 10000);
+await into(admin, openItem);
+await shot(admin, '33-avoin-moderointi', { area: `${openItem}.querySelector('.poll-detail')`, marks: [
+  { el: `${openItem}.querySelector('.res-open li button')`, label: '1' }, { el: `${openItem}.querySelector('.poll-hidden')`, label: '2', box: true }] });
+await admin.click('Piilota', C.open);
 
 // Iso QR
-await admin.click('Odotusnäkymä');
+await admin.click('Tyhjennä taulu');
 await top(admin);
 await admin.click('QR isona');
 await sleep(1200);
 await shot(stage, '34-iso-qr');
 await admin.click('QR pieneksi');
 
-// ================================================================ 6. kysymykset ja palaute
+// ================================================================ 6. vapaat kysymykset ja palautteet
 
-await admin.js(`document.getElementById('tab-btn-messages').click(); true`);
-await admin.waitFor(`document.querySelectorAll('ul.questions > li.q').length === ${C.messages.length}`, 'viestit');
+await admin.js(`document.getElementById('tab-btn-question').click(); true`);
+await admin.waitFor(`document.querySelectorAll('#tab-question li.q').length === ${C.messages.filter((m) => m[0] === 'question').length}`, 'viestit');
 await sleep(2500);
 await top(admin);
 await sleep(300);
-await shot(admin, '35-viestit', { area: q('.messages-admin'), marks: [
-  { el: q('#tab-btn-messages'), label: '1', box: true }, { el: q('.filters'), label: '2', box: true },
-  { el: el('Näytä projektorilla', 'ul.questions'), label: '3' }, { el: el('Merkitse vastatuksi', 'ul.questions'), label: '4' },
-  { el: el('Arkistoi', 'ul.questions'), label: '5' }, { el: el('Poista', 'ul.questions'), label: '6' }] });
-const lastQ = `[...document.querySelectorAll('ul.questions > li.q')].find((li) => li.innerText.includes(${lit(C.messages[2][1])}))`;
-await admin.js(`[...${lastQ}.querySelectorAll('button')].find((b) => b.textContent === 'Näytä projektorilla').click(); true`);
-await admin.click('Palautteet projektorille');
+await shot(admin, '35-viestit', { area: q('#tab-question'), marks: [
+  { el: q('#tab-btn-question'), label: '1', box: true }, { el: el('Näytä taululla', '#tab-question'), label: '2' },
+  { el: el('Merkitse vastatuksi', '#tab-question'), label: '3' }, { el: el('Poista', '#tab-question'), label: '4' }] });
+const msgButton = (tabSel, text, label) => admin.js(`[...[...document.querySelectorAll(${lit(tabSel + ' li.q')})].find((li) => li.innerText.includes(${lit(text)})).querySelectorAll('button')].find((b) => b.textContent === ${lit(label)}).click(), true`);
+await msgButton('#tab-question', C.messages[2][1], 'Näytä taululla');
+await msgButton('#tab-feedback', C.messages[1][1], 'Näytä taululla');
 await stage.waitFor(`document.body.innerText.includes(${lit(C.messages[2][1])}) && document.body.innerText.includes(${lit(C.messages[1][1])})`, 'viestit näytöllä', 8000);
 await sleep(1000);
 await shot(stage, '36-esitysnaytto-viestit');
-await admin.click('Tyhjennä näyttö');
+await admin.click('Tyhjennä taulu');
 
-// ================================================================ 7. luentolista, asetukset, ohjain, kirjautuminen
+// ================================================================ 7. luentolista, asetukset, kirjautuminen
 
 await admin.js(`document.getElementById('tab-btn-polls').click(); true`);
 await admin.click('Kaikki luennot');
@@ -504,25 +508,13 @@ await shot(admin, '38-asetukset', { area: q('main'), marks: [
   { el: q('#new-pk'), label: '1', box: true }, { el: el('Lisää passkey'), label: '2' }, { el: el('Lataa avaimen varmuuskopio'), label: '3' },
   { el: el('Vaihda tunnuslause', null, 'button'), label: '4' }, { el: `[...document.querySelectorAll('h2')].find((h) => h.textContent === 'Tietoturvaloki')`, label: '5', box: true }] });
 
-// Puhelin: sama istunto, ei salausavainta (avausnäkymä → Puhelinohjain)
+// Toinen laite (sama istunto): avausnäkymä ja uloskirjautuminen
 const phone = await tab(port);
 await view(phone, 390, 844, true);
 await phone.cdp('Page.navigate', { url: app + '/admin' });
 await phone.waitFor(phone.hasText('Avaa kysymykset'), 'avausnäkymä');
-await shot(phone, '39-avaa-kysymykset', { marks: [{ el: el('Avaa passkeylla'), label: '1' }, { el: el('Puhelinohjain'), label: '2' }, { el: el('Avaa tunnuslauseella'), label: '3' }] });
-await phone.click('Puhelinohjain');
-await phone.click('Ohjaa');
-await phone.waitFor(phone.has('.remote-grid'), 'ohjain');
-await phone.click('Seuraava →');
-await phone.waitFor(`!!document.querySelector('.remote-prompt') && document.querySelector('.remote-prompt').textContent !== ''`, 'ohjaimen kysymys');
-await sleep(600);
-await shot(phone, '40-puhelinohjain', { marks: [{ el: q('.remote-now'), label: '1', box: true }] });
-await phone.click('Odotusnäkymä').catch(() => {});
-await phone.click('Kirjaudu ulos').catch(async () => {
-  await phone.cdp('Page.navigate', { url: app + '/admin' });
-  await phone.waitFor(phone.hasText('Avaa kysymykset'), 'avausnäkymä');
-  await phone.click('Kirjaudu ulos');
-});
+await shot(phone, '39-avaa-kysymykset', { marks: [{ el: el('Avaa passkeylla'), label: '1' }, { el: el('Avaa tunnuslauseella'), label: '2' }] });
+await phone.click('Kirjaudu ulos');
 await phone.waitFor(phone.hasText('Kirjaudu passkeylla'), 'kirjautuminen');
 await shot(phone, '41-kirjaudu', { marks: [{ el: el('Kirjaudu passkeylla'), label: '1' }] });
 

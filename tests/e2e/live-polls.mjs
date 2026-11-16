@@ -1,8 +1,8 @@
-// Vaihe 2: sarjat, aktiivinen kysymys ja osallistujan näkymä kahdella välilehdellä (hallinta + osallistuja).
+// Vaihe 2: sarjat, kysymykset taululla ja osallistujan näkymä kahdella välilehdellä (hallinta + osallistuja).
 // Ajo: scripts/e2e.sh live-polls.mjs  (tai node tests/e2e/live-polls.mjs <cdp-port> <app-url>)
 const [port, app] = [process.argv[2], process.argv[3]];
 
-import { tab, step, setupAdmin, createEvent, openParticipant, mode } from './lib.mjs';
+import { tab, step, setupAdmin, createEvent, openParticipant, pollItem, setTools } from './lib.mjs';
 
 const admin = await tab(port);
 await setupAdmin(admin, app);
@@ -38,21 +38,14 @@ await part.waitFor(part.hasText('Waiting for the next question'), 'odotusnäkym�
 if ((await part.js('document.documentElement.lang')) !== 'en') throw new Error('Osallistujan kieli ei ole en');
 step('Osallistuja (selain fi) näkee odotusnäkymän englanniksi: "Waiting for the next question…"');
 
-await mode(admin, 'live');
-// Seuraava → luonnos aktiiviseksi: osallistuja odottaa yhä
-await admin.click('Seuraava →');
-await admin.waitFor(`document.querySelector('.live-control').innerText.includes('Which threat actor?')`, 'aktiivinen M1');
-await new Promise((r) => setTimeout(r, 2500));
-if (!(await part.js(part.hasText('Waiting for the next question')))) throw new Error('Luonnos näkyi osallistujalle');
-step('Seuraava → aktivoi luonnoksen; osallistuja näkee yhä odotusnäkymän');
-
-// H2: avaus näkyy osallistujalle alle 2 s
+// H2: Näytä taululla tuo kysymyksen taululle ja avaa sen vastauksille yhdellä napilla (issue #60).
 const t0 = Date.now();
-await admin.click('Avaa vastauksille');
+await admin.click('Näytä taululla', 'Which threat actor?');
 await part.waitFor(part.hasText('Which threat actor?'), 'kysymys osallistujalle', 5000);
 const latency = Date.now() - t0;
 if (latency > 2000) throw new Error('Viive ' + latency + ' ms > 2000 ms');
-step(`H2: avattu kysymys näkyi osallistujalle ${latency} ms:ssa ilman sivun päivitystä`);
+await admin.waitFor(`${pollItem('Which threat actor?')}.matches('.staged[data-status="open"]')`, 'rivillä Taululla ja Auki');
+step(`H2: Näytä taululla avasi kysymyksen, ja se näkyi osallistujalle ${latency} ms:ssa ilman sivun päivitystä`);
 
 // Vastaus ja muutos (H3)
 const answer = async (label) => {
@@ -61,10 +54,11 @@ const answer = async (label) => {
 };
 await answer('Hacktivist');
 if (!(await part.js(part.hasText('Thanks! You can change your answer until the poll closes.')))) throw new Error('Kuittausteksti puuttuu');
-await admin.waitFor(`document.querySelector('.live-control').innerText.includes('1 vastausta')`, 'hallinta: 1 vastaus');
+const adminCount = () => admin.js(`${pollItem('Which threat actor?')}.querySelector('.run-count').textContent`);
+await admin.waitFor(`${pollItem('Which threat actor?')}.querySelector('.run-count').textContent === '1'`, 'hallinta: 1 vastaus');
 await answer('State');
 await new Promise((r) => setTimeout(r, 3500));
-const count = await admin.js(`document.querySelector('.live-control').innerText.match(/(\\d+) vastausta/)[1]`);
+const count = await adminCount();
 if (count !== '1') throw new Error('Vastauksen muutos laski ' + count + ' vastausta');
 step('H3: kuittaus "Thanks! …", vastauksen muutos lasketaan yhtenä vastauksena');
 
@@ -76,41 +70,35 @@ if (checked !== 'State') throw new Error('Valinta uudelleenlatauksen jälkeen: '
 step('H10: sivun uudelleenlataus näyttää aktiivisen kysymyksen ja oman vastauksen (State)');
 
 // H4: sulkeminen
-await admin.click('Sulje vastaukset');
+await admin.click('Sulje', 'Which threat actor?');
 await part.waitFor(part.hasText('This poll is closed'), 'suljettu tila', 4000);
 const disabled = await part.js(`[...document.querySelectorAll('form.poll input')].every((i) => i.disabled) && !document.querySelector('form.poll button:not([hidden])')`);
 if (!disabled) throw new Error('Suljetussa kyselyssä voi yhä vastata');
 step('H4: suljettu kysely näkyy osallistujalle tilana, vastaaminen estetty');
 
-// H12: sarjan ohitus ja palautus
-await admin.click('Ohita', 'M2 Attacker');
-await admin.waitFor(admin.hasText('Ohitettu'), 'ohitettu-merkintä');
-await admin.click('Seuraava →');
-await admin.waitFor(admin.hasText('Ei enempää kysymyksiä.'), 'ohitettu sarja jää väliin');
-await admin.click('Palauta', 'M2 Attacker');
-await admin.waitFor(`!document.body.innerText.includes('Ohitettu')`, 'palautus');
-await mode(admin, 'prep');
+// H12: sarjojen järjestys muuttuu kesken luennon, ja kysymykset näytetään listasta missä järjestyksessä tahansa.
+// Ohitus = sarjan kysymyksiä ei näytetä taululla (Seuraava/Edellinen ja Ohita poistettiin, issue #60).
+await setTools(admin, 'M2 Attacker');
 await admin.click('↑', 'M2 Attacker');
 await admin.waitFor(`document.querySelector('section.set-card .set-head h3').textContent === 'M2 Attacker'`, 'M2 ensimmäiseksi');
-await mode(admin, 'live');
-await admin.click('← Edellinen');
-await admin.waitFor(`document.querySelector('.live-control').innerText.includes('Cybersecurity in one word?')`, 'edellinen = M2 uudessa järjestyksessä');
-step('H12: ohitettu sarja jää pois Seuraava-järjestyksestä; palautus ja sarjan siirto muuttavat järjestystä');
+if ((await adminCount()) !== '1') throw new Error('Sarjan siirto muutti vastauksia');
+step('H12: sarjan siirto kesken luennon muuttaa järjestystä; vastaukset säilyvät');
 
 // H10: yhteyskatko ja palautus
-await admin.click('Avaa vastauksille');
+await admin.click('Näytä taululla', 'Cybersecurity in one word?');
 await part.waitFor(part.hasText('Cybersecurity in one word?'), 'M2 osallistujalle');
 await part.cdp('Network.emulateNetworkConditions', { offline: true, latency: 0, downloadThroughput: -1, uploadThroughput: -1 });
 await part.waitFor(part.hasText('Connection lost. Reconnecting'), 'yhteyskatkon ilmoitus', 10000);
-await admin.click('Sulje vastaukset');
+await admin.click('Sulje', 'Cybersecurity in one word?');
 await part.cdp('Network.emulateNetworkConditions', { offline: false, latency: 0, downloadThroughput: -1, uploadThroughput: -1 });
 await part.waitFor(`!document.body.innerText.includes('Connection lost') && document.body.innerText.includes('This poll is closed')`, 'palautuminen', 12000);
 step('H10: yhteyskatko näyttää "Reconnecting…", palautuessa tila päivittyy (kysely suljettiin katkon aikana)');
 
-// Odotusnäkymä
-await admin.click('Odotusnäkymä');
+// Tyhjennä taulu
+await admin.click('Tyhjennä taulu');
 await part.waitFor(part.hasText('Waiting for the next question'), 'odotusnäkymä', 4000);
-step('Odotusnäkymä-nappi palauttaa osallistujat odotusnäkymään');
+if (await admin.js(`!!document.querySelector('li.poll-item.staged')`)) throw new Error('Taululle jäi kysymys');
+step('Tyhjennä taulu palauttaa osallistujat odotusnäkymään');
 
 // Tila tiedostosta (Apache), ei PHP:stä: jaetun palvelimen prosessiraja (kuormitustesti 28.10.).
 const resources = () => part.js(`performance.getEntriesByType('resource').map((e) => new URL(e.name).pathname)`);

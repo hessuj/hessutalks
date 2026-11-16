@@ -250,7 +250,6 @@ final class PollSecurityTest extends AppTestCase
         yield ['POST', '/admin/api/events/1/qr'];
         yield ['POST', '/admin/api/sets/1/update'];
         yield ['POST', '/admin/api/sets/1/move'];
-        yield ['POST', '/admin/api/sets/1/skip'];
         yield ['POST', '/admin/api/sets/1/delete'];
         yield ['POST', '/admin/api/sets/1/duplicate'];
         yield ['POST', '/admin/api/polls/1/set'];
@@ -330,24 +329,26 @@ final class PollSecurityTest extends AppTestCase
         $a = $this->poll('draft');
         $b = (int) (new PollRepository($this->db, $this->clock, str_repeat('ab', 32)))->create($this->eventId, $m2, 'words', 'Sana?', []);
         $live = fn (array $body): array => $this->json($this->request('POST', $base . '/live', $body, $h));
-        self::assertSame($a, $live(['action' => 'next'])['active']);
-        self::assertSame($b, $live(['action' => 'next'])['active']);
-        self::assertSame(409, $this->request('POST', $base . '/live', ['action' => 'next'], $h)->status, 'Viimeisen jälkeen');
-        self::assertNull($live(['action' => 'activate', 'poll' => null])['active']);
+        self::assertSame($a, $live(['action' => 'activate', 'poll' => $a])['active']);
+        self::assertSame($b, $live(['action' => 'activate', 'poll' => $b])['active']);
+        self::assertNull($live(['action' => 'activate', 'poll' => null])['active'], 'Tyhjennä taulu');
         self::assertSame(422, $this->request('POST', $base . '/live', ['action' => 'drop'], $h)->status);
 
-        // Ohitetun sarjan kysymykset jäävät pois järjestyksestä.
-        self::assertSame(422, $this->request('POST', '/admin/api/sets/' . $m2 . '/skip', ['skipped' => 'yes'], $h)->status);
-        self::assertSame(200, $this->request('POST', '/admin/api/sets/' . $m2 . '/skip', ['skipped' => true], $h)->status);
-        self::assertSame($a, $live(['action' => 'next'])['active']);
-        self::assertSame(409, $this->request('POST', $base . '/live', ['action' => 'next'], $h)->status);
+        // Issue #60: Seuraava/Edellinen ja sarjan ohitus on poistettu, eikä niiden reittejä enää ole.
+        foreach (['next', 'prev'] as $removed) {
+            self::assertSame(422, $this->request('POST', $base . '/live', ['action' => $removed], $h)->status, $removed);
+        }
+        self::assertSame(404, $this->request('POST', '/admin/api/sets/' . $m2 . '/skip', ['skipped' => true], $h)->status);
+        self::assertArrayNotHasKey('skipped', $this->json($this->request('GET', $base . '/polls'))['sets'][0]);
 
         // Toisen luennon kyselyä ei voi aktivoida tämän luennon kautta.
         $foreign = $this->poll('draft', 'words', [], (int) $this->createEvent('Toinen')['id']);
         self::assertSame(404, $this->request('POST', $base . '/live', ['action' => 'activate', 'poll' => $foreign], $h)->status);
 
-        // Avaaminen tuo näytölle muiden rinnalle ja tekee aktiiviseksi; sarjan poisto poistaa kysymykset
-        // näytöltä, ja aktiiviseksi jää näytölle jäänyt.
+        // Näytä taululla (avaus) tuo näytölle muiden rinnalle ja tekee aktiiviseksi; sarjan poisto poistaa
+        // kysymykset näytöltä, ja aktiiviseksi jää näytölle jäänyt.
+        // a näytölle luonnoksena (ei osallistujille), b näytetään taululla ja avataan.
+        self::assertSame(200, $this->request('POST', '/admin/api/polls/' . $a . '/stage', ['on' => true], $h)->status);
         self::assertSame(200, $this->request('POST', '/admin/api/polls/' . $b . '/status', ['status' => 'open'], $h)->status);
         $state = $this->json($this->request('GET', $base . '/polls'));
         self::assertSame($b, $state['active']);
@@ -400,8 +401,7 @@ final class PollSecurityTest extends AppTestCase
         self::assertSame($after['version'], $answersVersion());
         self::assertStringNotContainsString('show_qr', $this->request('GET', '/api/live?code=' . $this->code)->body, 'Ei osallistujalle');
 
-        $this->poll('draft');
-        $this->request('POST', '/admin/api/events/' . $this->eventId . '/live', ['action' => 'next'], $h);
+        $this->request('POST', '/admin/api/events/' . $this->eventId . '/live', ['action' => 'activate', 'poll' => $this->poll('draft')], $h);
         self::assertGreaterThan($after['version'], $answersVersion());
     }
 

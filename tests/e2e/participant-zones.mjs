@@ -3,7 +3,7 @@
 // SCREENSHOT=<hakemisto> tallentaa kuvat (fi ja en) tarkastelua varten.
 // Ajo: scripts/e2e.sh participant-zones.mjs  (tai node tests/e2e/participant-zones.mjs <cdp-port> <app-url>)
 import { writeFileSync } from 'node:fs';
-import { tab, step, setupAdmin, createEvent, openParticipant, openPoll, mode } from './lib.mjs';
+import { tab, step, setupAdmin, createEvent, openParticipant, openPoll } from './lib.mjs';
 
 const [port, app] = [process.argv[2], process.argv[3]];
 

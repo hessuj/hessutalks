@@ -1,8 +1,8 @@
 /*
  * HessuTalks – esitysikkuna projektorille (jatkettu näyttö).
  *
- * Yksi ikkuna näyttää kaiken, mitä luennoitsija on valinnut näytölle: kyselyt tuloksineen, kysymys- ja
- * palautelistan ja yksittäisen viestin. Ruudukko jaetaan niin, että kaikki mahtuvat (Hessun koeajo luennolla:
+ * Yksi ikkuna näyttää kaiken, mitä luennoitsija on valinnut näytölle: kyselyt tuloksineen ja
+ * osallistujien viestit. Ruudukko jaetaan niin, että kaikki mahtuvat (Hessun koeajo luennolla:
  * jokainen näkymä avautui omaan ikkunaansa, ja ikkunat jäivät toistensa taakse).
  *
  * Turvallisuusperiaatteet:
@@ -20,7 +20,6 @@
   if (!root) return;
 
   var MAX_TEXT = 4000;
-  var MAX_ITEMS = 20;
   var MAX_TILES = 12;
 
   function h(tag, cls, text) {
@@ -47,13 +46,13 @@
   var TEXT = {
     fi: {
       answers: function (n) { return n === 1 ? '1 vastaus' : n + ' vastausta'; }, closed: ' · suljettu', draft: ' · ei vielä auki',
-      later: 'Tulokset näytetään myöhemmin.', none: 'Ei vastauksia.', noMessages: 'Ei vielä viestejä.',
+      later: 'Tulokset näytetään myöhemmin.', none: 'Ei vastauksia.',
       mean: 'Keskiarvo', median: 'mediaani', locale: 'fi-FI', ended: 'Hallintanäkymä suljettiin.',
       more: function (n) { return '+' + n + ' muuta näytöllä'; }
     },
     en: {
       answers: function (n) { return n === 1 ? '1 answer' : n + ' answers'; }, closed: ' · closed', draft: ' · not open yet',
-      later: 'Results will be shown later.', none: 'No answers yet.', noMessages: 'No messages yet.',
+      later: 'Results will be shown later.', none: 'No answers yet.',
       mean: 'Average', median: 'median', locale: 'en-GB', ended: 'The admin view was closed.',
       more: function (n) { return '+' + n + ' more'; }
     }
@@ -115,23 +114,14 @@
     return { correct: r.correct, explanations: ex || null };
   }
 
-  function validItems(items) {
-    return Array.isArray(items) ? items.slice(0, MAX_ITEMS).filter(function (it) {
-      return it && str(it.nick, 100) !== null && str(it.text) !== null;
-    }) : null;
-  }
-
   /** Ruutu: { key, kind, ... } tai null, jos sisältö ei kelpaa. */
   function validTile(t) {
     if (!t || typeof t !== 'object') return null;
     if (t.kind === 'poll') return validPoll(t) ? { key: 'poll-' + t.poll.id, kind: 'poll', m: t } : null;
-    if (t.kind === 'list') {
-      var items = validItems(t.items);
-      return str(t.title, 200) !== null && (t.list === 'question' || t.list === 'feedback') && items
-        ? { key: 'list-' + t.list, kind: 'list', title: t.title, items: items } : null;
-    }
+    // Osallistujan viesti: taululla voi olla useita (issue #60), joten avaimessa on viestin id.
     if (t.kind === 'question') {
-      return str(t.nick, 100) !== null && str(t.text) !== null ? { key: 'question', kind: 'question', nick: t.nick, text: t.text } : null;
+      return Number.isSafeInteger(t.id) && t.id > 0 && str(t.nick, 100) !== null && str(t.text) !== null
+        ? { key: 'question-' + t.id, kind: 'question', nick: t.nick, text: t.text } : null;
     }
     return null;
   }
@@ -168,24 +158,6 @@
     tile.results.scrollTop = scroll;
   }
 
-  function listTile(t) {
-    var el = h('section', 'tile tile-list');
-    el.appendChild(h('p', 'stage-url', t.title));
-    if (!t.items.length) {
-      el.appendChild(h('p', 'stage-empty', tx().noMessages));
-      return { el: el };
-    }
-    var ol = h('ol', 'stage-list');
-    t.items.forEach(function (it) {
-      var li = h('li');
-      li.appendChild(h('span', 'stage-nick', it.nick));
-      li.appendChild(h('span', 'stage-list-text', it.text));
-      ol.appendChild(li);
-    });
-    el.appendChild(ol);
-    return { el: el };
-  }
-
   function questionTile(t) {
     var el = h('section', 'tile tile-question');
     el.appendChild(h('p', 'stage-url', t.nick));
@@ -204,7 +176,7 @@
       grid.style.gridTemplateRows = 'repeat(' + Math.ceil(shown.length / cols) + ', minmax(0, 1fr))';
       var map = {};
       shown.forEach(function (t) {
-        // Kyselyruutu säilyy, jotta kaaviot animoituvat; listat ja viesti piirretään aina uudelleen.
+        // Kyselyruutu säilyy, jotta kaaviot animoituvat; viestit piirretään aina uudelleen.
         map[t.key] = t.kind === 'poll' && old[t.key] ? old[t.key] : t.kind === 'poll' ? pollTile() : null;
         if (map[t.key]) grid.appendChild(map[t.key].el);
         else grid.appendChild(h('section', 'tile'));
@@ -230,7 +202,7 @@
     board.more.textContent = tiles.length > shown.length ? tx().more(tiles.length - shown.length) : '';
     shown.forEach(function (t, i) {
       if (t.kind === 'poll') { updatePoll(board.tiles[t.key], t.m); return; }
-      var tile = t.kind === 'list' ? listTile(t) : questionTile(t);
+      var tile = questionTile(t);
       var slot = board.grid.children[i];
       if (slot) slot.replaceWith(tile.el);
       board.tiles[t.key] = tile;
@@ -244,17 +216,6 @@
     lastBoard.tiles.forEach(function (t) { if (t.kind === 'poll' && board.tiles[t.key]) updatePoll(board.tiles[t.key], t.m); });
   }
 
-  // Piilottaa listan lopusta kohdat, jotka eivät mahdu kokonaan näkyviin (ei puoliksi leikattuja rivejä).
-  function trimList(ol) {
-    var li = ol.children;
-    for (var i = 0; i < li.length; i++) li[i].hidden = false;
-    var bottom = ol.getBoundingClientRect().bottom;
-    var full = false;
-    for (i = 0; i < li.length; i++) {
-      if (!full && i > 0 && li[i].getBoundingClientRect().bottom > bottom + 1) full = true;
-      li[i].hidden = full;
-    }
-  }
   // Yksittäinen viesti (enintään 2000 merkkiä): fonttia pienennetään, kunnes teksti mahtuu ruutuun otsikon alle.
   function fitQuestion(tile) {
     var q = tile.querySelector('.stage-q');
@@ -270,7 +231,6 @@
 
   // Koon muutos: ikkunan siirto projektorille, koko näyttö (Safari ei aina laukaise resize-tapahtumaa ajoissa) ja fontit.
   function refit() {
-    Array.prototype.forEach.call(root.querySelectorAll('.stage-list'), trimList);
     Array.prototype.forEach.call(root.querySelectorAll('.tile-question'), fitQuestion);
   }
   var resizeFrame = 0;
@@ -367,21 +327,15 @@
 
   // ---------------------------------------------------------------- pikanäppäimet
   //
-  // Esitysikkunalla ei ole pääsyä rajapintaan: komento lähetetään hallinnalle, joka tekee toiminnon.
-  // Langattomat esitysohjaimet lähettävät yleensä PageUp/PageDown tai nuolinäppäimiä.
-  var KEYS = {
-    ArrowRight: 'next', PageDown: 'next', ArrowDown: 'next',
-    ArrowLeft: 'prev', PageUp: 'prev', ArrowUp: 'prev',
-    ' ': 'toggle', r: 'results', R: 'results', a: 'reveal', A: 'reveal', q: 'qr', Q: 'qr'
-  };
+  // F koko näyttö, T teema ja Q iso QR-koodi. Esitysikkunalla ei ole pääsyä rajapintaan: Q lähetetään
+  // hallinnalle, joka tekee toiminnon. Kysymysten ohjaus tehdään hallinnan listasta (issue #60).
   document.addEventListener('keydown', function (e) {
     if (e.ctrlKey || e.metaKey || e.altKey) return;
     if (e.key === 'f' || e.key === 'F') { toggleFullscreen(); return; }
     if (e.key === 't' || e.key === 'T') { applyTheme(!document.body.classList.contains('light')); return; }
-    var cmd = KEYS[e.key];
-    if (!cmd) return;
+    if (e.key !== 'q' && e.key !== 'Q') return;
     e.preventDefault();
-    channel.postMessage({ type: 'command', cmd: cmd });
+    channel.postMessage({ type: 'command', cmd: 'qr' });
   });
 
   // Tahdistus sekunnin välein: hallinta lähettää sisällön uudelleen, jos tämä ikkuna ei ole ajan tasalla

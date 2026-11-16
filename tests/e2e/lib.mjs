@@ -59,11 +59,12 @@ export async function connect(wsUrl) {
     click: (text, within) => js(`(() => {
       let scope = document;
       if (${JSON.stringify(within || '')}) {
-        // Alue tunnistetaan otsikosta (sarjan nimi, kysymysteksti tai ohjauspalkin kysymys), ei koko tekstistä:
-        // valikot (esim. Siirrä sarjaan) sisältävät muiden sarjojen nimiä.
+        // Alue tunnistetaan otsikosta (sarjan nimi tai kysymysteksti), ei koko tekstistä: valikot (esim. Siirrä
+        // sarjaan) sisältävät muiden sarjojen nimiä. Sarjan napit ovat sen otsikkorivillä ja työkalurivillä.
         const w = ${JSON.stringify(within || '')};
-        const title = (e) => (e.querySelector('.set-head h3, .poll-card-prompt, .live-now strong') || e).textContent;
-        scope = [...document.querySelectorAll('article.poll-card, section.set-card, section.run-set, .live-control')].find((e) => title(e).includes(w));
+        const title = (e) => (e.matches('li.poll-item') ? e.querySelector('.run-prompt') : e.querySelector('.set-head h3')).textContent;
+        const area = [...document.querySelectorAll('section.set-card, li.poll-item')].find((e) => title(e).includes(w));
+        scope = area && area.matches('section.set-card') ? { querySelectorAll: (q) => [...area.querySelectorAll(':scope > .set-head ' + q + ', :scope > .set-tools ' + q)] } : area;
         if (!scope) throw new Error('alue puuttuu: ' + w);
       }
       const b = [...scope.querySelectorAll('button')].find((x) => x.textContent.trim() === ${JSON.stringify(text)});
@@ -77,12 +78,15 @@ export async function connect(wsUrl) {
 }
 export const step = (s) => console.log('✓ ' + s);
 
-/** Liittyy jo avattuun ikkunaan (esim. hallinnan avaama esitysikkuna) osoitteen perusteella. */
-export async function attach(port, urlPart, ms = 10000) {
+/**
+ * Liittyy jo avattuun ikkunaan (esim. hallinnan avaama esitysikkuna) osoitteen perusteella. ending erottaa
+ * esikatseluikkunan (#tunniste.p) projektorin ikkunasta (#tunniste), joiden osoitteet alkavat samoin.
+ */
+export async function attach(port, urlPart, ms = 10000, ending = null) {
   const end = Date.now() + ms;
   while (Date.now() < end) {
     const list = await (await fetch(`http://127.0.0.1:${port}/json/list`)).json();
-    const target = list.find((x) => x.type === 'page' && x.url.includes(urlPart));
+    const target = list.find((x) => x.type === 'page' && x.url.includes(urlPart) && (ending === null || x.url.endsWith(ending)));
     if (target) return connect(target.webSocketDebuggerUrl);
     await new Promise((r) => setTimeout(r, 200));
   }
@@ -111,7 +115,7 @@ export async function createEvent(admin, title, lang) {
   await admin.fill('#ev-title', title);
   if (lang) await admin.fill('#ev-lang', lang);
   await admin.submit('#ev-title');
-  await admin.waitFor(admin.hasText('Kysymyssarjat'), 'luennon näkymä');
+  await admin.waitFor(admin.has('#tab-polls'), 'luennon näkymä');
 }
 
 /** Avaa osallistujan ikkunan luennon linkistä (selaimen kieli suomi). */
@@ -124,34 +128,33 @@ export async function openParticipant(port, admin) {
   return part;
 }
 
-/** Kyselyjen tila: 'live' (▶ Luennolla: ohjauspalkki ja tiivis lista) tai 'prep' (Valmistelu: kortit ja muokkaus). */
-export async function mode(admin, which) {
-  const label = which === 'live' ? '▶ Luennolla' : 'Valmistelu';
-  await admin.js(`(() => {
-    const b = [...document.querySelectorAll('.mode-btn')].find((x) => x.textContent === ${JSON.stringify(label)});
-    if (!b) throw new Error('tilanappi puuttuu: ${label}');
-    if (b.getAttribute('aria-pressed') !== 'true') b.click();
-    return true;
-  })()`);
-  await admin.waitFor(`document.querySelector('.mode-btn[aria-pressed="true"]')?.textContent === ${JSON.stringify(label)}`, 'tila ' + label);
+/** Kysymysrivin valitsin (JavaScript-lauseke selaimeen) kysymystekstin mukaan. */
+export const pollItem = (prompt) => `[...document.querySelectorAll('li.poll-item')].find((li) => li.querySelector('.run-prompt').textContent.includes(${JSON.stringify(prompt)}))`;
+
+/** Avaa kysymyksen rivin alle tulokset ja muokkauksen (rivin klikkaus), ellei se ole jo auki. */
+export async function expand(admin, prompt) {
+  await admin.js(`(() => { const li = ${pollItem(prompt)}; if (!li) throw new Error('rivi puuttuu: ' + ${JSON.stringify(prompt)});
+    if (!li.classList.contains('expanded')) li.querySelector('.poll-toggle').click(); return true; })()`);
+  await admin.waitFor(`${pollItem(prompt)}?.querySelector('.poll-detail') != null`, 'avattu: ' + prompt);
+}
+
+/** Avaa sarjan työkalurivin (Muokkaa, järjestys, vienti, Monista, Poista sarja). */
+export async function setTools(admin, setTitle) {
+  await admin.js(`(() => { const s = [...document.querySelectorAll('section.set-card')].find((x) => x.querySelector('.set-head h3').textContent === ${JSON.stringify(setTitle)});
+    if (!s) throw new Error('sarja puuttuu: ' + ${JSON.stringify(setTitle)});
+    if (!s.querySelector('.set-tools')) s.querySelector('.set-tools-btn').click(); return true; })()`);
+  await admin.waitFor(`[...document.querySelectorAll('section.set-card')].some((x) => x.querySelector('.set-head h3').textContent === ${JSON.stringify(setTitle)} && x.querySelector('.set-tools'))`, 'sarjan työkalut');
 }
 
 /**
- * Luennolla-tilassa: vain tämä kysymys näytölle ja auki vastauksille. Rivin klikkaus lisää kysymyksen muiden
- * rinnalle, joten näyttö tyhjennetään ensin (Odotusnäkymä): testit olettavat yhden kysymyksen kerrallaan.
+ * Vain tämä kysymys taululle ja auki vastauksille: taulu tyhjennetään ensin (testit olettavat yhden
+ * kysymyksen kerrallaan), sitten rivin Näytä taululla.
  */
 export async function openPoll(admin, prompt) {
-  await mode(admin, 'live');
-  if (await admin.js(`[...document.querySelectorAll('.live-control button')].some((b) => b.textContent === 'Odotusnäkymä')`)) {
-    await admin.click('Odotusnäkymä');
-    await admin.waitFor(`!document.querySelector('.run-row.staged')`, 'näyttö tyhjä');
+  if (await admin.js(`!!document.querySelector('li.poll-item.staged')`)) {
+    await admin.click('Tyhjennä taulu');
+    await admin.waitFor(`!document.querySelector('li.poll-item.staged')`, 'taulu tyhjä');
   }
-  await admin.js(`(() => {
-    const row = [...document.querySelectorAll('.run-row')].find((r) => r.querySelector('.run-prompt').textContent.includes(${JSON.stringify(prompt)}));
-    if (!row) throw new Error('rivi puuttuu: ' + ${JSON.stringify(prompt)});
-    row.click(); return true;
-  })()`);
-  await admin.waitFor(`document.querySelector('.live-now strong')?.textContent.includes(${JSON.stringify(prompt)})`, 'aktiivinen: ' + prompt);
-  await admin.click('Avaa vastauksille');
-  await admin.waitFor(`document.querySelector('.live-control .badge')?.textContent === 'Auki'`, 'auki: ' + prompt);
+  await admin.click('Näytä taululla', prompt);
+  await admin.waitFor(`${pollItem(prompt)}?.matches('.staged[data-status="open"]')`, 'auki taululla: ' + prompt);
 }
