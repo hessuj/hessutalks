@@ -35,7 +35,7 @@ bin/init.php       asetustiedoston luonti; bin/dev-router.php kehityspalvelin; b
 ```
 Osallistujan tekstit ovat `src/I18n.php`:ssä molemmilla kielillä (testi valvoo). Hallinta on vain suomeksi.
 Julkinen dokumentaatio on suomeksi ja englanniksi: README.md/README.en.md, SECURITY.md/SECURITY.en.md,
-docs/hyvaksymistestit.md/.en.md. Päivitä aina molemmat (DocsTranslationTest valvoo kielilinkit ja rakenteen).
+docs/hyvaksymistestit.md/.en.md, docs/asennus.md/installation.md, docs/tuontimuoto.md/import-format.md. Päivitä aina molemmat (DocsTranslationTest valvoo kielilinkit ja rakenteen: otsikot samoilla riveillä, sama määrä taulukkorivejä ja koodilohkoja).
 
 ## Komennot
 ```sh

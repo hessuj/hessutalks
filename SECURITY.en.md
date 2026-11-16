@@ -55,10 +55,9 @@ Architecture, trust boundaries and a STRIDE table with test references: [docs/th
   they can replace the script with one that leaks *future* messages or the passphrase. Messages already stored remain protected.
   Mitigations: deploys only through CI/CD, protection of the FTPS credentials and a production smoke test.
 - **Loss of the passphrase.** Messages cannot be recovered without the passphrase. This is intentional.
-- **Web host logs.** Apache may log IP addresses in server logs outside the application.
-  The retention of at most 7 days required by requirement 7.7 is set in cPanel: *Raw Access* → disable
-  *Archive logs in your home directory* or limit archiving, so logs rotate according to the host's default.
-  The app itself does not store IP addresses.
+- **Server logs.** The web server may log IP addresses in access logs outside the application.
+  The retention of at most 7 days required by requirement 7.7 is set in the server's or web host's log settings,
+  see the [installation guide](docs/installation.md#server-logs). The app itself does not store IP addresses.
 - **Participants' own information.** If a participant writes personal data into a nickname or message,
   it is stored encrypted. The form advises against doing so.
 - **Users on the same network.** Limits are not based on IP addresses, so a lecture room can be behind NAT without harm.

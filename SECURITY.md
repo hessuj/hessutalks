@@ -55,10 +55,9 @@ Arkkitehtuuri, luottamusrajat ja STRIDE-taulukko testiviittauksineen: [docs/uhka
   se voi vaihtaa skriptin, joka vuotaa *tulevat* viestit tai tunnuslauseen. Jo tallennetut viestit pysyvät suojassa.
   Riskiä pienentävät: julkaisu vain CI/CD:n kautta, FTPS-tunnuksen suojaus ja tuotannon savutesti.
 - **Tunnuslauseen menetys.** Viestejä ei voi palauttaa ilman tunnuslausetta. Tämä on tarkoituksellista.
-- **Webhotellin lokit.** Apache voi kirjata IP-osoitteita palvelinlokeihin sovelluksen ulkopuolella.
-  Vaatimuksen 7.7 mukainen enintään 7 päivän säilytys asetetaan cPanelissa: *Raw Access* → poista
-  *Archive logs in your home directory* käytöstä tai rajaa arkistointi, jolloin lokit kiertävät webhotellin oletuksen mukaan.
-  Sovellus itse ei tallenna IP-osoitteita.
+- **Palvelimen lokit.** Verkkopalvelin voi kirjata IP-osoitteita pääsylokeihin sovelluksen ulkopuolella.
+  Vaatimuksen 7.7 mukainen enintään 7 päivän säilytys asetetaan palvelimen tai webhotellin lokiasetuksista,
+  ks. [asennusohje](docs/asennus.md#palvelimen-lokit). Sovellus itse ei tallenna IP-osoitteita.
 - **Osallistujan oma tieto.** Jos osallistuja kirjoittaa nimimerkkiin tai viestiin henkilötietoja,
   ne tallentuvat salattuina. Lomake ohjeistaa olemaan tekemättä niin.
 - **Saman verkon käyttäjät.** Rajoitukset eivät perustu IP-osoitteisiin, joten luentosali voi olla NAT:n takana ilman haittaa.

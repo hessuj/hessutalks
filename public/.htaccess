@@ -1,4 +1,4 @@
-# HessuTalks – Apache-asetukset (cPanel)
+# HessuTalks – Apache-asetukset (muut palvelimet: docs/asennus.md)
 Options -Indexes -MultiViews
 ServerSignature Off
 
