@@ -6,8 +6,7 @@ HessuTalks is a question, feedback and poll channel for lectures. Participants j
 QR code, ask questions under a nickname and answer polls. All messages and answers are encrypted on the participant's
 device, and only the lecturer can read them.
 
-In the pictures, a red frame marks the button or area being described. The number on the frame refers to the list
-below the picture.
+In the pictures, a red frame marks the button or area being described. The number on the frame refers to the list below the picture.
 
 **Contents**
 
@@ -22,8 +21,7 @@ below the picture.
 9. [Settings and signing in](#9-settings-and-signing-in)
 10. [Keyboard shortcuts](#10-keyboard-shortcuts)
 
-The admin view is always in Finnish, so this guide gives the Finnish button label followed by its meaning in brackets.
-Participant pages and projector texts are in English or Finnish according to the lecture language.
+The admin view is always in Finnish, so this guide gives the Finnish button label followed by its meaning in brackets. Participant pages and projector texts are in English or Finnish according to the lecture language.
 
 ## 1. Getting started
 
@@ -32,7 +30,7 @@ file, and a device that supports passkeys (e.g. Touch ID, Face ID, Windows Hello
 
 ### 1.1 Enable the admin view
 
-Open `…/admin`.
+Open the admin view. The administrator gives you its address.
 
 ![Enable the admin view](kuvat/en/01-kayttoonotto.png)
 
@@ -397,8 +395,7 @@ phone. The remote does not decrypt messages, so the encryption key is not needed
 
 1. The active question, its status and answer count. The large buttons match the control bar buttons.
 
-The laptop driving the projector picks up the remote's changes within a couple of seconds. The remote is also
-available from the **Ohjain** (remote) button on the lecture page.
+The laptop driving the projector picks up the remote's changes within a couple of seconds. The remote is also available from the **Ohjain** (remote) button on the lecture page.
 
 ## 9. Settings and signing in
 

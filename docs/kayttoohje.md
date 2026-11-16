@@ -30,7 +30,7 @@ ja laitteen, joka tukee passkeyta (esim. Touch ID, Face ID, Windows Hello tai tu
 
 ### 1.1 Ota hallinta käyttöön
 
-Avaa osoite `…/admin`.
+Avaa hallintanäkymä. Osoitteen saat ylläpitäjältä.
 
 ![Ota hallinta käyttöön](kuvat/fi/01-kayttoonotto.png)
 

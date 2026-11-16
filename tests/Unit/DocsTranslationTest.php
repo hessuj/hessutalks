@@ -47,8 +47,7 @@ final class DocsTranslationTest extends TestCase
         $shape = static function (string $text): array {
             $lines = explode("\n", $text);
             return [
-                // Otsikkotasot järjestyksessä (ei rivinumeroita: käännös saa olla eri mittainen).
-                'otsikot' => array_values(array_map(static fn (string $l): int => strspn($l, '#'), preg_grep('/^#{1,6} /', $lines) ?: [])),
+                'otsikot' => array_map(static fn (string $l): int => strspn($l, '#'), preg_grep('/^#{1,6} /', $lines) ?: []),
                 'taulukkorivit' => count(preg_grep('/^\|/', $lines) ?: []),
                 'koodilohkot' => count(preg_grep('/^\s*```/', $lines) ?: []),
             ];
