@@ -5,7 +5,7 @@
 //   scripts/e2e.sh "docs-screenshots.mjs fi" "docs-screenshots.mjs en"
 //
 // Kuvat: docs/kuvat/<kieli>/. Kieli määrää luennon sisällön ja osallistujan kielen (hallinta on aina suomeksi).
-import { mkdirSync, writeFileSync, rmSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, writeFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -18,6 +18,10 @@ const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const OUT = join(ROOT, 'docs', 'kuvat', LANG);
 mkdirSync(OUT, { recursive: true });
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+// Arvo JavaScript-literaaliksi selaimessa ajettavaan koodiin. JSON.stringify ei escapoi merkkejä < > / eikä
+// U+2028/U+2029, joten ne koodataan \uXXXX-muotoon: literaali pysyy turvallisena missä tahansa yhteydessä (CodeQL
+// js/bad-code-sanitization). Testidata on kovakoodattua, mutta upotus tehdään aina tämän kautta.
+const lit = (v) => JSON.stringify(v).replace(/[<>/\u2028\u2029]/g, (c) => '\\u' + c.charCodeAt(0).toString(16).padStart(4, '0'));
 const fi = LANG === 'fi';
 
 // ---------------------------------------------------------------- sisältö (testidataa)
@@ -94,7 +98,7 @@ const HELPERS = `window.__el = (text, scopeSel, sel) => {
 async function shot(t, name, { marks = [], area = null, pad = 14 } = {}) {
   await t.js(HELPERS);
   const r = await t.js(`(() => {
-    const marks = [${marks.map((m) => `{ el: (${m.el}), label: ${JSON.stringify(m.label || '')}, box: ${!!m.box} }`).join(',')}];
+    const marks = [${marks.map((m) => `{ el: (${m.el}), label: ${lit(m.label || '')}, box: ${!!m.box} }`).join(',')}];
     const sx = window.scrollX, sy = window.scrollY;
     const rects = [];
     const layer = document.createElement('div');
@@ -147,8 +151,8 @@ async function shot(t, name, { marks = [], area = null, pad = 14 } = {}) {
   step('kuva ' + name);
 }
 
-const el = (text, scope, sel) => `window.__el(${JSON.stringify(text)}, ${JSON.stringify(scope || null)}, ${JSON.stringify(sel || null)})`;
-const q = (sel) => `document.querySelector(${JSON.stringify(sel)})`;
+const el = (text, scope, sel) => `window.__el(${lit(text)}, ${lit(scope || null)}, ${lit(sel || null)})`;
+const q = (sel) => `document.querySelector(${lit(sel)})`;
 const view = (t, width, height, mobile = false) => t.cdp('Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor: mobile ? 2 : 1, mobile });
 const top = (t) => t.js('window.scrollTo(0, 0); true');
 const into = async (t, expr) => { await t.js(HELPERS); await t.js(`(${expr}).scrollIntoView({ block: 'center' }); true`); };
@@ -197,7 +201,7 @@ async function votes(eventUrl, pollId, answers) {
 const pollId = (admin, prompt) => admin.js(`(async () => {
   const s = await (await fetch('/admin/api/state', { credentials: 'same-origin' })).json();
   const p = await (await fetch('/admin/api/events/' + s.events[0].id + '/polls', { credentials: 'same-origin' })).json();
-  return p.polls.find((x) => x.prompt === ${JSON.stringify(prompt)}).id;
+  return p.polls.find((x) => x.prompt === ${lit(prompt)}).id;
 })()`);
 
 // ================================================================ 1. käyttöönotto
@@ -281,7 +285,10 @@ await admin.submit('#poll-prompt');
 await admin.waitFor(admin.hasText(C.q2), 'kysymys 2');
 
 // JSON-tuonti: tiedosto syötetään piilotettuun tiedostokenttään (sama kuin Tuo JSON -napin valinta).
-const file = join(tmpdir(), `hessutalks-ohje-${LANG}.json`);
+// Oma, satunnaisesti nimetty kansio (0700): ennalta arvattava nimi yhteisessä temp-kansiossa altistaisi
+// symlinkkihyökkäykselle monen käyttäjän koneella (CodeQL js/insecure-temporary-file).
+const tmp = mkdtempSync(join(tmpdir(), 'hessutalks-ohje-'));
+const file = join(tmp, `tuonti-${LANG}.json`);
 writeFileSync(file, JSON.stringify(IMPORT, null, 2));
 const { root } = await admin.cdp('DOM.getDocument', {});
 const { nodeId } = await admin.cdp('DOM.querySelector', { nodeId: root.nodeId, selector: '.polls-admin input[type=file]' });
@@ -292,19 +299,19 @@ await shot(admin, '10-tuo-json', { area: q('.polls-admin'), marks: [{ el: el('Tu
 await admin.click('Tuo');
 await admin.waitFor(admin.hasText(C.set2[1]), 'tuodut sarjat');
 await admin.js(`document.querySelector('.polls-admin .notice')?.remove(); true`);
-rmSync(file);
+rmSync(tmp, { recursive: true, force: true });
 
 await top(admin);
 await shot(admin, '11-valmistelu-tyokalut', { area: q('.polls-admin > .toolbar'), marks: [
   { el: el('Valmistelu'), label: '1' }, { el: el('▶ Luennolla'), label: '2' }, { el: el('Tuo JSON'), label: '3' }, { el: el('Vie JSON'), label: '4' },
   { el: el('Vie CSV'), label: '5' }, { el: el('Vie Markdown'), label: '6' }, { el: el('Uusi sarja'), label: '7' }] });
-const set1 = `[...document.querySelectorAll('section.set-card')].find((s) => s.querySelector('h3').textContent === ${JSON.stringify(C.set1[1])})`;
+const set1 = `[...document.querySelectorAll('section.set-card')].find((s) => s.querySelector('h3').textContent === ${lit(C.set1[1])})`;
 await shot(admin, '12-sarjan-painikkeet', { area: `${set1}.querySelector('.set-head')`, marks: [
   { el: `${set1}.querySelector('.set-head button')`, label: '1', box: true },
   { el: el('Ohita', 'section.set-card'), label: '2' }, { el: el('Muokkaa', '.set-head'), label: '3' }, { el: el('Vie', '.set-head'), label: '4' },
   { el: el('CSV', '.set-head'), label: '5' }, { el: el('Monista', '.set-head'), label: '6' }, { el: el('Uusi kysymys', '.set-head'), label: '7' },
   { el: el('Poista', '.set-head'), label: '8' }] });
-const card1 = `[...document.querySelectorAll('article.poll-card')].find((c) => c.querySelector('.poll-card-prompt').textContent === ${JSON.stringify(C.q1)})`;
+const card1 = `[...document.querySelectorAll('article.poll-card')].find((c) => c.querySelector('.poll-card-prompt').textContent === ${lit(C.q1)})`;
 await shot(admin, '13-kysymyskortti', { area: card1, marks: [
   { el: `${card1}.querySelector('.q-actions button')`, label: '1', box: true }, { el: el('Esikatsele', 'article.poll-card'), label: '2' },
   { el: el('Esikatsele projektorilla', 'article.poll-card'), label: '3' }, { el: el('Muokkaa', 'article.poll-card'), label: '4' },
@@ -335,7 +342,7 @@ await shot(part, '16-osallistuja', { marks: [
   { el: q('#polls-zone'), label: '1', box: true }, { el: q('.zone-nick'), label: '2', box: true },
   { el: q('.zone-ask'), label: '3', box: true }, { el: q('.lang-switch'), label: '4', box: true }] });
 await part.fill('#nickname', C.nicks[0]);
-await part.js(`(() => { document.querySelector('input[name=kind][value=question]').checked = true; const t = document.getElementById('text'); t.value = ${JSON.stringify(C.messages[0][1])}; t.dispatchEvent(new Event('input')); return true; })()`);
+await part.js(`(() => { document.querySelector('input[name=kind][value=question]').checked = true; const t = document.getElementById('text'); t.value = ${lit(C.messages[0][1])}; t.dispatchEvent(new Event('input')); return true; })()`);
 await into(part, q('.zone-nick'));
 await shot(part, '17-kysy', { area: q('#ask-form'), marks: [
   { el: q('#nickname'), label: '1', box: true }, { el: q('.kind'), label: '2', box: true }, { el: q('#text'), label: '3', box: true }, { el: q('#send'), label: '4' }] });
@@ -349,7 +356,7 @@ for (let i = 1; i < C.messages.length; i++) {
   const p = await isolated(eventUrl);
   await p.waitFor(p.has('#ask-form:not([hidden])'), 'osallistuja ' + i);
   await p.fill('#nickname', C.nicks[i]);
-  await p.js(`(() => { document.querySelector('input[name=kind][value=${C.messages[i][0]}]').checked = true; const t = document.getElementById('text'); t.value = ${JSON.stringify(C.messages[i][1])}; t.dispatchEvent(new Event('input')); document.getElementById('ask-form').requestSubmit(); return true; })()`);
+  await p.js(`(() => { document.querySelector('input[name=kind][value=${C.messages[i][0]}]').checked = true; const t = document.getElementById('text'); t.value = ${lit(C.messages[i][1])}; t.dispatchEvent(new Event('input')); document.getElementById('ask-form').requestSubmit(); return true; })()`);
   await p.waitFor(`!document.getElementById('status').hidden && !/…$/.test(document.getElementById('status').textContent)`, 'lähetetty ' + i);
   await p.cdp('Page.close').catch(() => {});
 }
@@ -360,7 +367,7 @@ await top(admin);
 await admin.click('Avaa esitysnäyttö');
 const stage = await attach(port, '/admin/esitys#');
 await view(stage, 1280, 720);
-await stage.waitFor(`document.body.innerText.includes(${JSON.stringify(code)})`, 'esitysnäyttö');
+await stage.waitFor(`document.body.innerText.includes(${lit(code)})`, 'esitysnäyttö');
 await shot(admin, '19-esitysnayttopalkki', { area: q('.stage-bar'), marks: [
   { el: el('Avaa esitysnäyttö'), label: '1' }, { el: el('Kysymykset projektorille'), label: '2' }, { el: el('Palautteet projektorille'), label: '3' },
   { el: el('QR isona'), label: '4' }, { el: el('Tyhjennä näyttö'), label: '5' }, { el: q('.stage-status'), label: '6', box: true }] });
@@ -369,15 +376,15 @@ await shot(stage, '20-esitysnaytto-odotus');
 
 await mode(admin, 'live');
 await top(admin);
-const row1 = `[...document.querySelectorAll('.run-row')].find((r) => r.querySelector('.run-prompt').textContent === ${JSON.stringify(C.q1)})`;
+const row1 = `[...document.querySelectorAll('.run-row')].find((r) => r.querySelector('.run-prompt').textContent === ${lit(C.q1)})`;
 await shot(admin, '21-tila-luennolla', { area: q('.polls-admin'), marks: [
   { el: el('▶ Luennolla'), label: '1' }, { el: row1, label: '2', box: true }, { el: `${row1}.parentElement.querySelector('.stage-toggle')`, label: '3' },
   { el: el('Ohita', 'section.run-set'), label: '4' }] });
 
 // Kysymys näytölle, auki ja vastauksia
 await admin.js(`${row1}.click(); true`);
-await admin.waitFor(`document.querySelector('.live-now strong')?.textContent === ${JSON.stringify(C.q1)}`, 'aktiivinen');
-await stage.waitFor(`document.querySelector('.poll-stage-prompt')?.textContent === ${JSON.stringify(C.q1)}`, 'kysymys näytöllä');
+await admin.waitFor(`document.querySelector('.live-now strong')?.textContent === ${lit(C.q1)}`, 'aktiivinen');
+await stage.waitFor(`document.querySelector('.poll-stage-prompt')?.textContent === ${lit(C.q1)}`, 'kysymys näytöllä');
 await shot(admin, '22-ohjauspalkki-luonnos', { area: q('.live-control'), marks: [
   { el: q('.live-now'), label: '1', box: true }, { el: el('← Edellinen'), label: '2' }, { el: el('Seuraava →'), label: '3' },
   { el: el('Avaa vastauksille', '.live-control'), label: '4' }, { el: el('Näytä tulokset', '.live-control'), label: '5' },
@@ -413,17 +420,17 @@ await shot(admin, '28-tulokset-hallinnassa', { area: q('.run-results') });
 
 // Useampi kysymys näytöllä: sanapilvi ja Likert muiden rinnalle
 for (const prompt of [C.words, C.likert]) {
-  await admin.js(`[...document.querySelectorAll('.run-row')].find((r) => r.querySelector('.run-prompt').textContent === ${JSON.stringify(prompt)}).parentElement.querySelector('.stage-toggle').click(); true`);
-  await admin.waitFor(`[...document.querySelectorAll('.run-row.staged .run-prompt')].some((e) => e.textContent === ${JSON.stringify(prompt)})`, 'näytöllä: ' + prompt);
-  await admin.waitFor(`document.querySelector('.live-now strong')?.textContent === ${JSON.stringify(prompt)}`, 'aktiivinen: ' + prompt);
+  await admin.js(`[...document.querySelectorAll('.run-row')].find((r) => r.querySelector('.run-prompt').textContent === ${lit(prompt)}).parentElement.querySelector('.stage-toggle').click(); true`);
+  await admin.waitFor(`[...document.querySelectorAll('.run-row.staged .run-prompt')].some((e) => e.textContent === ${lit(prompt)})`, 'näytöllä: ' + prompt);
+  await admin.waitFor(`document.querySelector('.live-now strong')?.textContent === ${lit(prompt)}`, 'aktiivinen: ' + prompt);
   await admin.js(`[...document.querySelectorAll('.live-control > .q-actions button')].find((b) => b.textContent === 'Avaa vastauksille').click(); true`);
-  await admin.waitFor(`document.querySelector('.live-now strong')?.textContent === ${JSON.stringify(prompt)} && document.querySelector('.live-now .badge')?.textContent === 'Auki'`, 'auki: ' + prompt);
+  await admin.waitFor(`document.querySelector('.live-now strong')?.textContent === ${lit(prompt)} && document.querySelector('.live-now .badge')?.textContent === 'Auki'`, 'auki: ' + prompt);
 }
 await votes(eventUrl, await pollId(admin, C.words), C.wordAnswers);
 await votes(eventUrl, await pollId(admin, C.likert), [4, 5, 3, 4, 4, 2, 5, 4, 3, 4]);
 // Aktiivisen napit ovat ohjauspalkin ylärivillä, muiden näytöllä olevien omilla riveillään.
 await admin.js(`[...document.querySelectorAll('.live-control > .q-actions button')].find((b) => b.textContent === 'Näytä tulokset').click(); true`);
-await admin.js(`[...[...document.querySelectorAll('.stage-row')].find((r) => r.innerText.includes(${JSON.stringify(C.words)})).querySelectorAll('button')].find((b) => b.textContent === 'Näytä tulokset').click(); true`);
+await admin.js(`[...[...document.querySelectorAll('.stage-row')].find((r) => r.innerText.includes(${lit(C.words)})).querySelectorAll('button')].find((b) => b.textContent === 'Näytä tulokset').click(); true`);
 await admin.waitFor(`document.querySelectorAll('.run-results').length === 3`, 'kolme tulosta');
 await stage.waitFor(`document.querySelectorAll('.board .tile').length === 3 && !!document.querySelector('.res-cloud *')`, 'ruudukko', 10000);
 await sleep(1500);
@@ -436,18 +443,18 @@ await top(part);
 await shot(part, '31-osallistuja-useita', { area: q('#polls-zone') });
 
 // Moderointi: sanapilven sana ja kirosanasuodatin
-const wordsRes = `[...document.querySelectorAll('.run-results')].find((d) => d.querySelector('summary').textContent.includes(${JSON.stringify(C.words)}))`;
+const wordsRes = `[...document.querySelectorAll('.run-results')].find((d) => d.querySelector('summary').textContent.includes(${lit(C.words)}))`;
 await admin.waitFor(`!!${wordsRes}?.querySelector('.poll-hidden button')`, 'suodattimen osuma', 8000);
 await into(admin, wordsRes);
 await shot(admin, '32-sanapilvi-moderointi', { area: wordsRes, marks: [
-  { el: `[...${wordsRes}.querySelectorAll('.res-word')].find((w) => w.textContent === ${JSON.stringify(C.wordAnswers[3])})`, label: '1' },
+  { el: `[...${wordsRes}.querySelectorAll('.res-word')].find((w) => w.textContent === ${lit(C.wordAnswers[3])})`, label: '1' },
   { el: `${wordsRes}.querySelector('.poll-hidden')`, label: '2', box: true }] });
 
 // Avoin kysymys: vastauksia, piilotus ja suodatin
 await admin.click('Odotusnäkymä');
 await admin.waitFor(`!document.querySelector('.run-row.staged')`, 'näyttö tyhjä');
-await admin.js(`[...document.querySelectorAll('.run-row')].find((r) => r.querySelector('.run-prompt').textContent === ${JSON.stringify(C.open)}).click(); true`);
-await admin.waitFor(`document.querySelector('.live-now strong')?.textContent === ${JSON.stringify(C.open)}`, 'avoin aktiivinen');
+await admin.js(`[...document.querySelectorAll('.run-row')].find((r) => r.querySelector('.run-prompt').textContent === ${lit(C.open)}).click(); true`);
+await admin.waitFor(`document.querySelector('.live-now strong')?.textContent === ${lit(C.open)}`, 'avoin aktiivinen');
 await admin.click('Avaa vastauksille');
 await votes(eventUrl, await pollId(admin, C.open), C.openAnswers);
 await admin.click('Näytä tulokset');
@@ -476,10 +483,10 @@ await shot(admin, '35-viestit', { area: q('.messages-admin'), marks: [
   { el: q('#tab-btn-messages'), label: '1', box: true }, { el: q('.filters'), label: '2', box: true },
   { el: el('Näytä projektorilla', 'ul.questions'), label: '3' }, { el: el('Merkitse vastatuksi', 'ul.questions'), label: '4' },
   { el: el('Arkistoi', 'ul.questions'), label: '5' }, { el: el('Poista', 'ul.questions'), label: '6' }] });
-const lastQ = `[...document.querySelectorAll('ul.questions > li.q')].find((li) => li.innerText.includes(${JSON.stringify(C.messages[2][1])}))`;
+const lastQ = `[...document.querySelectorAll('ul.questions > li.q')].find((li) => li.innerText.includes(${lit(C.messages[2][1])}))`;
 await admin.js(`[...${lastQ}.querySelectorAll('button')].find((b) => b.textContent === 'Näytä projektorilla').click(); true`);
 await admin.click('Palautteet projektorille');
-await stage.waitFor(`document.body.innerText.includes(${JSON.stringify(C.messages[2][1])}) && document.body.innerText.includes(${JSON.stringify(C.messages[1][1])})`, 'viestit näytöllä', 8000);
+await stage.waitFor(`document.body.innerText.includes(${lit(C.messages[2][1])}) && document.body.innerText.includes(${lit(C.messages[1][1])})`, 'viestit näytöllä', 8000);
 await sleep(1000);
 await shot(stage, '36-esitysnaytto-viestit');
 await admin.click('Tyhjennä näyttö');
