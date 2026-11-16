@@ -12,7 +12,7 @@ export async function tab(port) {
   return connect(list.find((x) => x.id === targetId).webSocketDebuggerUrl);
 }
 
-async function connect(wsUrl) {
+export async function connect(wsUrl) {
   const ws = new WebSocket(wsUrl);
   await new Promise((r) => ws.addEventListener('open', r, { once: true }));
   let seq = 0;

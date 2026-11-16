@@ -24,6 +24,7 @@ final class DocsTranslationTest extends TestCase
             'poikkeama' => ['docs/poikkeama-esitysnaytto.md', 'docs/incident-presenter.md'],
             'tuontimuoto' => ['docs/tuontimuoto.md', 'docs/import-format.md'],
             'asennus' => ['docs/asennus.md', 'docs/installation.md'],
+            'käyttöohje' => ['docs/kayttoohje.md', 'docs/user-guide.md'],
         ];
     }
 

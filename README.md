@@ -8,6 +8,8 @@ Vain luennoitsija voi lukea viestit.
 
 Osoite: <https://hessujarvinen.com/hessutalks/>
 
+**Käyttöohje ruutukaappauksin:** [docs/kayttoohje.md](docs/kayttoohje.md)
+
 ## Miten se toimii
 
 1. Luennoitsija luo hallintanäkymässä luennon. Sovellus antaa 6-merkkisen koodin ja QR-koodin. Otsikkoa voi muokata myöhemmin (*Muokkaa otsikkoa*), ja koodi pysyy samana.
