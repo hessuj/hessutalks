@@ -35,7 +35,7 @@ bin/init.php       asetustiedoston luonti; bin/dev-router.php kehityspalvelin; b
 ```
 Osallistujan tekstit ovat `src/I18n.php`:ssä molemmilla kielillä (testi valvoo). Hallinta on vain suomeksi.
 Julkinen dokumentaatio on suomeksi ja englanniksi: README.md/README.en.md, SECURITY.md/SECURITY.en.md,
-docs/hyvaksymistestit.md/.en.md, docs/asennus.md/installation.md, docs/tuontimuoto.md/import-format.md. Päivitä aina molemmat (DocsTranslationTest valvoo kielilinkit ja rakenteen: otsikot samoilla riveillä, sama määrä taulukkorivejä ja koodilohkoja).
+docs/hyvaksymistestit.md/.en.md, docs/asennus.md/installation.md, docs/tuontimuoto.md/import-format.md, docs/kayttoohje.md/user-guide.md. Päivitä aina molemmat (DocsTranslationTest valvoo kielilinkit ja rakenteen: otsikot samoilla riveillä, sama määrä taulukkorivejä ja koodilohkoja).
 
 ## Komennot
 ```sh
@@ -48,6 +48,7 @@ node --test tests/js/*.test.mjs
 scripts/verify-vendor.sh
 scripts/e2e.sh                         # selaintestit; aja käyttöliittymämuutosten jälkeen
 scripts/e2e.sh load.mjs                # kuormitus: 150 osallistujaa, viive esitysnäkymään (ei oletusajossa)
+scripts/e2e.sh "docs-screenshots.mjs fi" "docs-screenshots.mjs en"   # käyttöohjeen kuvat (docs/kuvat/), aja UI-muutosten jälkeen
 node scripts/load-test.mjs <linkki>    # osallistujasimulaatio mihin tahansa ympäristöön (tuotanto: --production, vain testiluento)
 ```
 Lisää jokaiselle uudelle ominaisuudelle testit, myös tietoturvatestit (`tests/Security`).
