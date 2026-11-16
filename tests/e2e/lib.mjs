@@ -53,30 +53,37 @@ export async function connect(wsUrl) {
       throw new Error('Aikakatkaisu: ' + what + ' (visibilityState=' + (await js('document.visibilityState').catch(() => '?')) + ')\n--- sivu ---\n' + (await js('document.body.innerText').catch(() => '?')).slice(0, 3000) + '\n' + logs.join('\n'));
     },
     dialogs: () => dialogs.slice(),
-    hasText: (s) => `document.body.innerText.includes(${JSON.stringify(s)})`,
-    has: (sel) => `!!document.querySelector(${JSON.stringify(sel)})`,
+    hasText: (s) => `document.body.innerText.includes(${lit(s)})`,
+    has: (sel) => `!!document.querySelector(${lit(sel)})`,
     // Nappi tekstin mukaan, valinnaisesti elementin sisältä, jossa on annettu teksti.
     click: (text, within) => js(`(() => {
       let scope = document;
-      if (${JSON.stringify(within || '')}) {
+      if (${lit(within || '')}) {
         // Alue tunnistetaan otsikosta (sarjan nimi tai kysymysteksti), ei koko tekstistä: valikot (esim. Siirrä
         // sarjaan) sisältävät muiden sarjojen nimiä. Sarjan napit ovat sen otsikkorivillä ja työkalurivillä.
-        const w = ${JSON.stringify(within || '')};
+        const w = ${lit(within || '')};
         const title = (e) => (e.matches('li.poll-item') ? e.querySelector('.run-prompt') : e.querySelector('.set-head h3')).textContent;
         const area = [...document.querySelectorAll('section.set-card, li.poll-item')].find((e) => title(e).includes(w));
         scope = area && area.matches('section.set-card') ? { querySelectorAll: (q) => [...area.querySelectorAll(':scope > .set-head ' + q + ', :scope > .set-tools ' + q)] } : area;
         if (!scope) throw new Error('alue puuttuu: ' + w);
       }
-      const b = [...scope.querySelectorAll('button')].find((x) => x.textContent.trim() === ${JSON.stringify(text)});
-      if (!b) throw new Error('nappi puuttuu: ' + ${JSON.stringify(text)});
-      if (b.disabled) throw new Error('nappi pois käytöstä: ' + ${JSON.stringify(text)});
+      const b = [...scope.querySelectorAll('button')].find((x) => x.textContent.trim() === ${lit(text)});
+      if (!b) throw new Error('nappi puuttuu: ' + ${lit(text)});
+      if (b.disabled) throw new Error('nappi pois käytöstä: ' + ${lit(text)});
       b.click(); return true; })()`),
-    fill: (sel, v) => js(`(() => { const e = document.querySelector(${JSON.stringify(sel)}); e.value = ${JSON.stringify(v)}; e.dispatchEvent(new Event('change')); return true; })()`),
-    submit: (sel) => js(`(() => { document.querySelector(${JSON.stringify(sel)}).closest('form').requestSubmit(); return true; })()`),
+    fill: (sel, v) => js(`(() => { const e = document.querySelector(${lit(sel)}); e.value = ${lit(v)}; e.dispatchEvent(new Event('change')); return true; })()`),
+    submit: (sel) => js(`(() => { document.querySelector(${lit(sel)}).closest('form').requestSubmit(); return true; })()`),
   };
   return t;
 }
 export const step = (s) => console.log('✓ ' + s);
+
+/**
+ * Arvo JavaScript-literaaliksi selaimessa ajettavaan koodiin. JSON.stringify ei escapoi merkkejä < > / eikä
+ * U+2028/U+2029, joten ne koodataan \uXXXX-muotoon: literaali pysyy turvallisena missä tahansa yhteydessä
+ * (CodeQL js/bad-code-sanitization). Testidata on kovakoodattua, mutta upotus tehdään aina tämän kautta.
+ */
+export const lit = (v) => JSON.stringify(v).replace(/[<>/\u2028\u2029]/g, (c) => '\\u' + c.charCodeAt(0).toString(16).padStart(4, '0'));
 
 /**
  * Liittyy jo avattuun ikkunaan (esim. hallinnan avaama esitysikkuna) osoitteen perusteella. ending erottaa
@@ -129,21 +136,21 @@ export async function openParticipant(port, admin) {
 }
 
 /** Kysymysrivin valitsin (JavaScript-lauseke selaimeen) kysymystekstin mukaan. */
-export const pollItem = (prompt) => `[...document.querySelectorAll('li.poll-item')].find((li) => li.querySelector('.run-prompt').textContent.includes(${JSON.stringify(prompt)}))`;
+export const pollItem = (prompt) => `[...document.querySelectorAll('li.poll-item')].find((li) => li.querySelector('.run-prompt').textContent.includes(${lit(prompt)}))`;
 
 /** Avaa kysymyksen rivin alle tulokset ja muokkauksen (rivin klikkaus), ellei se ole jo auki. */
 export async function expand(admin, prompt) {
-  await admin.js(`(() => { const li = ${pollItem(prompt)}; if (!li) throw new Error('rivi puuttuu: ' + ${JSON.stringify(prompt)});
+  await admin.js(`(() => { const li = ${pollItem(prompt)}; if (!li) throw new Error('rivi puuttuu: ' + ${lit(prompt)});
     if (!li.classList.contains('expanded')) li.querySelector('.poll-toggle').click(); return true; })()`);
   await admin.waitFor(`${pollItem(prompt)}?.querySelector('.poll-detail') != null`, 'avattu: ' + prompt);
 }
 
 /** Avaa sarjan työkalurivin (Muokkaa, järjestys, vienti, Monista, Poista sarja). */
 export async function setTools(admin, setTitle) {
-  await admin.js(`(() => { const s = [...document.querySelectorAll('section.set-card')].find((x) => x.querySelector('.set-head h3').textContent === ${JSON.stringify(setTitle)});
-    if (!s) throw new Error('sarja puuttuu: ' + ${JSON.stringify(setTitle)});
+  await admin.js(`(() => { const s = [...document.querySelectorAll('section.set-card')].find((x) => x.querySelector('.set-head h3').textContent === ${lit(setTitle)});
+    if (!s) throw new Error('sarja puuttuu: ' + ${lit(setTitle)});
     if (!s.querySelector('.set-tools')) s.querySelector('.set-tools-btn').click(); return true; })()`);
-  await admin.waitFor(`[...document.querySelectorAll('section.set-card')].some((x) => x.querySelector('.set-head h3').textContent === ${JSON.stringify(setTitle)} && x.querySelector('.set-tools'))`, 'sarjan työkalut');
+  await admin.waitFor(`[...document.querySelectorAll('section.set-card')].some((x) => x.querySelector('.set-head h3').textContent === ${lit(setTitle)} && x.querySelector('.set-tools'))`, 'sarjan työkalut');
 }
 
 /**

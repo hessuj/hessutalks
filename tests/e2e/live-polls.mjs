@@ -2,7 +2,7 @@
 // Ajo: scripts/e2e.sh live-polls.mjs  (tai node tests/e2e/live-polls.mjs <cdp-port> <app-url>)
 const [port, app] = [process.argv[2], process.argv[3]];
 
-import { tab, step, setupAdmin, createEvent, openParticipant, pollItem, setTools } from './lib.mjs';
+import { tab, step, setupAdmin, createEvent, openParticipant, pollItem, setTools, lit } from './lib.mjs';
 
 const admin = await tab(port);
 await setupAdmin(admin, app);
@@ -49,7 +49,7 @@ step(`H2: Näytä taululla avasi kysymyksen, ja se näkyi osallistujalle ${laten
 
 // Vastaus ja muutos (H3)
 const answer = async (label) => {
-  await part.js(`(() => { [...document.querySelectorAll('.poll-choice')].find((l) => l.innerText.trim() === ${JSON.stringify(label)}).querySelector('input').click(); document.querySelector('form.poll').requestSubmit(); return true; })()`);
+  await part.js(`(() => { [...document.querySelectorAll('.poll-choice')].find((l) => l.innerText.trim() === ${lit(label)}).querySelector('input').click(); document.querySelector('form.poll').requestSubmit(); return true; })()`);
   await part.waitFor(`document.querySelector('form.poll .notice.ok')`, 'kuittaus');
 };
 await answer('Hacktivist');

@@ -3,7 +3,7 @@
 // Taulurivi näkyy kaikilla välilehdillä, ja viestivälilehdet kertovat uusien määrän.
 // Ajo: scripts/e2e.sh tabs.mjs  (tai node tests/e2e/tabs.mjs <cdp-port> <app-url>)
 import { fileURLToPath } from 'node:url';
-import { tab, step, setupAdmin, createEvent, openParticipant, expand, pollItem } from './lib.mjs';
+import { tab, step, setupAdmin, createEvent, openParticipant, expand, pollItem, lit } from './lib.mjs';
 
 const [port, app] = [process.argv[2], process.argv[3]];
 const fixture = fileURLToPath(new URL('../fixtures/mmoit-2026.json', import.meta.url));
@@ -25,8 +25,8 @@ const state = () => admin.js(`(() => {
   const btn = (k) => document.getElementById('tab-btn-' + k);
   return {
     polls: shown('#tab-polls'), question: shown('#tab-question'), feedback: shown('#tab-feedback'), board: shown('.stage-bar'),
-    selected: ${JSON.stringify(KEYS)}.filter((k) => btn(k).getAttribute('aria-selected') === 'true'),
-    labels: ${JSON.stringify(KEYS)}.map((k) => btn(k).textContent),
+    selected: ${lit(KEYS)}.filter((k) => btn(k).getAttribute('aria-selected') === 'true'),
+    labels: ${lit(KEYS)}.map((k) => btn(k).textContent),
   };
 })()`);
 let s = await state();
@@ -64,7 +64,7 @@ const part = await openParticipant(port, admin);
 await part.waitFor(part.has('#ask-form:not([hidden])'), 'viestilomake');
 await part.fill('#nickname', 'Tab_Tester');
 for (const [kind, text] of [['question', 'Is MFA enough?'], ['feedback', 'Great session']]) {
-  await part.js(`(() => { document.querySelector('input[name=kind][value=${kind}]').click(); const t = document.getElementById('text'); t.value = ${JSON.stringify(text)}; t.dispatchEvent(new Event('input')); document.getElementById('ask-form').requestSubmit(); return true; })()`);
+  await part.js(`(() => { document.querySelector(${lit('input[name=kind][value=' + kind + ']')}).click(); const t = document.getElementById('text'); t.value = ${lit(text)}; t.dispatchEvent(new Event('input')); document.getElementById('ask-form').requestSubmit(); return true; })()`);
   await part.waitFor(`!document.getElementById('send').disabled && !document.getElementById('status').hidden && !/…$/.test(document.getElementById('status').textContent)`, 'lähetys');
 }
 await admin.waitFor(`document.getElementById('tab-btn-question').textContent === 'Vapaat kysymykset1 uutta' && document.getElementById('tab-btn-feedback').textContent === 'Palautteet1 uutta'`, 'uusien määrä välilehdissä', 10000);

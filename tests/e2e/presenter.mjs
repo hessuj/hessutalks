@@ -2,7 +2,7 @@
 // Issue #60: kysymykset ohjataan hallinnan listasta; näppäimistä jäivät F, T ja Q (iso QR), ja
 // puhelinohjain poistettiin.
 // Ajo: scripts/e2e.sh presenter.mjs  (tai node tests/e2e/presenter.mjs <cdp-port> <app-url>)
-import { tab, attach, step, setupAdmin, createEvent, pollItem } from './lib.mjs';
+import { tab, attach, step, setupAdmin, createEvent, pollItem, lit } from './lib.mjs';
 
 const [port, app] = [process.argv[2], process.argv[3]];
 
@@ -28,7 +28,7 @@ const code = await admin.js(`document.querySelector('.big-code').textContent`);
 await admin.click('Avaa esitysnäyttö');
 const stage = await attach(port, '/admin/esitys');
 await stage.cdp('Emulation.setDeviceMetricsOverride', { width: 1920, height: 1080, deviceScaleFactor: 1, mobile: false });
-await stage.waitFor(`document.body.innerText.includes(${JSON.stringify(code)})`, 'QR-näkymä ilman aktiivista');
+await stage.waitFor(`document.body.innerText.includes(${lit(code)})`, 'QR-näkymä ilman aktiivista');
 
 const key = async (t, k, code2) => {
   for (const type of ['keyDown', 'keyUp']) {
@@ -51,7 +51,7 @@ if (corner.code !== code || !corner.qr || corner.count !== '0 answers' || corner
 step(`Kulmassa koodi ${code} ja QR, vastausmäärä näkyy; kysymyksen fontti ${corner.size}px (1920×1080)`);
 
 // Projektorin kieli seuraa luennon osallistujien kieltä (hallinta pysyy suomeksi).
-const setLang = (v) => admin.js(`(() => { const s = document.getElementById('event-lang'); s.value = ${JSON.stringify(v)}; s.dispatchEvent(new Event('change')); return true; })()`);
+const setLang = (v) => admin.js(`(() => { const s = document.getElementById('event-lang'); s.value = ${lit(v)}; s.dispatchEvent(new Event('change')); return true; })()`);
 await setLang('fi');
 await stage.waitFor(`document.querySelector('.poll-stage-count')?.textContent === '0 vastausta'`, 'projektori suomeksi', 5000);
 await setLang('');

@@ -9,7 +9,7 @@ import { mkdirSync, mkdtempSync, writeFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { tab, attach, connect, step } from './lib.mjs';
+import { tab, attach, connect, step, lit } from './lib.mjs';
 import { loadEventPage } from '../../scripts/load-test.mjs';
 import { createRequire } from 'node:module';
 
@@ -18,10 +18,6 @@ const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const OUT = join(ROOT, 'docs', 'kuvat', LANG);
 mkdirSync(OUT, { recursive: true });
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-// Arvo JavaScript-literaaliksi selaimessa ajettavaan koodiin. JSON.stringify ei escapoi merkkejä < > / eikä
-// U+2028/U+2029, joten ne koodataan \uXXXX-muotoon: literaali pysyy turvallisena missä tahansa yhteydessä (CodeQL
-// js/bad-code-sanitization). Testidata on kovakoodattua, mutta upotus tehdään aina tämän kautta.
-const lit = (v) => JSON.stringify(v).replace(/[<>/\u2028\u2029]/g, (c) => '\\u' + c.charCodeAt(0).toString(16).padStart(4, '0'));
 const fi = LANG === 'fi';
 
 // ---------------------------------------------------------------- sisältö (testidataa)
@@ -364,7 +360,7 @@ for (let i = 1; i < C.messages.length; i++) {
   const p = await isolated(eventUrl);
   await p.waitFor(p.has('#ask-form:not([hidden])'), 'osallistuja ' + i);
   await p.fill('#nickname', C.nicks[i]);
-  await p.js(`(() => { document.querySelector('input[name=kind][value=${C.messages[i][0]}]').checked = true; const t = document.getElementById('text'); t.value = ${lit(C.messages[i][1])}; t.dispatchEvent(new Event('input')); document.getElementById('ask-form').requestSubmit(); return true; })()`);
+  await p.js(`(() => { document.querySelector(${lit('input[name=kind][value=' + C.messages[i][0] + ']')}).checked = true; const t = document.getElementById('text'); t.value = ${lit(C.messages[i][1])}; t.dispatchEvent(new Event('input')); document.getElementById('ask-form').requestSubmit(); return true; })()`);
   await p.waitFor(`!document.getElementById('status').hidden && !/…$/.test(document.getElementById('status').textContent)`, 'lähetetty ' + i);
   await p.cdp('Page.close').catch(() => {});
 }

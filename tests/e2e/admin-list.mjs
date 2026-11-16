@@ -3,7 +3,7 @@
 // toiminnot ovat sen rivillä, ja rivin klikkaus avaa alle tulokset ja muokkauksen.
 // Ajo: scripts/e2e.sh admin-list.mjs  (tai node tests/e2e/admin-list.mjs <cdp-port> <app-url>)
 import { fileURLToPath } from 'node:url';
-import { tab, step, setupAdmin, createEvent, openParticipant, pollItem, expand } from './lib.mjs';
+import { tab, step, setupAdmin, createEvent, openParticipant, pollItem, expand, lit } from './lib.mjs';
 
 const [port, app] = [process.argv[2], process.argv[3]];
 const fixture = fileURLToPath(new URL('../fixtures/mmoit-2026.json', import.meta.url));
@@ -18,7 +18,7 @@ await admin.waitFor(admin.hasText('Tuodaan 9 sarjaa ja 22 kysymystä'), 'esikats
 await admin.click('Tuo');
 await admin.waitFor(admin.hasText('Tuotu 9 sarjaa ja 22 kysymystä.'), 'tuonti');
 
-const visible = (sel) => `[...document.querySelectorAll(${JSON.stringify(sel)})].filter((e) => e.offsetParent !== null)`;
+const visible = (sel) => `[...document.querySelectorAll(${lit(sel)})].filter((e) => e.offsetParent !== null)`;
 const rowButtons = (prompt) => admin.js(`[...${pollItem(prompt)}.querySelectorAll('.poll-actions button')].map((b) => b.textContent)`);
 const Q = 'Which of these EU regulations apply';   // M3, monivalinta, oikeat vastaukset 1–4
 
@@ -67,7 +67,7 @@ await part.waitFor(part.hasText('Waiting for the next question'), 'pois osallist
 await admin.waitFor(`!${pollItem(Q)}.matches('.staged') && ${pollItem(Q)}.querySelector('.run-count').textContent === '1'`, 'pois taululta, vastaus tallessa');
 if ((await rowButtons(Q)).join() !== 'Näytä taululla,Näytä tulokset,Paljasta oikea vastaus') throw new Error('Taululta poistetun napit: ' + (await rowButtons(Q)));
 await admin.click('Näytä taululla', Q);
-await part.waitFor(`document.body.innerText.includes(${JSON.stringify(Q)}) && !document.body.innerText.includes('This poll is closed')`, 'taas auki', 8000);
+await part.waitFor(`document.body.innerText.includes(${lit(Q)}) && !document.body.innerText.includes('This poll is closed')`, 'taas auki', 8000);
 await admin.waitFor(`${pollItem(Q)}.dataset.status === 'open'`, 'auki uudelleen');
 step('Poista taululta piilottaa osallistujilta, vastaukset säilyvät; uudelleen näyttäminen avaa vastauksille');
 

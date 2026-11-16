@@ -4,7 +4,7 @@
 // muokkaus (koodi pysyy).
 // Ajo: scripts/e2e.sh mmoit-must.mjs  (tai node tests/e2e/mmoit-must.mjs <cdp-port> <app-url>)
 import { fileURLToPath } from 'node:url';
-import { tab, attach, step, setupAdmin, createEvent, openParticipant, openPoll, pollItem, expand } from './lib.mjs';
+import { tab, attach, step, setupAdmin, createEvent, openParticipant, openPoll, pollItem, expand, lit } from './lib.mjs';
 
 const [port, app] = [process.argv[2], process.argv[3]];
 const fixture = fileURLToPath(new URL('../fixtures/mmoit-2026.json', import.meta.url));
@@ -73,11 +73,11 @@ step('R9: M4/3 (ei oikeaa vastausta) – paljastusnappia ei näytetä');
 await openPoll(admin, 'Stage 2: The vulnerability');
 const longest = 'National CSIRT';
 await stage.cdp('Emulation.setDeviceMetricsOverride', { width: 1920, height: 1080, deviceScaleFactor: 1, mobile: false });
-await stage.waitFor(`[...document.querySelectorAll('.res-label')].some((e) => e.textContent.includes(${JSON.stringify(longest)}))`, 'M4/2 projektorilla', 8000);
-const onStage = await stage.js(`(() => { const e = [...document.querySelectorAll('.res-label')].find((x) => x.textContent.includes(${JSON.stringify(longest)})); const r = e.getBoundingClientRect(); return { full: e.scrollWidth <= e.clientWidth + 1 && getComputedStyle(e).textOverflow !== 'ellipsis', inside: r.right <= window.innerWidth && r.bottom <= window.innerHeight, len: e.textContent.length }; })()`);
+await stage.waitFor(`[...document.querySelectorAll('.res-label')].some((e) => e.textContent.includes(${lit(longest)}))`, 'M4/2 projektorilla', 8000);
+const onStage = await stage.js(`(() => { const e = [...document.querySelectorAll('.res-label')].find((x) => x.textContent.includes(${lit(longest)})); const r = e.getBoundingClientRect(); return { full: e.scrollWidth <= e.clientWidth + 1 && getComputedStyle(e).textOverflow !== 'ellipsis', inside: r.right <= window.innerWidth && r.bottom <= window.innerHeight, len: e.textContent.length }; })()`);
 await part.cdp('Emulation.setDeviceMetricsOverride', { width: 360, height: 740, deviceScaleFactor: 2, mobile: true });
-await part.waitFor(`[...document.querySelectorAll('.poll-choice')].some((e) => e.textContent.includes(${JSON.stringify(longest)}))`, 'M4/2 puhelimessa', 8000);
-const onPhone = await part.js(`(() => { const e = [...document.querySelectorAll('.poll-choice')].find((x) => x.textContent.includes(${JSON.stringify(longest)})); const r = e.getBoundingClientRect(); return { full: e.scrollWidth <= e.clientWidth + 1, inside: r.left >= 0 && r.right <= window.innerWidth, overflow: document.documentElement.scrollWidth - window.innerWidth, lines: Math.round(r.height / parseFloat(getComputedStyle(e).lineHeight || 20)) }; })()`);
+await part.waitFor(`[...document.querySelectorAll('.poll-choice')].some((e) => e.textContent.includes(${lit(longest)}))`, 'M4/2 puhelimessa', 8000);
+const onPhone = await part.js(`(() => { const e = [...document.querySelectorAll('.poll-choice')].find((x) => x.textContent.includes(${lit(longest)})); const r = e.getBoundingClientRect(); return { full: e.scrollWidth <= e.clientWidth + 1, inside: r.left >= 0 && r.right <= window.innerWidth, overflow: document.documentElement.scrollWidth - window.innerWidth, lines: Math.round(r.height / parseFloat(getComputedStyle(e).lineHeight || 20)) }; })()`);
 if (!onStage.full || !onStage.inside || !onPhone.full || !onPhone.inside || onPhone.overflow > 0) throw new Error('R11: ' + JSON.stringify({ onStage, onPhone }));
 step(`R11: ${onStage.len} merkin vaihtoehto näkyy kokonaan projektorilla (1920×1080) ja puhelimessa (360 px), ei vaakavieritystä`);
 
@@ -91,7 +91,7 @@ await expand(admin, 'Stage 2: The vulnerability');
 await admin.click('Palauta luonnokseksi', 'Stage 2: The vulnerability');
 await admin.waitFor(`${card}?.dataset.status === 'draft'`, 'luonnos-tila', 8000);
 await part.waitFor(`!document.querySelector('form.poll')`, 'kysymys pois osallistujalta', 8000);
-await stage.waitFor(`![...document.querySelectorAll('.res-label')].some((e) => e.textContent.includes(${JSON.stringify(longest)}))`, 'pois projektorilta', 8000);
+await stage.waitFor(`![...document.querySelectorAll('.res-label')].some((e) => e.textContent.includes(${lit(longest)}))`, 'pois projektorilta', 8000);
 await openPoll(admin, 'Stage 2: The vulnerability');
 await part.waitFor(`!!document.querySelector('form.poll')`, 'julkaistu uudelleen', 8000);
 await admin.waitFor(`${card}.querySelector('.run-count').textContent === '1'`, 'vastaus säilyi', 8000);

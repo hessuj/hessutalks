@@ -4,7 +4,7 @@ import { mkdtempSync, readdirSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { tab, attach, step, setupAdmin, createEvent, openParticipant, openPoll, pollItem, expand, setTools } from './lib.mjs';
+import { tab, attach, step, setupAdmin, createEvent, openParticipant, openPoll, pollItem, expand, setTools, lit } from './lib.mjs';
 
 const [port, app] = [process.argv[2], process.argv[3]];
 const fixture = fileURLToPath(new URL('../fixtures/mmoit-2026.json', import.meta.url));
@@ -29,7 +29,7 @@ await part.js(`(() => { [...document.querySelectorAll('.poll-choice')].find((l) 
 await part.waitFor(`document.querySelector('form.poll .notice.ok')`, 'kuittaus');
 await openPoll(admin, 'What surprised you today?');
 await part.waitFor(part.hasText('What surprised you today?'), 'avoin osallistujalle');
-await part.js(`(() => { const a = document.querySelector('form.poll textarea'); a.value = ${JSON.stringify(EVIL)}; document.querySelector('form.poll').requestSubmit(); return true; })()`);
+await part.js(`(() => { const a = document.querySelector('form.poll textarea'); a.value = ${lit(EVIL)}; document.querySelector('form.poll').requestSubmit(); return true; })()`);
 await part.waitFor(`document.querySelector('form.poll .notice.ok')`, 'kuittaus 2');
 await admin.waitFor(`${pollItem('What surprised you today?')}.querySelector('.run-count').textContent === '1'`, 'vastaus hallinnassa', 8000);
 

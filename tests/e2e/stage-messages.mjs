@@ -2,7 +2,7 @@
 // voi olla useita viestejä yhtä aikaa. Pitkät viestit eivät saa mennä nimimerkin päälle eivätkä ruudun
 // ulkopuolelle (Hessun havainto 2.11.: teksti meni otsikon päälle myös koko näytöllä).
 // Ajo: scripts/e2e.sh stage-messages.mjs  (tai node tests/e2e/stage-messages.mjs <cdp-port> <app-url>)
-import { tab, attach, step, setupAdmin, createEvent, openParticipant } from './lib.mjs';
+import { tab, attach, step, setupAdmin, createEvent, openParticipant, lit } from './lib.mjs';
 
 const [port, app] = [process.argv[2], process.argv[3]];
 
@@ -14,7 +14,7 @@ const part = await openParticipant(port, admin);
 await part.waitFor(part.has('#ask-form:not([hidden])'), 'viestilomake');
 await part.fill('#nickname', 'Long_Questions');
 const send = async (text) => {
-  await part.js(`(() => { const t = document.getElementById('text'); t.value = ${JSON.stringify(text)}; t.dispatchEvent(new Event('input')); document.getElementById('ask-form').requestSubmit(); return true; })()`);
+  await part.js(`(() => { const t = document.getElementById('text'); t.value = ${lit(text)}; t.dispatchEvent(new Event('input')); document.getElementById('ask-form').requestSubmit(); return true; })()`);
   await part.waitFor(`!document.getElementById('send').disabled && !document.getElementById('status').hidden && !/…$/.test(document.getElementById('status').textContent)`, 'lähetys');
 };
 const long = (i) => `Question ${i}: ` + 'How should a healthcare organisation verify AI-generated code before it reaches patients, and who is accountable? '.repeat(i % 3 === 0 ? 4 : 2);
@@ -24,7 +24,7 @@ await admin.waitFor(`document.querySelectorAll('#tab-question li.q').length === 
 step('Osallistuja lähetti 8 pitkää kysymystä');
 
 const show = (prefix) => admin.js(`(() => {
-  const li = [...document.querySelectorAll('#tab-question li.q')].find((x) => x.querySelector('.q-text').textContent.startsWith(${JSON.stringify(prefix)}));
+  const li = [...document.querySelectorAll('#tab-question li.q')].find((x) => x.querySelector('.q-text').textContent.startsWith(${lit(prefix)}));
   [...li.querySelectorAll('button')].find((b) => b.textContent === 'Näytä taululla').click(); return true; })()`);
 await admin.click('Avaa esitysnäyttö');
 const stage = await attach(port, '/admin/esitys');

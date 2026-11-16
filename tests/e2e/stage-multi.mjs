@@ -4,7 +4,7 @@
 // eikä näytön ulkopuolelle, ja että yhteys palautuu, kun esitysikkuna tai hallinta ladataan uudelleen.
 // Ajo: scripts/e2e.sh stage-multi.mjs  (tai node tests/e2e/stage-multi.mjs <cdp-port> <app-url>)
 import { writeFileSync } from 'node:fs';
-import { tab, attach, step, setupAdmin, createEvent, openParticipant, pollItem, expand } from './lib.mjs';
+import { tab, attach, step, setupAdmin, createEvent, openParticipant, pollItem, expand, lit } from './lib.mjs';
 
 const [port, app] = [process.argv[2], process.argv[3]];
 // Kuvakaappaukset silmämääräiseen tarkistukseen: E2E_SHOTS=/polku/kansioon scripts/e2e.sh stage-multi.mjs
@@ -146,7 +146,7 @@ await admin.click('Näytä taululla', 'Ask anything for tomorrow');
 await part.waitFor(`document.querySelector('form.poll textarea')`, 'avoin kysymys osallistujalla');
 const long = (i) => `Answer ${i}: how should we balance patching speed against testing when a critical CVE is published on a Friday afternoon?`;
 for (let i = 1; i <= 10; i++) {
-  await part.js(`(() => { const f = document.querySelector('form.poll'); f.querySelector('textarea').value = ${JSON.stringify(long(i))}; f.requestSubmit(); return true; })()`);
+  await part.js(`(() => { const f = document.querySelector('form.poll'); f.querySelector('textarea').value = ${lit(long(i))}; f.requestSubmit(); return true; })()`);
   await part.waitFor(`document.querySelector('form.poll .notice.ok')?.textContent.includes('${i}')`, 'vastaus ' + i, 8000);
 }
 await admin.click('Näytä tulokset', 'Ask anything for tomorrow');
