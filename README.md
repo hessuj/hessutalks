@@ -296,7 +296,7 @@ Kirjastoja ei ladata CDN:stä.
 
 MMoIT 2026 -kurssin vaatimukset on toteutettu, ja kuormitustesti 150 osallistujalla meni läpi tuotannossa.
 Hyväksymistestit ja niiden todennus: [docs/hyvaksymistestit.md](docs/hyvaksymistestit.md).
-Jäljellä: koeajo oikeilla laitteilla ja Teamsilla. 200 osallistujan kuormitustesti on siirretty, ja kysymysten tykkäykset (Q&A, COULD) on jätetty pois.
+Kehitystehtävät, user storyt ja määrittelyt ovat backlogina [GitHub Issuesissa](https://github.com/hessuj/hessutalks/issues). Kysymysten tykkäykset (Q&A, COULD) on jätetty pois.
 
 ## Lisenssi
 

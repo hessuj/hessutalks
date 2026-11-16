@@ -296,7 +296,7 @@ No libraries are loaded from a CDN.
 
 The requirements of the MMoIT 2026 course have been implemented, and the load test with 150 participants passed in production.
 Acceptance tests and their verification: [docs/hyvaksymistestit.en.md](docs/hyvaksymistestit.en.md).
-Remaining: a trial run with real devices and Teams. The 200-participant load test has been postponed, and question upvotes (Q&A, COULD) were left out.
+Development tasks, user stories and specifications are kept as a backlog in [GitHub Issues](https://github.com/hessuj/hessutalks/issues). Question upvotes (Q&A, COULD) were left out.
 
 ## License
 

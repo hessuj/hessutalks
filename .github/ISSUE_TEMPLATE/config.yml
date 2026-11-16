@@ -1,0 +1,5 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Tietoturvahavainto
+    url: https://github.com/hessuj/hessutalks/blob/main/SECURITY.md
+    about: Älä kirjaa haavoittuvuuksia julkiseksi issueksi; katso ilmoitusohje SECURITY.md:stä.
