@@ -215,50 +215,13 @@ pull requestin (`.github/dependabot.yml`). Uutta versiota ehdotetaan vasta, kun 
 - Satunnaisesti kaatunut job (esim. ZAP:n exit code 3) ajetaan uudelleen PR:n *Checks*-välilehdeltä
   (*Re-run failed jobs*).
 
-## Käyttöönotto (cPanel)
+## Käyttöönotto
 
-Hakemistorakenne webhotellissa:
-
-```
-~/public_html/hessutalks/               FTP-tunnuksen juuri = sovelluksen URL-kansio  ← deploy
-    index.php, .htaccess, assets/       julkiset tiedostot
-    app/                                sovelluskoodi, suora pääsy estetty
-~/hessutalks-data/                      config.php, tietokanta, istunnot  ← webrootin ulkopuolella,
-                                        deploy ei koske tähän
-```
-
-Deploy-tunnus on rajattu pelkkään sovelluksen kansioon. Vaikka tunnus vuotaisi, sillä ei pääse
-käsiksi tietokantaan eikä muihin sivuston osiin.
-
-1. **PHP-versio:** cPanel → *MultiPHP Manager* → oma domain → **PHP 8.4**.
-   Varmista, että laajennukset `sodium`, `pdo_sqlite`, `mbstring` ja `intl` ovat päällä (*Select PHP Version → Extensions*).
-2. **FTP-tili:** cPanel → *FTP Accounts* → oma tili julkaisulle. Valitse nimi, jota ei voi arvata (esim. satunnainen jatke), ja pitkä satunnainen salasana.
-   Directory-kentäksi sovelluksen kansio sivuston juuren (`public_html`) alla: `public_html/hessutalks`.
-3. **GitHub:** (julkaisu käynnistyy pushista `main`-haaraan tai *Actions → CI/CD → Run workflow*) repo → *Settings → Environments* → luo ympäristö `production` ja lisää siihen secretit:
-   - `FTP_SERVER`: webhotellin FTP-palvelin (esim. `ftp.example.com`)
-   - `FTP_USERNAME`: FTP-tilin koko käyttäjätunnus
-   - `FTP_PASSWORD`: FTP-tilin salasana
-
-   Jos sovellus ei ole osoitteessa `https://hessujarvinen.com/hessutalks`, lisää
-   *Settings → Secrets and variables → Actions → Variables* -kohtaan muuttuja `APP_URL`.
-   Halutessasi lisää ympäristöön *Required reviewers* → itsesi, jolloin jokainen julkaisu odottaa hyväksyntääsi.
-4. **Asetustiedosto:** kun sovellus on julkaistu kerran, avaa cPanel → *Terminal* ja aja:
-   ```sh
-   php ~/public_html/hessutalks/app/bin/init.php --origin=https://example.com --base=/hessutalks
-   ```
-   Komento luo tiedoston `~/hessutalks-data/config.php` suoraan oikeaan paikkaan kotihakemistoon
-   sivuston ulkopuolelle oikeilla tiedosto-oikeuksilla. Se tulostaa **käyttöönottotunnuksen**, joka kannattaa tallentaa hetkeksi.
-   Sovellus löytää asetukset automaattisesti.
-
-   *Jos cPanelissa ei ole Terminalia:* aja sama komento omalla koneella repon juuressa (`php bin/init.php … --data=/home/CPANEL-KÄYTTÄJÄ/hessutalks-data --out=config.php`,
-   vaatii PHP:n, esim. `brew install php`). Lataa sitten `config.php` File Managerilla kotihakemiston kansioon `hessutalks-data` (oikeudet `700`/`600`).
-5. **Ensimmäinen kirjautuminen:** avaa sovelluksen hallintanäkymä selaimella, syötä käyttöönottotunnus ja luo passkey.
-   Luo sen jälkeen salausavaimet tunnuslauseella. Tallenna tunnuslause salasanojen hallintaan
-   ja talleta ladattu varmuuskopiotiedosto turvaan.
-6. **Varapasskey:** lisää *Asetukset*-sivulta toinen passkey esimerkiksi puhelimeen.
-7. **Avaus passkeylla:** kirjaudu kullakin passkeylla kerran ja avaa avain tunnuslauseella. Sovellus
-   tallentaa passkeykohtaisen salatun kopion, ja sen jälkeen pelkkä Touch ID / Face ID avaa myös kysymykset.
-   Vaatii PRF-tuen (Safari 18 / macOS 15 / iOS 18, Chrome, Edge). Muuten tunnuslause kysytään kuten ennenkin.
+HessuTalks on PHP 8.4 -sovellus, joka asennetaan web-palvelimelle omaan hakemistoonsa. Tietokantapalvelinta ei
+tarvita. Julkinen hakemisto sisältää `index.php`:n ja `assets/`-kansion, sovelluskoodi on sen `app/`-alikansiossa
+(suora pääsy estetty), ja asetukset, tietokanta ja istunnot ovat datahakemistossa webrootin ulkopuolella.
+Asennus Apacheen, nginxiin tai muuhun palvelimeen, asetustiedoston luonti, tarkistuslista ja päivitykset:
+[docs/asennus.md](docs/asennus.md).
 
 ## Kehitys omalla koneella
 

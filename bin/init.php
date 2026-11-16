@@ -3,9 +3,9 @@
 /**
  * Luo HessuTalksin asetustiedoston ja kertakäyttöisen käyttöönottotunnuksen.
  *
- * Tuotanto, cPanelin Terminalissa (suositeltu – asetukset syntyvät suoraan oikeaan paikkaan):
- *   php ~/public_html/hessutalks/app/bin/init.php --origin=https://example.com --base=/hessutalks
- *   -> luo ~/hessutalks-data/config.php (kotihakemistoon, EI sivuston kansioon)
+ * Tuotanto, palvelimen komentorivillä PHP:n käyttäjänä (ks. docs/asennus.md):
+ *   php <julkinen hakemisto>/app/bin/init.php --origin=https://example.com --base=/hessutalks
+ *   -> luo ~/hessutalks-data/config.php (kotihakemistoon, EI webrootin alle). Domainin juuressa --base=/
  *
  * Valinnaiset: --data=<hakemisto> (oletus ~/hessutalks-data), --out=<tiedosto> (oletus <data>/config.php)
  *
