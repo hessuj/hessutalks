@@ -78,6 +78,8 @@ korvaa aiemman, kunnes kysely suljetaan.
 kursseja varten. Ennen tallennusta sovellus näyttää yhteenvedon: tuotavat sarjat, ohitettavat kysymykset ja virheet.
 Tuonti on kaikki tai ei mitään. Virhe (myös luennolla jo oleva sarjan tunniste) estää koko tuonnin.
 *Vie JSON* (koko luento) ja sarjan *Vie* lataavat saman muodon takaisin. Esimerkki: [tests/fixtures/mmoit-2026.json](tests/fixtures/mmoit-2026.json).
+Tiedostomuodon tarkka kuvaus: [docs/tuontimuoto.md](docs/tuontimuoto.md). Kun annat tekoälylle oppimateriaalin ja
+tämän kuvauksen, se voi tuottaa tuontitiedoston suoraan materiaalista.
 
 ```json
 { "event": { "title": "…" },
