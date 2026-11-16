@@ -78,6 +78,8 @@ replaces the earlier one until the poll is closed.
 courses. Before saving, the app shows a summary: sets to import, questions to skip and errors.
 Import is all or nothing. An error (including a set identifier already used in the lecture) prevents the whole import.
 *Vie JSON* (export JSON, whole lecture) and a set's *Vie* (export) download the same format. Example: [tests/fixtures/mmoit-2026.json](tests/fixtures/mmoit-2026.json).
+Full description of the file format: [docs/import-format.md](docs/import-format.md). When you give an AI your learning
+material and this description, it can produce an import file directly from the material.
 
 ```json
 { "event": { "title": "…" },
