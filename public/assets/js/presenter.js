@@ -48,16 +48,24 @@
       answers: function (n) { return n === 1 ? '1 vastaus' : n + ' vastausta'; }, closed: ' · suljettu', draft: ' · ei vielä auki',
       later: 'Tulokset näytetään myöhemmin.', none: 'Ei vastauksia.',
       mean: 'Keskiarvo', median: 'mediaani', locale: 'fi-FI', ended: 'Hallintanäkymä suljettiin.',
-      more: function (n) { return '+' + n + ' muuta näytöllä'; }
+      more: function (n) { return '+' + n + ' muuta näytöllä'; },
+      hint: 'F tai kaksoisklikkaus: koko näyttö · Q iso QR · T teema'
     },
     en: {
       answers: function (n) { return n === 1 ? '1 answer' : n + ' answers'; }, closed: ' · closed', draft: ' · not open yet',
       later: 'Results will be shown later.', none: 'No answers yet.',
       mean: 'Average', median: 'median', locale: 'en-GB', ended: 'The admin view was closed.',
-      more: function (n) { return '+' + n + ' more'; }
+      more: function (n) { return '+' + n + ' more'; },
+      hint: 'F or double-click: full screen · Q large QR · T theme'
     }
   };
   function tx() { return TEXT[lang]; }
+  /** Projektorin kieli: myös pikanäppäinohje ja sivun lang-attribuutti (ruudunlukijat). */
+  function setLang(next) {
+    lang = next;
+    document.documentElement.lang = lang;
+    if (hint) hint.textContent = TEXT[lang].hint;
+  }
 
   function qrImg(url, cell, margin) {
     var qr = window.qrcode(0, 'M');
@@ -273,7 +281,7 @@
   function onMessage(ev) {
     var m = ev.data;
     if (!m || typeof m !== 'object') return;
-    lang = m.lang === 'en' ? 'en' : 'fi';
+    setLang(m.lang === 'en' ? 'en' : 'fi');
     switch (m.type) {
       case 'board':
         onBoard(m);

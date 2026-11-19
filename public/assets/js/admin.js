@@ -990,7 +990,10 @@
           (invalid[poll.id] ? ', ' + invalid[poll.id] + ' hylätty (virheellinen tai toiselle kyselylle salattu)' : '');
         if (view.details.open) {
           // Hallinnassa luvut näkyvät aina; oikeat vastaukset korostetaan (vain luennoitsijalle).
-          var opts = poll.type === 'words' ? { onWord: function (word) { hideWord(poll, word); } }
+          var opts = poll.type === 'words' ? {
+            onWord: function (word) { hideWord(poll, word); },
+            wordLabel: function (word) { return 'Piilota sana "' + word + '"'; }
+          }
             : poll.type === 'open' ? { onAnswer: function (it) { hideAnswer(poll, it); } }
             : { reveal: Array.isArray(poll.config.correct) ? { correct: poll.config.correct, explanations: poll.config.explanations || null } : null };
           HessuResults.render(view.el, poll, data, opts);

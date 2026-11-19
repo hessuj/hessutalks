@@ -441,8 +441,17 @@
       span.style.top = spot.y + 'px';
       keep[word] = true;
       if (opts && typeof opts.onWord === 'function' && !span.dataset.bound) {
+        // Hallinnassa sana on painike: piilotus toimii myös näppäimistöllä (Tab + Enter tai välilyönti).
         span.dataset.bound = '1';
+        span.tabIndex = 0;
+        span.setAttribute('role', 'button');
+        if (typeof opts.wordLabel === 'function') span.setAttribute('aria-label', opts.wordLabel(word));
         span.addEventListener('click', function () { opts.onWord(word); });
+        span.addEventListener('keydown', function (ev) {
+          if (ev.key !== 'Enter' && ev.key !== ' ') return;
+          ev.preventDefault();
+          opts.onWord(word);
+        });
       }
     });
     Object.keys(existing).forEach(function (word) { if (!keep[word]) existing[word].remove(); });
