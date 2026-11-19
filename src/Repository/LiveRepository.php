@@ -126,7 +126,8 @@ final class LiveRepository
         }
         $this->db->exec("UPDATE polls SET status = 'closed' WHERE event_id = ? AND on_stage = 1 AND status = 'open'", [$eventId]);
         $this->db->exec('UPDATE polls SET on_stage = 0 WHERE event_id = ?', [$eventId]);
-        $this->db->exec('UPDATE events SET active_poll_id = NULL WHERE id = ?', [$eventId]);
+        // board_clears: läppärin hallinta poistaa taululta myös viestit (puhelinohjaimen Tyhjennä taulu, issue #63).
+        $this->db->exec('UPDATE events SET active_poll_id = NULL, board_clears = board_clears + 1 WHERE id = ?', [$eventId]);
         $this->bump($eventId);
         return true;
     }

@@ -434,6 +434,27 @@ final class AdminSecurityTest extends AppTestCase
 
     // ------------------------------------------------------------ turvaotsakkeet
 
+    /**
+     * Puhelinohjain (issue #63) ei pura viestejä eikä vastauksia: se toimii ilman salausavainta, eikä puhelimeen
+     * jää purettua sisältöä. Ainoa tallennus on valittu välilehti. Sisältö DOMiin vain textContentilla (h()).
+     */
+    public function testPhoneRemoteNeverDecryptsOrStoresContent(): void
+    {
+        $admin = (string) file_get_contents(dirname(__DIR__, 2) . '/public/assets/js/admin.js');
+        $start = strpos($admin, 'function showRemote(eventId)');
+        $end = strpos($admin, 'function stopPolling()');
+        self::assertIsInt($start);
+        self::assertIsInt($end);
+        $remote = substr($admin, $start, $end - $start);
+        foreach (['decrypt(', 'sodium.', 'crypto_box', 'poll-answers', 'innerHTML', 'insertAdjacentHTML', 'localStorage'] as $bad) {
+            self::assertStringNotContainsString($bad, $remote, $bad);
+        }
+        self::assertSame(1, substr_count($remote, 'sessionStorage.setItem('), 'Vain välilehden valinta tallennetaan');
+        self::assertStringContainsString("window.sessionStorage.setItem(TAB_KEY, t)", $remote);
+        // #-osasta luetaan vain luennon numero.
+        self::assertStringContainsString('var REMOTE_HASH = /^#ohjain=(\d{1,9})$/;', $admin);
+    }
+
     public function testSecurityHeadersOnEveryResponse(): void
     {
         $this->createKeys();

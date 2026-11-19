@@ -118,8 +118,9 @@ Several are split into a grid (at most 12), and the fonts shrink with the tile s
 | T | Light / dark theme (presenter window) |
 | F or double-click | Full screen (presenter window) |
 
-Controlling questions with keys (next/previous, open, results, reveal) and the phone remote were removed when the admin view
-was simplified ([#60](https://github.com/hessuj/hessutalks/issues/60)): the actions are on the question's row.
+Controlling questions with keys (next/previous, open, results, reveal) was removed when the admin view was simplified
+([#60](https://github.com/hessuj/hessutalks/issues/60)): the actions are on the question's row. On a phone, the same actions
+are in the **phone remote** ([#63](https://github.com/hessuj/hessutalks/issues/63), user guide section 5.5).
 
 ### Projector presentation
 

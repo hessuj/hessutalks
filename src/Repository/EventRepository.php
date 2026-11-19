@@ -121,6 +121,12 @@ final class EventRepository
         return $this->db->exec('UPDATE events SET show_qr = ? WHERE id = ?', [$show ? 1 : 0, $id]) === 1;
     }
 
+    /** Läppärin hallinta: esitysnäyttö on yhteydessä (puhelinohjain näyttää sen, issue #63). Ei muuta osallistujien tilaa. */
+    public function touchScreen(int $id, int $now): bool
+    {
+        return $this->db->exec('UPDATE events SET screen_seen_at = ? WHERE id = ?', [$now, $id]) === 1;
+    }
+
     /** Otsikon muokkaus (esim. kirjoitusvirhe); koodi ja QR pysyvät samoina. Samat rajat kuin luonnissa. */
     public function setTitle(int $id, string $title): bool
     {

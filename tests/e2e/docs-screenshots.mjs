@@ -374,7 +374,7 @@ await view(stage, 1280, 720);
 await stage.waitFor(`document.body.innerText.includes(${lit(code)})`, 'esitysnäyttö');
 await shot(admin, '19-taulu', { area: q('.stage-bar'), marks: [
   { el: q('.stage-status'), label: '1', box: true }, { el: el('Avaa esitysnäyttö'), label: '2' }, { el: el('QR isona'), label: '3' },
-  { el: el('Tyhjennä taulu'), label: '4' }, { el: q('.stage-bar .q-actions .hint'), label: '5', box: true }] });
+  { el: el('Tyhjennä taulu'), label: '4' }, { el: el('Puhelinohjain'), label: '5' }, { el: q('.stage-bar .q-actions .hint'), label: '6', box: true }] });
 await sleep(800);
 await shot(stage, '20-esitysnaytto-odotus');
 
@@ -489,6 +489,16 @@ await msgButton('#tab-feedback', C.messages[1][1], 'Näytä taululla');
 await stage.waitFor(`document.body.innerText.includes(${lit(C.messages[2][1])}) && document.body.innerText.includes(${lit(C.messages[1][1])})`, 'viestit näytöllä', 8000);
 await sleep(1000);
 await shot(stage, '36-esitysnaytto-viestit');
+
+// Puhelinohjain: QR-koodi läppärin taulurivillä
+await admin.js(`document.getElementById('tab-btn-polls').click(); true`);
+await top(admin);
+await admin.click('Puhelinohjain');
+await admin.waitFor(admin.has('.remote-qr img'), 'ohjaimen QR');
+await shot(admin, '43-ohjain-qr', { area: q('.stage-bar'), marks: [
+  { el: el('Puhelinohjain'), label: '1' }, { el: q('.remote-qr img'), label: '2', box: true }] });
+await admin.js(`document.querySelector('.remote-qr button').click(); true`);
+
 await admin.click('Tyhjennä taulu');
 
 // ================================================================ 7. luentolista, asetukset, kirjautuminen
@@ -496,7 +506,8 @@ await admin.click('Tyhjennä taulu');
 await admin.js(`document.getElementById('tab-btn-polls').click(); true`);
 await admin.click('Kaikki luennot');
 await admin.waitFor(admin.has('.event-list'), 'luentolista');
-await shot(admin, '37-luentolista', { area: q('main'), marks: [{ el: q('.event-list li'), label: '1', box: true }, { el: el('Avaa', '.event-list'), label: '2' }] });
+await shot(admin, '37-luentolista', { area: q('main'), marks: [{ el: q('.event-list li'), label: '1', box: true }, { el: el('Avaa', '.event-list'), label: '2' },
+  { el: el('Ohjain', '.event-list'), label: '3' }] });
 
 await admin.click('Asetukset');
 await admin.waitFor(admin.hasText('Tietoturvaloki'), 'asetukset');
@@ -509,7 +520,37 @@ const phone = await tab(port);
 await view(phone, 390, 844, true);
 await phone.cdp('Page.navigate', { url: app + '/admin' });
 await phone.waitFor(phone.hasText('Avaa kysymykset'), 'avausnäkymä');
-await shot(phone, '39-avaa-kysymykset', { marks: [{ el: el('Avaa passkeylla'), label: '1' }, { el: el('Avaa tunnuslauseella'), label: '2' }] });
+await shot(phone, '39-avaa-kysymykset', { marks: [{ el: el('Avaa passkeylla'), label: '1' }, { el: el('Avaa tunnuslauseella'), label: '2' },
+  { el: el('Puhelinohjain'), label: '3' }] });
+
+// Puhelinohjain (issue #63): kaikki kysymykset ja Taululla-välilehti
+await phone.click('Puhelinohjain');
+await phone.waitFor(phone.hasText('Ohjaa'), 'luentovalinta');
+await phone.click('Ohjaa');
+await phone.waitFor(`document.querySelectorAll('.remote-card').length > 3 && document.querySelector('.remote-conn').dataset.state !== 'bad'`, 'ohjain');
+await phone.js(`document.getElementById('remote-tab-all').click(); true`);
+// Kaksi kysymystä näytölle ohjaimesta (taulu tyhjennettiin viestikuvien jälkeen).
+for (const i of [0, 1]) {
+  await phone.js(`[...document.querySelectorAll('.remote-card:not(.staged)')][0].querySelector('.remote-btn').click(); true`);
+  await phone.waitFor(`document.querySelectorAll('.remote-card.staged').length === ${i + 1}`, 'näytölle ohjaimesta');
+}
+await phone.js(`window.scrollTo(0, 0); true`);
+await sleep(600);
+const firstFree = `document.querySelector('.remote-card:not(.staged)')`;
+const firstStaged = `document.querySelector('.remote-card.staged')`;
+await shot(phone, '40-puhelinohjain', { marks: [
+  { el: q('.remote-conn'), label: '1', box: true }, { el: el('Tyhjennä taulu'), label: '2' }, { el: q('#remote-tab-stage'), label: '3' },
+  { el: `${firstFree}.querySelector('.remote-btn')`, label: '4' }] });
+await phone.js(`document.getElementById('remote-tab-stage').click(); true`);
+await phone.waitFor(`!!${firstStaged}`, 'Taululla-välilehti');
+await sleep(400);
+await shot(phone, '42-ohjain-taululla', { marks: [
+  { el: `${firstStaged}.querySelector('.remote-card-head')`, label: '1', box: true },
+  { el: `${firstStaged}.querySelector('.remote-btn')`, label: '2' },
+  { el: `[...${firstStaged}.querySelectorAll('.remote-btn')].find((b) => b.textContent === 'Poista näytöltä')`, label: '3' },
+  { el: `[...${firstStaged}.querySelectorAll('.remote-btn')].find((b) => /tulokset$/.test(b.textContent))`, label: '4' }] });
+await phone.js(`document.querySelector('.remote-top button').click(); true`);
+await phone.waitFor(phone.hasText('Avaa kysymykset'), 'takaisin avausnäkymään');
 await phone.click('Kirjaudu ulos');
 await phone.waitFor(phone.hasText('Kirjaudu passkeylla'), 'kirjautuminen');
 await shot(phone, '41-kirjaudu', { marks: [{ el: el('Kirjaudu passkeylla'), label: '1' }] });

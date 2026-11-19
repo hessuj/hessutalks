@@ -118,8 +118,9 @@ Useampi jaetaan ruudukoksi (enintään 12), ja fontit pienenevät ruudun koon mu
 | T | Vaalea / tumma teema (esitysikkuna) |
 | F tai kaksoisklikkaus | Koko näyttö (esitysikkuna) |
 
-Kysymysten ohjaus näppäimillä (Seuraava/Edellinen, avaus, tulokset, paljastus) ja puhelinohjain poistettiin hallinnan
-yksinkertaistuksessa ([#60](https://github.com/hessuj/hessutalks/issues/60)): toiminnot ovat kysymyksen rivillä.
+Kysymysten ohjaus näppäimillä (Seuraava/Edellinen, avaus, tulokset, paljastus) poistettiin hallinnan yksinkertaistuksessa
+([#60](https://github.com/hessuj/hessutalks/issues/60)): toiminnot ovat kysymyksen rivillä. Puhelimella samoja toimintoja
+käytetään **puhelinohjaimella** ([#63](https://github.com/hessuj/hessutalks/issues/63), käyttöohjeen luku 5.5).
 
 ### Esitys projektorilla
 

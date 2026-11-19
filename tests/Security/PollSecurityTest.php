@@ -248,6 +248,7 @@ final class PollSecurityTest extends AppTestCase
         yield ['POST', '/admin/api/events/1/live'];
         yield ['POST', '/admin/api/events/1/lang'];
         yield ['POST', '/admin/api/events/1/qr'];
+        yield ['POST', '/admin/api/events/1/screen'];
         yield ['POST', '/admin/api/sets/1/update'];
         yield ['POST', '/admin/api/sets/1/move'];
         yield ['POST', '/admin/api/sets/1/delete'];
@@ -403,6 +404,40 @@ final class PollSecurityTest extends AppTestCase
 
         $this->request('POST', '/admin/api/events/' . $this->eventId . '/live', ['action' => 'activate', 'poll' => $this->poll('draft')], $h);
         self::assertGreaterThan($after['version'], $answersVersion());
+    }
+
+    /**
+     * Puhelinohjain (issue #63): läppärin elonmerkki esitysnäytöstä ja taulun tyhjennysten laskuri.
+     * Elonmerkki ei muuta osallistujien tilaa (ei versiota), eikä kumpikaan tieto päädy osallistujalle.
+     */
+    public function testRemoteSeesScreenHeartbeatAndBoardClears(): void
+    {
+        $state = fn (): array => $this->json($this->request('GET', '/admin/api/events/' . $this->eventId . '/polls'));
+        $h = ['X-CSRF-Token' => $this->loginAdmin()];
+        $before = $state();
+        self::assertNull($before['screen_age'], 'Esitysnäyttöä ei ole vielä ollut');
+        self::assertSame(0, $before['board_clears']);
+
+        self::assertSame(403, $this->request('POST', '/admin/api/events/' . $this->eventId . '/screen', [])->status, 'CSRF-token vaaditaan');
+        self::assertSame(404, $this->request('POST', '/admin/api/events/999999/screen', [], $h)->status);
+        self::assertNotSame(200, $this->request('GET', '/admin/api/events/' . $this->eventId . '/screen')->status, 'Vain POST');
+        self::assertSame(200, $this->request('POST', '/admin/api/events/' . $this->eventId . '/screen', [], $h)->status);
+        $beat = $state();
+        self::assertIsInt($beat['screen_age']);
+        self::assertLessThanOrEqual(2, $beat['screen_age']);
+        self::assertSame($before['version'], $beat['version'], 'Elonmerkki ei muuta osallistujien tilaa');
+
+        // Tyhjennys kasvattaa laskuria aina (myös tyhjällä taululla): läppäri poistaa silloin taululta viestit.
+        $clear = fn () => $this->request('POST', '/admin/api/events/' . $this->eventId . '/live', ['action' => 'activate', 'poll' => null], $h);
+        self::assertSame(1, $this->json($clear())['board_clears']);
+        $this->request('POST', '/admin/api/polls/' . $this->poll('draft') . '/status', ['status' => 'open'], $h);
+        $cleared = $this->json($clear());
+        self::assertSame(2, $cleared['board_clears']);
+        self::assertSame([], array_values(array_filter($cleared['polls'], static fn (array $p): bool => $p['on_stage'])));
+
+        $live = $this->request('GET', '/api/live?code=' . $this->code)->body;
+        self::assertStringNotContainsString('screen', $live, 'Ei osallistujalle');
+        self::assertStringNotContainsString('board_clears', $live, 'Ei osallistujalle');
     }
 
     public function testDuplicateSetAndMoveQuestionBetweenSets(): void

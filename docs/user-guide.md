@@ -93,6 +93,7 @@ One lecture can cover a whole course: participants use the same code and nicknam
 
 1. A lecture row shows the code, name, number of new messages, creation time and number of messages.
 2. **Avaa** (open): the lecture page.
+3. **Ohjain** (remote): the phone remote (see [section 5.5](#55-phone-remote)).
 
 ## 3. Preparing questions
 
@@ -273,7 +274,8 @@ so the admin view stays on the laptop screen.
    **Näytä taululla** (show on board) also opens the window if it is not open.
 3. **QR isona** (large QR): a large QR code over the whole screen (also **Q**). It moves aside when you bring something to the board.
 4. **Tyhjennä taulu** (clear board): everything off the board. Questions on the board are closed, and answers are kept.
-5. What is on the board now.
+5. **Puhelinohjain** (phone remote): a QR code for opening the remote on your phone (see [section 5.5](#55-phone-remote)).
+6. What is on the board now.
 
 When nothing is on the board, it shows the QR code and joining instructions:
 
@@ -328,6 +330,34 @@ In the picture three questions (1–3) are on the board and open. **Sulje** and 
 The projector shows the questions as a grid (at most 12), and the text size is fitted to the tile:
 
 ![Grid on the projector](kuvat/en/30-esitysnaytto-ruudukko.png)
+
+### 5.5 Phone remote
+
+With the phone remote you control the questions from your phone while walking around the room. The admin view stays
+open on the laptop and updates the presenter screen. The remote does not decrypt messages or answers, so the key is not unlocked on the phone.
+
+![Remote QR code](kuvat/en/43-ohjain-qr.png)
+
+1. **Puhelinohjain** (phone remote) on the board row shows a QR code.
+2. Scan it with your phone and sign in with a passkey. The remote is also behind the **Ohjain** button in the lecture list.
+
+<img src="kuvat/en/40-puhelinohjain.png" alt="Phone remote" width="260">
+
+1. **Status**: connection to the server, whether the laptop's presenter screen is connected, and whether the phone screen stays on.
+   Red text means a break. The remote retries by itself and updates as soon as the screen or the network comes back.
+2. **Tyhjennä taulu** (clear board, with confirmation) and **QR isona** (large QR), as on the laptop. Clearing also removes messages shown from the laptop.
+3. **Taululla** (on the board) shows only the questions on the screen, **Kaikki** (all) every question by set.
+4. **Näytölle** (to the screen): the question on the projector next to the others and open for answers. Several questions can be on the screen.
+
+<img src="kuvat/en/42-ohjain-taululla.png" alt="Remote on-the-board tab" width="260">
+
+1. Status at a glance: **Taululla**, *Auki* (open) or *Suljettu* (closed) and the number of answers.
+2. **Sulje vastaukset** (close answers) or **Avaa vastauksille** (open for answers).
+3. **Poista näytöltä** (remove from screen): off the projector and the participants' phones. Answers are kept.
+4. **Näytä tulokset** (show results) and **Paljasta oikea vastaus** (reveal correct answer, if the question has one).
+
+Free questions and feedback are put on the board from the laptop. Set the phone's auto-lock long enough
+if the browser cannot keep the screen on.
 
 ## 6. Results and moderation
 
@@ -388,6 +418,7 @@ When you open the admin view in a new window or on another device, the messages 
 
 1. **Avaa passkeylla** (unlock with passkey): opens the messages if the passkey supports unlocking (PRF).
 2. **Avaa tunnuslauseella** (unlock with passphrase): a fallback if the passkey cannot unlock the key.
+3. **Puhelinohjain** (phone remote): control the questions without unlocking the key (see [section 5.5](#55-phone-remote)).
 
 Signing in:
 

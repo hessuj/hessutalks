@@ -93,6 +93,7 @@ Yksi luento voi kattaa koko kurssin: osallistujat käyttävät samaa koodia ja n
 
 1. Luennon rivillä näkyvät koodi, nimi, uusien viestien määrä, luontiaika ja viestien määrä.
 2. **Avaa**: luennon sivu.
+3. **Ohjain**: puhelinohjain (ks. [luku 5.5](#55-puhelinohjain)).
 
 ## 3. Kysymysten valmistelu
 
@@ -273,7 +274,8 @@ jolloin hallinta jää läppärin näytölle.
    Myös **Näytä taululla** avaa ikkunan, jos se ei ole auki.
 3. **QR isona**: iso QR-koodi koko näytölle (myös **Q**). Se väistyy, kun tuot jotain taululle.
 4. **Tyhjennä taulu**: kaikki pois taululta. Taululla olleet kysymykset suljetaan, ja vastaukset säilyvät.
-5. Mitä taululla on nyt.
+5. **Puhelinohjain**: QR-koodi ohjaimen avaamiseen puhelimella (ks. [luku 5.5](#55-puhelinohjain)).
+6. Mitä taululla on nyt.
 
 Kun taululla ei ole mitään, siinä on QR-koodi ja liittymisohje:
 
@@ -328,6 +330,34 @@ Kuvassa kolme kysymystä (1–3) on taululla ja auki. **Sulje** ja **Poista taul
 Projektori näyttää kysymykset ruudukkona (enintään 12), ja tekstikoko sovitetaan ruudun kokoon:
 
 ![Ruudukko projektorilla](kuvat/fi/30-esitysnaytto-ruudukko.png)
+
+### 5.5 Puhelinohjain
+
+Puhelinohjaimella ohjaat kysymyksiä puhelimesta kävellessäsi salissa. Läppärin hallinta pysyy auki ja päivittää
+esitysnäytön. Ohjain ei pura viestejä eikä vastauksia, joten salausavainta ei avata puhelimessa.
+
+![Ohjaimen QR-koodi](kuvat/fi/43-ohjain-qr.png)
+
+1. **Puhelinohjain** taulurivillä näyttää QR-koodin.
+2. Skannaa se puhelimella ja kirjaudu passkeylla. Ohjaimen saa myös luentolistan napista **Ohjain**.
+
+<img src="kuvat/fi/40-puhelinohjain.png" alt="Puhelinohjain" width="260">
+
+1. **Tila**: yhteys palvelimeen, onko läppärin esitysnäyttö yhteydessä ja pysyykö puhelimen näyttö päällä.
+   Punainen teksti kertoo katkoksesta. Ohjain yrittää uudelleen itse ja päivittyy heti, kun näyttö tai verkko palaa.
+2. **Tyhjennä taulu** (vahvistus) ja **QR isona**, kuten läppärillä. Tyhjennys poistaa myös läppäriltä nostetut viestit.
+3. **Taululla** näyttää vain näytöllä olevat kysymykset, **Kaikki** kaikki sarjoittain.
+4. **Näytölle**: kysymys projektorille muiden rinnalle ja auki vastauksille. Näytölle voi nostaa useita kysymyksiä.
+
+<img src="kuvat/fi/42-ohjain-taululla.png" alt="Ohjaimen Taululla-välilehti" width="260">
+
+1. Tila yhdellä silmäyksellä: **Taululla**, *Auki* tai *Suljettu* ja vastausmäärä.
+2. **Sulje vastaukset** tai **Avaa vastauksille**.
+3. **Poista näytöltä**: pois projektorilta ja osallistujilta. Vastaukset säilyvät.
+4. **Näytä tulokset** ja **Paljasta oikea vastaus** (jos kysymyksellä on oikea vastaus).
+
+Vapaat kysymykset ja palautteet nostetaan taululle läppäriltä. Pidä puhelimen automaattinen lukitus riittävän
+pitkänä, jos selain ei pysty pitämään näyttöä päällä.
 
 ## 6. Tulokset ja moderointi
 
@@ -388,6 +418,7 @@ Kun avaat hallinnan uudessa ikkunassa tai toisella laitteella, viestit avataan e
 
 1. **Avaa passkeylla**: avaa viestit, jos passkey tukee avausta (PRF).
 2. **Avaa tunnuslauseella**: varakeino, jos passkey ei pysty avaamaan avainta.
+3. **Puhelinohjain**: kysymysten ohjaus avaamatta avainta (ks. [luku 5.5](#55-puhelinohjain)).
 
 Kirjautuminen:
 

@@ -84,6 +84,9 @@ ruudukkona kaiken taululle valitun, ja taululla voi olla useita kysymyksiä auki
 Hallinta yksinkertaistettiin (issue #60): ei tiloja eikä aktiivista kysymystä, toiminnot kysymyksen tai viestin rivillä,
 rivin klikkaus avaa tulokset ja muokkauksen. Annettuja vastauksia ei poisteta vahingossa: tyhjennys ja poisto vain
 avautuvassa osassa vahvistuksella.
+Puhelinohjain (issue #63, `showRemote` admin.js:ssä): samat kysymystoiminnot puhelimella ilman salausavainta. Läppärin
+hallinta päivittää esitysnäytön ja ilmoittaa sen elonmerkillä (`events/{id}/screen`); `board_clears` kertoo läppärille,
+että taulu tyhjennettiin puhelimesta (läppäri poistaa silloin viestit). Selaintesti `remote.mjs`.
 Selaintestit (scripts/e2e.sh) ajetaan aina käyttöliittymämuutosten jälkeen. Kysymysrivit ja sarjat haetaan testeissä
 otsikon mukaan (`pollItem`, `expand`, `setTools` tiedostossa tests/e2e/lib.mjs; valikot sisältävät muiden sarjojen nimiä).
 Englanninkielinen kuva-ajo (`docs-screenshots.mjs en`) ei voi ylikirjoittaa kuvia tämän koneen hiekkalaatikossa (EPERM):
