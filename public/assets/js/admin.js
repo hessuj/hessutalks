@@ -1454,15 +1454,22 @@
             setBoard([]);
             panel.clear();
           } }),
+          // Kosketuslaitteella (puhelin) ohjain avataan suoraan: omaa näyttöä ei voi skannata (Hessun havainto: ohjaimesta
+          // Hallintaan palannut ei päässyt takaisin ohjaimeen, koska nappi näytti vain QR-koodin).
           h('button.btn.ghost.small', { type: 'button', 'aria-expanded': String(remoteQr), text: 'Puhelinohjain',
-            title: 'Avaa ohjain puhelimella QR-koodista', onclick: function () { remoteQr = !remoteQr; renderStageBar(); } }),
+            title: 'Läppärillä QR-koodi puhelimelle, puhelimella ohjain suoraan', onclick: function () {
+              if (touchDevice()) { showRemote(id); return; }
+              remoteQr = !remoteQr; renderStageBar();
+            } }),
           h('span.hint', { text: parts.length ? 'Taululla: ' + parts.join(', ') : 'Taululla: QR-koodi ja liittymisohje' })),
         remoteQr ? h('div.remote-qr', null,
           h('img', { src: qrDataUrl(remoteUrl(id), 5), alt: 'QR-koodi puhelinohjaimeen', width: 200, height: 200 }),
           h('div', null,
             h('p', { text: 'Skannaa puhelimella ja kirjaudu passkeylla. Ohjain ei pura viestejä, joten salausavainta ei tarvita.' }),
             h('p.hint.remote-link', { text: remoteUrl(id) }),
-            h('button.btn.ghost.small', { type: 'button', text: 'Sulje', onclick: function () { remoteQr = false; renderStageBar(); } }))) : null,
+            h('p.actions', null,
+              h('button.btn.small', { type: 'button', text: 'Avaa ohjain tässä', title: 'Ohjain tähän ikkunaan (esim. tabletilla)', onclick: function () { showRemote(id); } }), ' ',
+              h('button.btn.ghost.small', { type: 'button', text: 'Sulje', onclick: function () { remoteQr = false; renderStageBar(); } })))) : null,
         panel.showQr() ? notice('Iso QR-koodi peittää nyt koko näytön. Paina QR pieneksi tai Q, niin taulun sisältö tulee näkyviin.', 'warn') : null,
         h('p.hint', null, presenterNote)]);
       renderStageStatus();
@@ -1699,6 +1706,10 @@
   }
   function setRemoteHash(eventId) {
     try { window.history.replaceState(null, '', window.location.pathname + window.location.search + (eventId ? '#ohjain=' + eventId : '')); } catch (e) { /* ei historiaa */ }
+  }
+  /** Puhelin tai tabletti: ei hiirtä eikä kosketuslevyä (kosketusnäytöllinen läppäri ei täsmää). */
+  function touchDevice() {
+    try { return window.matchMedia('(hover: none) and (pointer: coarse)').matches; } catch (e) { return false; }
   }
   function remoteUrl(eventId) {
     return window.location.origin + window.location.pathname + '#ohjain=' + eventId;

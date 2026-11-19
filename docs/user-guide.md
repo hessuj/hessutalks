@@ -339,7 +339,7 @@ open on the laptop and updates the presenter screen. The remote does not decrypt
 ![Remote QR code](kuvat/en/43-ohjain-qr.png)
 
 1. **Puhelinohjain** (phone remote) on the board row shows a QR code.
-2. Scan it with your phone and sign in with a passkey. The remote is also behind the **Ohjain** button in the lecture list.
+2. Scan it with your phone and sign in with a passkey. On a phone, **Puhelinohjain** and **Ohjain** in the lecture list open the remote directly.
 
 <img src="kuvat/en/40-puhelinohjain.png" alt="Phone remote" width="260">
 

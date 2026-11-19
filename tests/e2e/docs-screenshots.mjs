@@ -497,7 +497,7 @@ await admin.click('Puhelinohjain');
 await admin.waitFor(admin.has('.remote-qr img'), 'ohjaimen QR');
 await shot(admin, '43-ohjain-qr', { area: q('.stage-bar'), marks: [
   { el: el('Puhelinohjain'), label: '1' }, { el: q('.remote-qr img'), label: '2', box: true }] });
-await admin.js(`document.querySelector('.remote-qr button').click(); true`);
+await admin.js(`[...document.querySelectorAll('.remote-qr button')].find((b) => b.textContent === 'Sulje').click(); true`);
 
 await admin.click('Tyhjennä taulu');
 
