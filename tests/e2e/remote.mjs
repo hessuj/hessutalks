@@ -158,6 +158,34 @@ await phone.cdp('Page.reload');
 await phone.waitFor(`document.querySelectorAll('.remote-card').length > 0 || document.getElementById('remote-tab-stage')`, 'ohjain latauksen jälkeen');
 step('Uudelleenlataus: ohjain aukeaa suoraan samaan luentoon');
 
+// Paluu ohjaimeen (Hessun havainto): Hallintaan ja takaisin, sekä ilman avainta että avain avattuna puhelimessa.
+const toRemote = async (what) => {
+  await phone.waitFor(`!!document.querySelector('.remote-conn') && document.querySelectorAll('.remote-card').length + document.querySelectorAll('.remote .empty').length > 0`, what);
+};
+await phone.click('Hallintaan');
+await phone.waitFor(phone.hasText('Avaa kysymykset'), 'avausnäkymä ohjaimesta');
+await phone.click('Puhelinohjain');
+await phone.click('Ohjaa');
+await toRemote('takaisin ohjaimeen ilman avainta');
+await phone.click('Hallintaan');
+await phone.waitFor(phone.has('#pp'), 'avausnäkymä');
+await phone.fill('#pp', 'e2e-oikein-pitka-tunnuslause');
+await phone.submit('#pp');
+await phone.waitFor(phone.has('.event-list'), 'luentolista puhelimessa', 60000);
+await phone.click('Ohjain');
+await toRemote('ohjain luentolistasta');
+await phone.click('Hallintaan');
+await phone.waitFor(`[...document.querySelectorAll('.stage-bar button')].some((b) => b.textContent === 'Puhelinohjain')`, 'luennon näkymä puhelimessa');
+const touch = await phone.js(`matchMedia('(hover: none) and (pointer: coarse)').matches`);
+await phone.click('Puhelinohjain');
+if (!touch) {
+  await phone.waitFor(phone.has('.remote-qr'), 'QR-ruutu');
+  await phone.click('Avaa ohjain tässä');
+}
+await toRemote('takaisin ohjaimeen luennon näkymästä');
+if ((await phone.js('location.hash')) !== new URL(remoteUrl).hash) throw new Error('Ohjaimen osoite puuttuu paluun jälkeen');
+step(`Paluu: ohjain → Hallintaan → ohjain toimii ilman avainta ja avain avattuna (${touch ? 'kosketuslaite: suoraan' : 'Avaa ohjain tässä'})`);
+
 const errs = [...admin.logs, ...phone.logs, ...stage.logs, ...part.logs];
 if (errs.length) { console.log('Selaimen virheet:\n' + errs.join('\n')); process.exit(1); }
 process.exit(0);

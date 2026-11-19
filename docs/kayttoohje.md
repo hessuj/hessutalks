@@ -339,7 +339,7 @@ esitysnäytön. Ohjain ei pura viestejä eikä vastauksia, joten salausavainta e
 ![Ohjaimen QR-koodi](kuvat/fi/43-ohjain-qr.png)
 
 1. **Puhelinohjain** taulurivillä näyttää QR-koodin.
-2. Skannaa se puhelimella ja kirjaudu passkeylla. Ohjaimen saa myös luentolistan napista **Ohjain**.
+2. Skannaa se puhelimella ja kirjaudu passkeylla. Puhelimessa **Puhelinohjain** ja luentolistan **Ohjain** avaavat ohjaimen suoraan.
 
 <img src="kuvat/fi/40-puhelinohjain.png" alt="Puhelinohjain" width="260">
 
