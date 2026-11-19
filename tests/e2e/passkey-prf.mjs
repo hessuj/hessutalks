@@ -1,5 +1,6 @@
 // Päästä päähän -testi: passkey-kirjautuminen ja avaimen avaus PRF:llä Chromen virtuaalisella autentikaattorilla.
 // Ajo: scripts/e2e.sh passkey-prf.mjs  (tai node tests/e2e/passkey-prf.mjs <cdp-port> <app-url> [noprf])
+import { lit } from './lib.mjs';
 const [port, app] = [process.argv[2], process.argv[3]];
 const hasPrf = process.argv[4] !== 'noprf';
 
@@ -35,11 +36,11 @@ async function waitFor(expr, what, ms = 20000) {
   throw new Error('Aikakatkaisu: ' + what + '\nSivu: ' + (await js('document.body.innerText').catch(() => '?')) + '\n' + logs.join('\n'));
 }
 const text = () => js('document.body.innerText');
-const has = (sel) => `!!document.querySelector(${JSON.stringify(sel)})`;
-const hasText = (t) => `document.body.innerText.includes(${JSON.stringify(t)})`;
-const clickText = (t) => js(`(() => { const b = [...document.querySelectorAll('button')].find((x) => x.textContent.trim() === ${JSON.stringify(t)}); if (!b) throw new Error('nappi puuttuu: ${t}'); b.click(); return true; })()`);
-const fill = (sel, v) => js(`(() => { const e = document.querySelector(${JSON.stringify(sel)}); e.value = ${JSON.stringify(v)}; return true; })()`);
-const submit = (sel) => js(`(() => { document.querySelector(${JSON.stringify(sel)}).closest('form').requestSubmit(); return true; })()`);
+const has = (sel) => `!!document.querySelector(${lit(sel)})`;
+const hasText = (t) => `document.body.innerText.includes(${lit(t)})`;
+const clickText = (t) => js(`(() => { const b = [...document.querySelectorAll('button')].find((x) => x.textContent.trim() === ${lit(t)}); if (!b) throw new Error('nappi puuttuu: ${t}'); b.click(); return true; })()`);
+const fill = (sel, v) => js(`(() => { const e = document.querySelector(${lit(sel)}); e.value = ${lit(v)}; return true; })()`);
+const submit = (sel) => js(`(() => { document.querySelector(${lit(sel)}).closest('form').requestSubmit(); return true; })()`);
 const step = (s) => console.log('✓ ' + s);
 
 await cdp('Runtime.enable');

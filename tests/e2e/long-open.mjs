@@ -2,7 +2,7 @@
 // Osallistuja näkee laskurin (esim. 2400/3500), liian pitkä vastaus estetään selaimessa, hallinta näyttää
 // koko tekstin ja projektori pitkistä vastauksista vain alun.
 // Ajo: scripts/e2e.sh long-open.mjs  (tai node tests/e2e/long-open.mjs <cdp-port> <app-url>)
-import { tab, attach, step, setupAdmin, createEvent, openParticipant, openPoll, mode } from './lib.mjs';
+import { tab, attach, step, setupAdmin, createEvent, openParticipant, openPoll, expand, lit } from './lib.mjs';
 
 const [port, app] = [process.argv[2], process.argv[3]];
 const PROMPT = 'Biggest risk at the national, organisational and individual level?';
@@ -23,8 +23,10 @@ if ((await admin.js(`document.querySelector('#poll-open-max').value`)) !== '280'
 await admin.fill('#poll-open-max', '3500');
 await admin.fill('#poll-prompt', PROMPT);
 await admin.submit('#poll-prompt');
-await admin.waitFor(admin.hasText('Avoin teksti · enintään 3500 merkkiä'), 'kysymys ja raja kortissa');
-step('Avoin kysymys enimmäispituudella 3500 merkkiä; kortissa "enintään 3500 merkkiä"');
+await admin.waitFor(admin.hasText(PROMPT), 'kysymys listassa');
+await expand(admin, PROMPT);
+await admin.waitFor(admin.hasText('Avoin teksti · enintään 3500 merkkiä'), 'raja avautuvassa osassa');
+step('Avoin kysymys enimmäispituudella 3500 merkkiä; avautuvassa osassa "enintään 3500 merkkiä"');
 
 const part = await openParticipant(port, admin);
 await part.waitFor(part.hasText('Waiting for the next question'), 'odotusnäkymä');
@@ -33,7 +35,7 @@ await part.waitFor(`!!document.querySelector('form.poll textarea')`, 'tekstikent
 const counter = () => part.js(`document.querySelector('form.poll .counter').textContent`);
 if ((await counter()) !== '0/3500') throw new Error('Laskuri: ' + (await counter()));
 
-const type = (text) => part.js(`(() => { const a = document.querySelector('form.poll textarea'); a.value = ${JSON.stringify(text)}; a.dispatchEvent(new Event('input')); return true; })()`);
+const type = (text) => part.js(`(() => { const a = document.querySelector('form.poll textarea'); a.value = ${lit(text)}; a.dispatchEvent(new Event('input')); return true; })()`);
 const full = ('National: NIS2 reporting. Organisational: patching. Individual: phishing – ä ö. ').repeat(50).slice(0, 3500);
 await type(full + 'x');
 if ((await counter()) !== '3501/3500') throw new Error('Laskuri yli rajan: ' + (await counter()));
@@ -47,7 +49,7 @@ await part.js(`document.querySelector('form.poll').requestSubmit()`);
 await part.waitFor(`!!document.querySelector('form.poll .notice.ok')`, 'kuittaus');
 step('3500 merkin vastaus (noin 500 sanaa) lähetetty');
 
-await admin.waitFor(`[...document.querySelectorAll('.res-open-text')].some((e) => e.textContent === ${JSON.stringify(full.trim())})`, 'koko teksti hallinnassa', 8000);
+await admin.waitFor(`[...document.querySelectorAll('.res-open-text')].some((e) => e.textContent === ${lit(full.trim())})`, 'koko teksti hallinnassa', 8000);
 step('Hallinta näyttää koko 3500 merkin tekstin');
 
 await admin.click('Näytä tulokset');

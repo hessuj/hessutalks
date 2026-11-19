@@ -13,8 +13,8 @@ use HessuTalks\Security\Clock;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Näyttö ja sarjat: useita kysymyksiä näytöllä, vain näytöllä oleva voi olla auki, yksi aktiivinen,
- * Seuraava/Edellinen ohittaa ohitetut sarjat, ja luonnos näkyy osallistujalle odotusnäkymänä.
+ * Taulu ja sarjat: useita kysymyksiä taululla, vain taululla oleva voi olla auki, Poista taululta sulkee vain omansa,
+ * ja luonnos näkyy osallistujalle odotusnäkymänä. Seuraava/Edellinen ja sarjan ohitus poistettiin (issue #60).
  */
 final class LiveRepositoryTest extends TestCase
 {
@@ -88,13 +88,14 @@ final class LiveRepositoryTest extends TestCase
         self::assertSame('open', $this->pollStatus($a));
         self::assertSame('open', $this->pollStatus($b));
 
-        // Seuraava/Edellinen vaihtaa vain aktiivisen: c pois näytöltä, muut pysyvät auki.
-        self::assertTrue($this->live->stage($this->eventId, $c, false));
-        self::assertTrue($this->live->activate($this->eventId, $b));
-        self::assertSame($c, $this->live->step($this->eventId, 1));
+        // Poista taululta (issue #60) koskee vain yhtä: se suljetaan, muut pysyvät auki.
+        self::assertTrue($this->live->stage($this->eventId, $b, false));
         self::assertSame([$a, $c], $this->live->stageIds($this->eventId));
-        self::assertSame('closed', $this->pollStatus($b), 'Siirrytty pois aktiivisesta: suljetaan');
+        self::assertSame('closed', $this->pollStatus($b), 'Taululta poistettu suljetaan');
         self::assertSame('open', $this->pollStatus($a), 'Muu näytöllä oleva pysyy auki');
+        self::assertTrue($this->live->open($this->eventId, $b), 'Uudelleen näyttäminen avaa taas vastauksille');
+        self::assertSame('open', $this->pollStatus($b));
+        self::assertSame([$a, $b, $c], $this->live->stageIds($this->eventId));
 
         self::assertTrue($this->live->activate($this->eventId, null));
         self::assertNull($this->live->activeId($this->eventId));
@@ -134,7 +135,6 @@ final class LiveRepositoryTest extends TestCase
             'aktivointi' => fn () => $this->live->activate($this->eventId, $a),
             'näytölle lisäys' => fn () => $this->live->stage($this->eventId, $b, true),
             'avaus' => fn () => $this->live->open($this->eventId, $a),
-            'seuraava' => fn () => $this->live->step($this->eventId, 1),
         ] as $what => $action) {
             $this->events->setShowQr($this->eventId, true);
             $action();
@@ -167,41 +167,6 @@ final class LiveRepositoryTest extends TestCase
 
         $foreign = (int) $this->events->create('Toinen', null)['id'];
         self::assertFalse($this->live->stage($foreign, $a, true), 'Toisen luennon kautta ei voi lisätä');
-    }
-
-    public function testStepSkipsSkippedSetsAndStopsAtEnds(): void
-    {
-        $m1 = $this->set('M1');
-        $m2 = $this->set('M2');
-        $m3 = $this->set('M3');
-        $a = $this->poll($m1);
-        $b = $this->poll($m2);
-        $c = $this->poll($m3);
-        $d = $this->poll($m3);
-        $this->sets->setSkipped($m2, true);
-
-        self::assertSame($a, $this->live->step($this->eventId, 1), 'Ilman aktiivista Seuraava aloittaa ensimmäisestä');
-        self::assertSame($c, $this->live->step($this->eventId, 1), 'Ohitettu sarja M2 jää väliin');
-        self::assertSame($d, $this->live->step($this->eventId, 1));
-        self::assertNull($this->live->step($this->eventId, 1), 'Viimeisen jälkeen ei siirrytä');
-        self::assertSame($d, $this->live->activeId($this->eventId));
-        self::assertSame($c, $this->live->step($this->eventId, -1));
-        self::assertSame($a, $this->live->step($this->eventId, -1));
-
-        // Ohitetun sarjan kysymyksen voi silti näyttää suoraan, ja siitä jatketaan järjestyksessä.
-        self::assertTrue($this->live->activate($this->eventId, $b));
-        self::assertSame($c, $this->live->step($this->eventId, 1));
-    }
-
-    public function testReorderingSetsChangesSequence(): void
-    {
-        $m1 = $this->set('M1');
-        $m2 = $this->set('M2');
-        $a = $this->poll($m1);
-        $b = $this->poll($m2);
-        $this->sets->move($m2, -1);
-        self::assertSame($b, $this->live->step($this->eventId, 1));
-        self::assertSame($a, $this->live->step($this->eventId, 1));
     }
 
     public function testParticipantSeesOnlyOpenOrClosedActivePollWithPublicFields(): void
@@ -257,7 +222,7 @@ final class LiveRepositoryTest extends TestCase
         $foreign = (int) $this->polls->create($other, $set, 'words', 'Sana?', []);
         self::assertFalse($this->live->activate($this->eventId, $foreign));
         self::assertFalse($this->live->open($this->eventId, $foreign));
-        self::assertNull($this->live->step($this->eventId, 1), 'Toisen luennon kysymykset eivät ole järjestyksessä');
+        self::assertFalse($this->live->stage($this->eventId, $foreign, false));
     }
 
     public function testSlugAndTitleValidation(): void

@@ -145,7 +145,7 @@ final class AdminController
         if (preg_match('#^polls/(\d{1,10})/(update|status|delete|reset|move|moderation|results|reveal|summary|set|stage)$#', $route, $m) === 1 && $req->method === 'POST') {
             return $this->pollAction((int) $m[1], $m[2], $in, $client);
         }
-        if (preg_match('#^sets/(\d{1,10})/(update|move|skip|delete|duplicate)$#', $route, $m) === 1 && $req->method === 'POST') {
+        if (preg_match('#^sets/(\d{1,10})/(update|move|delete|duplicate)$#', $route, $m) === 1 && $req->method === 'POST') {
             return $this->setAction((int) $m[1], $m[2], $in, $client);
         }
         if (preg_match('#^questions/(\d{1,10})/(status|delete)$#', $route, $m) === 1 && $req->method === 'POST') {
@@ -617,7 +617,7 @@ final class AdminController
         $fresh = $this->events->find($eventId) ?? $event;
         return Response::json([
             'sets' => array_map(static fn (array $s): array => [
-                'id' => $s['id'], 'slug' => $s['slug'], 'title' => $s['title'], 'position' => $s['position'], 'skipped' => $s['skipped'],
+                'id' => $s['id'], 'slug' => $s['slug'], 'title' => $s['title'], 'position' => $s['position'],
             ], $this->sets->forEvent($eventId)),
             'polls' => array_map(fn (array $p): array => $this->pollOut($p, $event), $this->polls->forEvent($eventId)),
             'active' => $this->live->activeId($eventId),
@@ -628,28 +628,19 @@ final class AdminController
     }
 
     /**
-     * Aktiivisen kysymyksen ohjaus: activate (poll tai null = odotusnäkymä), next, prev.
+     * Taulun ohjaus: activate (poll = näytölle muiden rinnalle, null = tyhjennä taulu). Seuraava/Edellinen
+     * poistettiin hallinnan yksinkertaistuksessa (issue #60): kysymykset näytetään listasta.
      * @param array<string, mixed> $event
      * @param array<string, mixed> $in
      */
     private function liveAction(array $event, array $in): Response
     {
-        $eventId = (int) $event['id'];
-        switch ($in['action'] ?? null) {
-            case 'activate':
-                $poll = $in['poll'] ?? null;
-                if (($poll !== null && !is_int($poll)) || !$this->live->activate($eventId, $poll)) {
-                    return Response::error('Kyselyä ei löytynyt.', 404);
-                }
-                break;
-            case 'next':
-            case 'prev':
-                if ($this->live->step($eventId, $in['action'] === 'next' ? 1 : -1) === null) {
-                    return Response::error($in['action'] === 'next' ? 'Ei enempää kysymyksiä.' : 'Tämä on ensimmäinen kysymys.', 409);
-                }
-                break;
-            default:
-                return Response::error('Tuntematon toiminto.', 422);
+        if (($in['action'] ?? null) !== 'activate') {
+            return Response::error('Tuntematon toiminto.', 422);
+        }
+        $poll = $in['poll'] ?? null;
+        if (($poll !== null && !is_int($poll)) || !$this->live->activate((int) $event['id'], $poll)) {
+            return Response::error('Kyselyä ei löytynyt.', 404);
         }
         return $this->pollsState($event);
     }
@@ -752,12 +743,6 @@ final class AdminController
                 if (is_string($copy)) {
                     return Response::error($copy, 409);
                 }
-                break;
-            case 'skip':
-                if (!is_bool($in['skipped'] ?? null)) {
-                    return Response::error('Virheellinen arvo.', 422);
-                }
-                $this->sets->setSkipped($id, $in['skipped']);
                 break;
             default: // delete
                 $this->live->forgetSet((int) $event['id'], $id);

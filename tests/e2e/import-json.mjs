@@ -4,7 +4,7 @@ import { readFileSync, mkdtempSync, readdirSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { tab, step, setupAdmin, createEvent, openParticipant, openPoll, mode } from './lib.mjs';
+import { tab, step, setupAdmin, createEvent, openParticipant, openPoll, expand } from './lib.mjs';
 
 const [port, app] = [process.argv[2], process.argv[3]];
 const fixture = fileURLToPath(new URL('../fixtures/mmoit-2026.json', import.meta.url));
@@ -31,6 +31,7 @@ await admin.click('Tuo');
 await admin.waitFor(admin.hasText('Tuotu 9 sarjaa ja 22 kysymystä.'), 'tuonti');
 const slugs = await admin.js(`[...document.querySelectorAll('section.set-card .set-head .code')].map((e) => e.textContent)`);
 if (slugs.join(',') !== 'OPEN,M1,M2,M3,M4,M5,M6,WRAP-FRI,CLOSE-SAT') throw new Error('Sarjat: ' + slugs);
+await expand(admin, 'Which of these EU regulations apply');
 const m3 = await admin.js(`[...document.querySelectorAll('section.set-card')].find((s) => s.querySelector('.set-head h3').textContent === 'M3 Rules of the game').innerText`);
 if (!m3.includes('Oikea: 1, 2, 3, 4 · selitykset')) throw new Error('M3:n oikeat vastaukset puuttuvat:\n' + m3);
 step('H14: tuonti loi sarjat oikeassa järjestyksessä; M3:n oikeat vastaukset ja selitykset tallessa');
@@ -53,7 +54,6 @@ step('Osallistujan rajapinta ei sisällä oikeita vastauksia eikä selityksiä')
 // Vienti lataa JSONin, joka vastaa tuotua.
 const dir = mkdtempSync(join(tmpdir(), 'hessutalks-export-'));
 await admin.cdp('Page.setDownloadBehavior', { behavior: 'allow', downloadPath: dir });
-await mode(admin, 'prep');
 await admin.click('Vie JSON');
 let file = null;
 for (let i = 0; i < 50 && !file; i++) {

@@ -1,6 +1,6 @@
 // Vaihe 4: avoin teksti (H6 XSS, H7 moderointi), kirosanasuodatin, useita vastauksia ja pysyvä moderointi.
 // Ajo: scripts/e2e.sh open-text.mjs  (tai node tests/e2e/open-text.mjs <cdp-port> <app-url>)
-import { tab, attach, step, setupAdmin, createEvent, openParticipant, openPoll, mode } from './lib.mjs';
+import { tab, attach, step, setupAdmin, createEvent, openParticipant, openPoll, expand, lit } from './lib.mjs';
 
 const [port, app] = [process.argv[2], process.argv[3]];
 const XSS = '<script>alert(1)</script><img src=x onerror=alert(2)>';
@@ -31,7 +31,7 @@ if (!(await part.js(part.hasText('Please do not include personal data.')))) thro
 step('Osallistujalla tekstikenttä ja huomautus "Please do not include personal data."');
 
 const send = async (text) => {
-  await part.js(`(() => { const a = document.querySelector('form.poll textarea'); a.value = ${JSON.stringify(text)}; a.dispatchEvent(new Event('input')); document.querySelector('form.poll').requestSubmit(); return true; })()`);
+  await part.js(`(() => { const a = document.querySelector('form.poll textarea'); a.value = ${lit(text)}; a.dispatchEvent(new Event('input')); document.querySelector('form.poll').requestSubmit(); return true; })()`);
   await part.waitFor(`document.querySelector('form.poll .notice.ok')?.innerText.includes('Sent: ')`, 'kuittaus');
   await part.js(`document.querySelector('form.poll .notice.ok').className = 'notice'`);
 };
@@ -42,8 +42,9 @@ if ((await part.js(`document.querySelector('form.poll textarea').value`)) !== ''
 if (!(await part.js(part.hasText('Thanks! You can send another answer. Sent: 3.')))) throw new Error('Useiden vastausten kuittaus puuttuu');
 step('Kolme vastausta samalta osallistujalta; kenttä tyhjenee ja "Sent: 3."');
 
-// Hallinta: XSS-yritys näkyy tekstinä, kirosana odottaa tarkistusta.
-await admin.waitFor(`[...document.querySelectorAll('.res-open-text')].some((e) => e.textContent === ${JSON.stringify(XSS)})`, 'XSS-teksti hallinnassa', 8000);
+// Hallinta: XSS-yritys näkyy tekstinä, kirosana odottaa tarkistusta (rivin klikkaus avaa tulokset).
+await expand(admin, 'What surprised you today?');
+await admin.waitFor(`[...document.querySelectorAll('.res-open-text')].some((e) => e.textContent === ${lit(XSS)})`, 'XSS-teksti hallinnassa', 8000);
 if (await admin.js(`!!document.querySelector('.res-open img, .res-open script')`)) throw new Error('XSS: elementti syntyi hallintaan');
 if (await admin.js(`[...document.querySelectorAll('.res-open-text')].some((e) => e.textContent.includes('fucking'))`)) throw new Error('Kirosana näkyi suoraan');
 await admin.waitFor(admin.hasText('⚠ This is fucking hard'), 'suodattimen tarkistettava');
@@ -53,7 +54,7 @@ step('H6 (hallinta): <script> ja <img onerror> näkyvät tekstinä; kirosanasuod
 await admin.click('Näytä tulokset');
 await admin.click('Avaa esitysnäyttö');
 const stage = await attach(port, '/admin/esitys');
-await stage.waitFor(`[...document.querySelectorAll('.res-open-text')].some((e) => e.textContent === ${JSON.stringify(XSS)})`, 'XSS-teksti projektorilla');
+await stage.waitFor(`[...document.querySelectorAll('.res-open-text')].some((e) => e.textContent === ${lit(XSS)})`, 'XSS-teksti projektorilla');
 if (await stage.js(`!!document.querySelector('#presenter img:not([alt="QR-koodi"]), #presenter script')`)) throw new Error('XSS: elementti syntyi projektorille');
 step('H6 (projektori): sama teksti näkyy projektorilla tekstinä');
 
@@ -78,6 +79,8 @@ await admin.fill('#pp', 'e2e-oikein-pitka-tunnuslause');
 await admin.submit('#pp');
 await admin.waitFor(admin.has('#ev-title'), 'luennot', 60000);
 await admin.js(`[...document.querySelectorAll('.event-list button')].find((b) => b.textContent === 'Avaa').click()`);
+await admin.waitFor(admin.has('li.poll-item'), 'kysymyslista');
+await expand(admin, 'What surprised you today?');
 await admin.waitFor(`document.querySelectorAll('.res-open-text').length === 2`, 'tulokset uudelleen ladattuina', 8000);
 const visible = await admin.js(`[...document.querySelectorAll('.res-open-text')].map((e) => e.textContent).sort()`);
 if (JSON.stringify(visible) !== JSON.stringify([XSS, 'This is fucking hard'].sort())) throw new Error('Moderointi ei säilynyt: ' + visible);

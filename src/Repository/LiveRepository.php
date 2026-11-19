@@ -11,11 +11,10 @@ use HessuTalks\Database;
  *
  * - Näytöllä voi olla useita kysymyksiä yhtä aikaa (Hessun koeajo luennolla). Vain näytöllä oleva voi olla auki.
  *   Näytöltä poistettu kysymys suljetaan, jos se oli auki. Vastaukset säilyvät aina.
- * - Aktiivinen kysymys on näytöllä olevista se, jota pikanäppäimet ja puhelinohjain ohjaavat.
- * - Kysymys poistuu näytöltä vain Pois näytöltä- ja Odotusnäkymä-toiminnoilla. Seuraava/Edellinen vaihtaa vain
- *   aktiivisen kysymyksen; muut näytöllä olevat pysyvät auki.
+ * - Aktiivinen kysymys (events.active_poll_id) on viimeksi näytölle tuotu. Hallinta ei enää käytä sitä (issue #60),
+ *   mutta vanhojen osallistujasivujen yhteensopivuus (participantPoll) lukee sen.
+ * - Kysymys poistuu näytöltä vain Poista taululta- ja Tyhjennä taulu -toiminnoilla.
  * - Luonnos-tilainen kysymys näkyy esittäjälle, mutta osallistujat eivät näe sitä ennen avaamista.
- * - Seuraava/Edellinen kulkee sarjojen ja kysymysten järjestyksessä ja ohittaa ohitetut sarjat.
  * - live_version kasvaa jokaisesta osallistujille näkyvästä muutoksesta. Osallistujan selain
  *   kysyy tilaa sekunnin välein ja saa lyhyen vastauksen, kun mikään ei ole muuttunut.
  * - Jokainen muutos kirjoittaa osallistujan tilan myös staattiseen tiedostoon (LiveFile), jota selain
@@ -184,35 +183,6 @@ final class LiveRepository
             "SELECT id FROM polls WHERE id = ? AND event_id = ? AND on_stage = 1 AND status = 'open'",
             [$pollId, $eventId],
         ) !== null;
-    }
-
-    /**
-     * Siirtyy seuraavaan (1) tai edelliseen (-1) kysymykseen, jonka sarjaa ei ole ohitettu.
-     * Jos aktiivista ei ole, Seuraava aloittaa ensimmäisestä ja Edellinen viimeisestä.
-     * Palauttaa uuden aktiivisen id:n tai null, jos suunnassa ei ole enää kysymyksiä.
-     */
-    public function step(int $eventId, int $dir): ?int
-    {
-        $rows = $this->db->all(
-            'SELECT p.id, s.skipped FROM polls p JOIN poll_sets s ON s.id = p.set_id
-             WHERE p.event_id = ? ORDER BY s.position ASC, s.id ASC, p.position ASC, p.id ASC',
-            [$eventId],
-        );
-        $ids = array_map(static fn (array $r): int => (int) $r['id'], $rows);
-        $current = $this->activeId($eventId);
-        $i = $current === null ? false : array_search($current, $ids, true);
-        $i = is_int($i) ? $i + $dir : ($dir > 0 ? 0 : count($ids) - 1);
-        for (; $i >= 0 && $i < count($ids); $i += $dir) {
-            if ((int) $rows[$i]['skipped'] === 0) {
-                // Vain aktiivinen vaihtuu: se pois näytöltä (suljetaan, jos auki), muut näytöllä olevat pysyvät.
-                if ($current !== null && $current !== $ids[$i]) {
-                    $this->db->exec("UPDATE polls SET on_stage = 0, status = CASE WHEN status = 'open' THEN 'closed' ELSE status END WHERE id = ?", [$current]);
-                }
-                $this->stage($eventId, $ids[$i], true);
-                return $ids[$i];
-            }
-        }
-        return null;
     }
 
     /** Avaa kyselyn vastauksille: se tulee näytölle muiden rinnalle ja aktiiviseksi. */

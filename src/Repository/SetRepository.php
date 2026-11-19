@@ -184,11 +184,6 @@ final class SetRepository
         return true;
     }
 
-    public function setSkipped(int $id, bool $skipped): bool
-    {
-        return $this->db->exec('UPDATE poll_sets SET skipped = ? WHERE id = ?', [$skipped ? 1 : 0, $id]) === 1;
-    }
-
     /** Poistaa sarjan, sen kysymykset ja vastaukset (ON DELETE CASCADE). */
     public function delete(int $id): bool
     {

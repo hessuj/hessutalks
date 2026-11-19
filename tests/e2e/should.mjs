@@ -4,7 +4,7 @@ import { mkdtempSync, readdirSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { tab, attach, step, setupAdmin, createEvent, openParticipant, openPoll, mode } from './lib.mjs';
+import { tab, attach, step, setupAdmin, createEvent, openParticipant, openPoll, pollItem, expand, setTools, lit } from './lib.mjs';
 
 const [port, app] = [process.argv[2], process.argv[3]];
 const fixture = fileURLToPath(new URL('../fixtures/mmoit-2026.json', import.meta.url));
@@ -29,14 +29,13 @@ await part.js(`(() => { [...document.querySelectorAll('.poll-choice')].find((l) 
 await part.waitFor(`document.querySelector('form.poll .notice.ok')`, 'kuittaus');
 await openPoll(admin, 'What surprised you today?');
 await part.waitFor(part.hasText('What surprised you today?'), 'avoin osallistujalle');
-await part.js(`(() => { const a = document.querySelector('form.poll textarea'); a.value = ${JSON.stringify(EVIL)}; document.querySelector('form.poll').requestSubmit(); return true; })()`);
+await part.js(`(() => { const a = document.querySelector('form.poll textarea'); a.value = ${lit(EVIL)}; document.querySelector('form.poll').requestSubmit(); return true; })()`);
 await part.waitFor(`document.querySelector('form.poll .notice.ok')`, 'kuittaus 2');
-await admin.waitFor(`document.querySelector('.live-control').innerText.includes('1 vastausta')`, 'vastaus hallinnassa', 8000);
+await admin.waitFor(`${pollItem('What surprised you today?')}.querySelector('.run-count').textContent === '1'`, 'vastaus hallinnassa', 8000);
 
 // CSV
 const dir = mkdtempSync(join(tmpdir(), 'hessutalks-csv-'));
 await admin.cdp('Page.setDownloadBehavior', { behavior: 'allow', downloadPath: dir });
-await mode(admin, 'prep');
 await admin.click('Vie CSV');
 let file = null;
 for (let i = 0; i < 50 && !file; i++) {
@@ -56,15 +55,18 @@ if (/voter|[0-9a-f]{32}/.test(text)) throw new Error('CSV:ssä osallistujatunnis
 step(`CSV ${file}: BOM, otsikko, M2 Insider 1, kaava "${EVIL}" muutettu tekstiksi ('), ei osallistujatunnisteita`);
 
 // Monistus ja siirto
+await setTools(admin, 'M5 Governance and risk');
 await admin.click('Monista', 'M5 Governance and risk');
 await admin.waitFor(`[...document.querySelectorAll('section.set-card .set-head .code')].some((e) => e.textContent === 'M5-2')`, 'monistettu M5-2');
 const m52 = await admin.js(`[...document.querySelectorAll('section.set-card')].find((s) => s.querySelector('.code').textContent === 'M5-2').innerText`);
 if (!m52.includes('M5 Governance and risk (kopio)') || !m52.includes('3 kysymystä')) throw new Error('Monistus: ' + m52);
-await admin.js(`(() => { const card = [...document.querySelectorAll('article.poll-card')].find((c) => c.innerText.includes('Your most important takeaway')); const sel = card.querySelector('select.move-set'); sel.value = [...sel.options].find((o) => o.text.startsWith('WRAP-FRI')).value; sel.dispatchEvent(new Event('change')); return true; })()`);
+await expand(admin, 'Your most important takeaway');
+await admin.js(`(() => { const sel = ${pollItem('Your most important takeaway')}.querySelector('select.move-set'); sel.value = [...sel.options].find((o) => o.text.startsWith('WRAP-FRI')).value; sel.dispatchEvent(new Event('change')); return true; })()`);
 await admin.waitFor(`[...document.querySelectorAll('section.set-card')].find((s) => s.querySelector('.code').textContent === 'WRAP-FRI').innerText.includes('Your most important takeaway')`, 'siirto WRAP-FRI:hin');
 step('Sarjan monistus (M5-2, 3 kysymystä) ja kysymyksen siirto CLOSE-SAT → WRAP-FRI');
 
 // Esikatselu osallistujan ulkoasussa ja projektorilla
+await expand(admin, 'Is this a risk? \'A DDoS attack');
 await admin.click('Esikatsele', 'Is this a risk? \'A DDoS attack');
 const pv = await attach(port, '/admin/esikatselu');
 await pv.waitFor(pv.hasText('A DDoS attack causes 2 hours'), 'osallistujan esikatselu');
@@ -72,7 +74,7 @@ if (await pv.js(`document.body.innerText.includes('correct') || !!document.query
 await pv.js(`(() => { document.querySelector('.poll-choice input').click(); document.querySelector('form.poll').requestSubmit(); return true; })()`);
 await pv.waitFor(pv.hasText('Preview: the answer is not sent.'), 'esikatselu ei lähetä');
 await admin.click('Esikatsele projektorilla', 'Is this a risk? \'A DDoS attack');
-const st = await attach(port, '/admin/esitys');
+const st = await attach(port, '/admin/esitys#', 10000, '.p');
 await st.waitFor(`document.querySelector('.poll-stage-prompt')?.textContent.includes('A DDoS attack')`, 'projektorin esikatselu');
 step('Esikatselu: osallistujan kortti (englanniksi, ei lähetä, ei oikeaa vastausta) ja projektorin näkymä');
 

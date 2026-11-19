@@ -1,7 +1,8 @@
-// Vaihe 6: esitysnäkymä (koodi ja QR kulmassa, fonttikoko 1080p:llä, iso QR, teema), pikanäppäimet
-// esitysikkunassa ja hallinnassa sekä puhelinohjain.
+// Vaihe 6: esitysnäkymä (koodi ja QR kulmassa, fonttikoko 1080p:llä, iso QR, teema) ja pikanäppäimet.
+// Issue #60: kysymykset ohjataan hallinnan listasta; näppäimistä jäivät F, T ja Q (iso QR), ja
+// puhelinohjain poistettiin.
 // Ajo: scripts/e2e.sh presenter.mjs  (tai node tests/e2e/presenter.mjs <cdp-port> <app-url>)
-import { tab, attach, step, setupAdmin, createEvent, mode } from './lib.mjs';
+import { tab, attach, step, setupAdmin, createEvent, pollItem, lit } from './lib.mjs';
 
 const [port, app] = [process.argv[2], process.argv[3]];
 
@@ -24,30 +25,25 @@ for (const prompt of ['Is this a risk? Phishing.', 'Is this a risk? DDoS.']) {
 }
 const code = await admin.js(`document.querySelector('.big-code').textContent`);
 
-await mode(admin, 'live');
 await admin.click('Avaa esitysnäyttö');
 const stage = await attach(port, '/admin/esitys');
 await stage.cdp('Emulation.setDeviceMetricsOverride', { width: 1920, height: 1080, deviceScaleFactor: 1, mobile: false });
-await stage.waitFor(`document.body.innerText.includes(${JSON.stringify(code)})`, 'QR-näkymä ilman aktiivista');
+await stage.waitFor(`document.body.innerText.includes(${lit(code)})`, 'QR-näkymä ilman aktiivista');
 
 const key = async (t, k, code2) => {
   for (const type of ['keyDown', 'keyUp']) {
     await t.cdp('Input.dispatchKeyEvent', { type, key: k, code: code2 || k, text: k.length === 1 ? k : undefined, windowsVirtualKeyCode: { ArrowRight: 39, ArrowLeft: 37, PageDown: 34, PageUp: 33, ' ': 32 }[k] || k.toUpperCase().charCodeAt(0) });
   }
 };
-const activePrompt = () => admin.js(`document.querySelector('.live-control strong').textContent`);
-
-// Esitysikkunan näppäimet ohjaavat hallintaa (postMessage avaajalle).
-await key(stage, 'ArrowRight', 'ArrowRight');
-await admin.waitFor(`document.querySelector('.live-control').innerText.includes('Is this a risk? Phishing.')`, '→ esitysikkunassa');
+// Kysymys taululle, tulokset ja paljastus kysymyksen riviltä.
+await admin.click('Näytä taululla', 'Is this a risk? Phishing.');
 await stage.waitFor(`document.querySelector('.poll-stage-prompt')?.textContent === 'Is this a risk? Phishing.'`, 'kysymys projektorilla');
-await key(stage, ' ', 'Space');
-await admin.waitFor(`document.querySelector('.live-control .badge')?.textContent === 'Auki'`, 'välilyönti avaa');
-await key(stage, 'r', 'KeyR');
-await admin.waitFor(admin.hasText('Piilota tulokset'), 'R näyttää tulokset');
-await key(stage, 'a', 'KeyA');
-await stage.waitFor(`!!document.querySelector('.res-row.correct')`, 'A paljastaa');
-step('Esitysikkunan näppäimet: → seuraava, välilyönti avaa, R tulokset, A paljastus');
+await admin.waitFor(`${pollItem('Is this a risk? Phishing.')}.dataset.status === 'open'`, 'auki');
+await admin.click('Näytä tulokset', 'Is this a risk? Phishing.');
+await admin.waitFor(admin.hasText('Piilota tulokset'), 'tulokset näkyvissä');
+await admin.click('Paljasta oikea vastaus', 'Is this a risk? Phishing.');
+await stage.waitFor(`!!document.querySelector('.res-row.correct')`, 'paljastus projektorilla');
+step('Rivin napit: Näytä taululla (auki), Näytä tulokset ja Paljasta oikea vastaus näkyvät projektorilla');
 
 // Koodi ja QR kulmassa, vastausmäärä, fonttikoko 1080p:llä
 const corner = await stage.js(`({ code: document.querySelector('.poll-stage-code')?.textContent, qr: !!document.querySelector('.poll-stage-foot img'), count: document.querySelector('.poll-stage-count')?.textContent, size: parseFloat(getComputedStyle(document.querySelector('.poll-stage-prompt')).fontSize) })`);
@@ -55,7 +51,7 @@ if (corner.code !== code || !corner.qr || corner.count !== '0 answers' || corner
 step(`Kulmassa koodi ${code} ja QR, vastausmäärä näkyy; kysymyksen fontti ${corner.size}px (1920×1080)`);
 
 // Projektorin kieli seuraa luennon osallistujien kieltä (hallinta pysyy suomeksi).
-const setLang = (v) => admin.js(`(() => { const s = document.getElementById('event-lang'); s.value = ${JSON.stringify(v)}; s.dispatchEvent(new Event('change')); return true; })()`);
+const setLang = (v) => admin.js(`(() => { const s = document.getElementById('event-lang'); s.value = ${lit(v)}; s.dispatchEvent(new Event('change')); return true; })()`);
 await setLang('fi');
 await stage.waitFor(`document.querySelector('.poll-stage-count')?.textContent === '0 vastausta'`, 'projektori suomeksi', 5000);
 await setLang('');
@@ -74,32 +70,28 @@ await key(stage, 't', 'KeyT');
 if (!(await stage.js(`document.body.classList.contains('light')`))) throw new Error('Teema ei vaihtunut');
 step('Q: iso QR päälle ja pois; T: vaalea teema');
 
-// Esitysohjain (PageDown) ja hallinnan omat näppäimet
-await key(stage, 'PageDown', 'PageDown');
-await admin.waitFor(`document.querySelector('.live-control').innerText.includes('Is this a risk? DDoS.')`, 'PageDown');
-await admin.js(`document.querySelector('.live-control button').focus()`);
-await key(admin, 'ArrowLeft', 'ArrowLeft');
-await admin.waitFor(`document.querySelector('.live-control').innerText.includes('Is this a risk? Phishing.')`, '← hallinnassa');
-await key(admin, ' ', 'Space');
-await admin.waitFor(`document.querySelector('.live-control .badge')?.textContent === 'Suljettu'`, 'välilyönti sulkee (fokus ohjauspalkin napissa)');
-if ((await activePrompt()) !== 'Is this a risk? Phishing.') throw new Error('Välilyönti painoi fokuksessa olevaa nappia');
-step('Esitysohjaimen PageDown; hallinnassa ← ja välilyönti (myös kun ohjauspalkin nappi on fokuksessa)');
+// Poistetut ohjausnäppäimet eivät tee mitään (esitysikkunassa eivätkä hallinnassa); Q toimii myös hallinnassa.
+const state = () => admin.js(`[...document.querySelectorAll('li.poll-item')].map((li) => li.dataset.status + (li.classList.contains('staged') ? '+' : '')).join(',') + '|' + document.body.innerText.includes('Piilota tulokset')`);
+const before = await state();
+for (const [k, c] of [['ArrowRight', 'ArrowRight'], ['PageDown', 'PageDown'], ['ArrowLeft', 'ArrowLeft'], [' ', 'Space'], ['r', 'KeyR'], ['a', 'KeyA']]) {
+  await key(stage, k, c);
+  await key(admin, k, c);
+}
+await new Promise((r) => setTimeout(r, 2500));
+if ((await state()) !== before) throw new Error('Poistettu näppäin muutti tilaa: ' + before + ' → ' + (await state()));
+await key(admin, 'q', 'KeyQ');
+await stage.waitFor(`!!document.querySelector('.stage-bigqr')`, 'Q hallinnassa', 8000);
+await admin.click('QR pieneksi');
+await stage.waitFor(`!document.querySelector('.stage-bigqr')`, 'QR pieneksi', 8000);
+step('Nuolet, PageDown, välilyönti, R ja A eivät enää ohjaa; Q (hallinnassa) ja QR pieneksi -nappi toimivat');
 
-// Puhelinohjain toisessa ikkunassa (sama istunto, avainta ei avata)
+// Puhelinohjainta ei enää ole: toisen ikkunan avausnäkymässä ei ole sen nappia.
 const phone = await tab(port);
 await phone.cdp('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 2, mobile: true });
 await phone.cdp('Page.navigate', { url: app + '/admin' });
-await phone.waitFor(phone.hasText('Puhelinohjain'), 'avausnäkymän ohjainnappi');
-await phone.click('Puhelinohjain');
-await phone.waitFor(phone.hasText('Ohjaa'), 'luentovalinta');
-await phone.click('Ohjaa');
-await phone.waitFor(phone.hasText('Is this a risk? Phishing.'), 'ohjain näyttää aktiivisen');
-await phone.click('Seuraava →');
-await stage.waitFor(`document.querySelector('.poll-stage-prompt')?.textContent === 'Is this a risk? DDoS.'`, 'puhelimen Seuraava projektorilla', 8000);
-await phone.waitFor(phone.hasText('QR isona'), 'QR-nappi');
-await phone.click('QR isona');
-await stage.waitFor(`!!document.querySelector('.stage-bigqr')`, 'puhelimen iso QR projektorilla', 8000);
-step('Puhelinohjain (ilman avainta): Seuraava ja iso QR näkyvät projektorilla läppärin kautta');
+await phone.waitFor(phone.hasText('Avaa kysymykset'), 'avausnäkymä');
+if (await phone.js(phone.hasText('Puhelinohjain'))) throw new Error('Puhelinohjaimen nappi näkyy yhä');
+step('Puhelinohjaimen nappi on poistunut avausnäkymästä');
 
 const errs = [...admin.logs, ...stage.logs, ...phone.logs];
 if (errs.length) { console.log('Selaimen virheet:\n' + errs.join('\n')); process.exit(1); }

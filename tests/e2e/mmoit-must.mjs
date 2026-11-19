@@ -1,9 +1,10 @@
 // MMoIT-vaatimukset v2 (2.11.): R9 ei paljastusnappia ilman oikeaa vastausta, R10 multi-paljastus (4 oikeaa ja
 // 7 selitystä), R11 pitkät vaihtoehdot rivittyvät projektorilla ja puhelimessa, R12 kysymyksen vastausten
-// nollaus Valmistelu-tilassa varmistuksen jälkeen (ei luennon ohjauksessa), sekä luennon otsikon muokkaus (koodi pysyy).
+// nollaus kysymyksen avautuvasta osasta varmistuksen jälkeen (ei rivin napeissa, issue #60), sekä luennon otsikon
+// muokkaus (koodi pysyy).
 // Ajo: scripts/e2e.sh mmoit-must.mjs  (tai node tests/e2e/mmoit-must.mjs <cdp-port> <app-url>)
 import { fileURLToPath } from 'node:url';
-import { tab, attach, step, setupAdmin, createEvent, openParticipant, openPoll, mode } from './lib.mjs';
+import { tab, attach, step, setupAdmin, createEvent, openParticipant, openPoll, pollItem, expand, lit } from './lib.mjs';
 
 const [port, app] = [process.argv[2], process.argv[3]];
 const fixture = fileURLToPath(new URL('../fixtures/mmoit-2026.json', import.meta.url));
@@ -38,47 +39,45 @@ await part.js(`(() => { const c = document.querySelectorAll('form.poll input[typ
 await part.waitFor(`!!document.querySelector('form.poll .notice.ok')`, 'vastaus');
 await admin.click('Avaa esitysnäyttö');
 const stage = await attach(port, '/admin/esitys');
-await admin.click('Näytä tulokset');
-await admin.click('Paljasta oikea vastaus');
+await admin.click('Näytä tulokset', 'Which of these EU regulations');
+await admin.click('Paljasta oikea vastaus', 'Which of these EU regulations');
 await stage.waitFor(`document.querySelectorAll('.res-row.correct').length === 4`, 'neljä oikeaa projektorilla', 8000);
 const stageExpl = await stage.js(`[...document.querySelectorAll('.res-explanation')].filter((e) => e.textContent.trim()).length`);
 await part.waitFor(`document.querySelectorAll('.poll-explanation').length === 7`, 'seitsemän selitystä osallistujalla', 8000);
 if (stageExpl !== 7) throw new Error('Selityksiä projektorilla ' + stageExpl);
 step('R10: M3-paljastus näyttää 4 oikeaa vaihtoehtoa ja 7 selitystä projektorilla ja osallistujalla');
 
-// R12: vastaukset nollataan vain Valmistelu-tilan kortista varmistuksen jälkeen. Luennon ohjauspalkissa ei ole
-// tyhjennystä: luennon aikana annettuja vastauksia ei poisteta vahingossa (Hessun koeajo luennolla).
-await admin.waitFor(`document.querySelector('.live-now')?.innerText.includes('1 vastaus')`, 'yksi vastaus', 8000);
-if (await admin.js(`[...document.querySelectorAll('.live-control button, .stage-bar button')].some((b) => b.textContent === 'Tyhjennä vastaukset')`)) {
-  throw new Error('Tyhjennä vastaukset luennon ohjauksessa');
+// R12: vastaukset nollataan vain kysymyksen avautuvasta osasta varmistuksen jälkeen (issue #60). Rivin napeissa
+// ja taulurivillä ei ole tyhjennystä: luennon aikana annettuja vastauksia ei poisteta vahingossa.
+const R12 = 'Which of these EU regulations';
+await admin.waitFor(`${pollItem(R12)}.querySelector('.run-count').textContent === '1'`, 'yksi vastaus', 8000);
+if (await admin.js(`[...document.querySelectorAll('.poll-actions button, .stage-bar button')].some((b) => b.textContent === 'Tyhjennä vastaukset')`)) {
+  throw new Error('Tyhjennä vastaukset rivin napeissa tai taulurivillä');
 }
-const r12 = await admin.js(`document.querySelector('.live-now strong').textContent`);
-await mode(admin, 'prep');
-await admin.cdp('Page.enable');
+await expand(admin, R12);
 const before = admin.dialogs().length;
-await admin.js(`setTimeout(() => [...[...document.querySelectorAll('article.poll-card')].find((c) => c.querySelector('.poll-card-prompt').textContent.includes(${JSON.stringify(r12)})).querySelectorAll('button')].find((b) => b.textContent === 'Tyhjennä vastaukset').click(), 0), true`);
+await admin.click('Tyhjennä vastaukset', R12);
 const t0 = Date.now();
 while (admin.dialogs().length === before && Date.now() - t0 < 5000) await new Promise((r) => setTimeout(r, 100));
 const asked = admin.dialogs()[before] || '';
-if (!asked.includes('Which of these EU regulations')) throw new Error('Varmistus: ' + asked);
-await mode(admin, 'live');
-await admin.waitFor(`document.querySelector('.live-now')?.innerText.includes('0 vastausta')`, 'nollattu', 8000);
-step('R12: ei tyhjennystä luennon ohjauksessa; Valmistelu-kortin Tyhjennä vastaukset kysyy varmistuksen ja nollaa (1 → 0)');
+if (!asked.includes(R12)) throw new Error('Varmistus: ' + asked);
+await admin.waitFor(`${pollItem(R12)}.querySelector('.run-count').textContent === '0'`, 'nollattu', 8000);
+step('R12: ei tyhjennystä rivin napeissa eikä taulurivillä; avautuvan osan Tyhjennä vastaukset kysyy varmistuksen ja nollaa (1 → 0)');
 
 // R9: M4/3 ilman oikeaa vastausta: ei paljastusnappia.
 await openPoll(admin, 'Stage 3: The media asks');
-if (await admin.js(`[...document.querySelectorAll('.live-control button')].some((b) => /oikea vastaus/.test(b.textContent))`)) throw new Error('Paljastusnappi näkyi M4/3:ssa');
+if (await admin.js(`[...${pollItem('Stage 3: The media asks')}.querySelectorAll('button')].some((b) => /oikea vastaus/.test(b.textContent))`)) throw new Error('Paljastusnappi näkyi M4/3:ssa');
 step('R9: M4/3 (ei oikeaa vastausta) – paljastusnappia ei näytetä');
 
 // R11: pitkä vaihtoehto (yli 100 merkkiä, M4/2) rivittyy projektorilla ja puhelimessa, ei katkea.
 await openPoll(admin, 'Stage 2: The vulnerability');
 const longest = 'National CSIRT';
 await stage.cdp('Emulation.setDeviceMetricsOverride', { width: 1920, height: 1080, deviceScaleFactor: 1, mobile: false });
-await stage.waitFor(`[...document.querySelectorAll('.res-label')].some((e) => e.textContent.includes(${JSON.stringify(longest)}))`, 'M4/2 projektorilla', 8000);
-const onStage = await stage.js(`(() => { const e = [...document.querySelectorAll('.res-label')].find((x) => x.textContent.includes(${JSON.stringify(longest)})); const r = e.getBoundingClientRect(); return { full: e.scrollWidth <= e.clientWidth + 1 && getComputedStyle(e).textOverflow !== 'ellipsis', inside: r.right <= window.innerWidth && r.bottom <= window.innerHeight, len: e.textContent.length }; })()`);
+await stage.waitFor(`[...document.querySelectorAll('.res-label')].some((e) => e.textContent.includes(${lit(longest)}))`, 'M4/2 projektorilla', 8000);
+const onStage = await stage.js(`(() => { const e = [...document.querySelectorAll('.res-label')].find((x) => x.textContent.includes(${lit(longest)})); const r = e.getBoundingClientRect(); return { full: e.scrollWidth <= e.clientWidth + 1 && getComputedStyle(e).textOverflow !== 'ellipsis', inside: r.right <= window.innerWidth && r.bottom <= window.innerHeight, len: e.textContent.length }; })()`);
 await part.cdp('Emulation.setDeviceMetricsOverride', { width: 360, height: 740, deviceScaleFactor: 2, mobile: true });
-await part.waitFor(`[...document.querySelectorAll('.poll-choice')].some((e) => e.textContent.includes(${JSON.stringify(longest)}))`, 'M4/2 puhelimessa', 8000);
-const onPhone = await part.js(`(() => { const e = [...document.querySelectorAll('.poll-choice')].find((x) => x.textContent.includes(${JSON.stringify(longest)})); const r = e.getBoundingClientRect(); return { full: e.scrollWidth <= e.clientWidth + 1, inside: r.left >= 0 && r.right <= window.innerWidth, overflow: document.documentElement.scrollWidth - window.innerWidth, lines: Math.round(r.height / parseFloat(getComputedStyle(e).lineHeight || 20)) }; })()`);
+await part.waitFor(`[...document.querySelectorAll('.poll-choice')].some((e) => e.textContent.includes(${lit(longest)}))`, 'M4/2 puhelimessa', 8000);
+const onPhone = await part.js(`(() => { const e = [...document.querySelectorAll('.poll-choice')].find((x) => x.textContent.includes(${lit(longest)})); const r = e.getBoundingClientRect(); return { full: e.scrollWidth <= e.clientWidth + 1, inside: r.left >= 0 && r.right <= window.innerWidth, overflow: document.documentElement.scrollWidth - window.innerWidth, lines: Math.round(r.height / parseFloat(getComputedStyle(e).lineHeight || 20)) }; })()`);
 if (!onStage.full || !onStage.inside || !onPhone.full || !onPhone.inside || onPhone.overflow > 0) throw new Error('R11: ' + JSON.stringify({ onStage, onPhone }));
 step(`R11: ${onStage.len} merkin vaihtoehto näkyy kokonaan projektorilla (1920×1080) ja puhelimessa (360 px), ei vaakavieritystä`);
 
@@ -86,15 +85,15 @@ step(`R11: ${onStage.len} merkin vaihtoehto näkyy kokonaan projektorilla (1920�
 await part.cdp('Emulation.clearDeviceMetricsOverride');
 await part.js(`(() => { document.querySelector('form.poll input').click(); document.querySelector('form.poll').requestSubmit(); return true; })()`);
 await part.waitFor(`!!document.querySelector('form.poll .notice.ok')`, 'vastaus M4/2');
-await admin.waitFor(`document.querySelector('.live-now')?.innerText.includes('1 vastaus')`, 'yksi vastaus M4/2', 8000);
-await mode(admin, 'prep');
-const card = `[...document.querySelectorAll('article.poll-card')].find((c) => c.querySelector('.poll-card-prompt').textContent.includes('Stage 2: The vulnerability'))`;
-await admin.js(`[...${card}.querySelectorAll('button')].find((b) => b.textContent === 'Palauta luonnokseksi').click(), true`);
+const card = pollItem('Stage 2: The vulnerability');
+await admin.waitFor(`${card}.querySelector('.run-count').textContent === '1'`, 'yksi vastaus M4/2', 8000);
+await expand(admin, 'Stage 2: The vulnerability');
+await admin.click('Palauta luonnokseksi', 'Stage 2: The vulnerability');
 await admin.waitFor(`${card}?.dataset.status === 'draft'`, 'luonnos-tila', 8000);
 await part.waitFor(`!document.querySelector('form.poll')`, 'kysymys pois osallistujalta', 8000);
-await stage.waitFor(`![...document.querySelectorAll('.res-label')].some((e) => e.textContent.includes(${JSON.stringify(longest)}))`, 'pois projektorilta', 8000);
+await stage.waitFor(`![...document.querySelectorAll('.res-label')].some((e) => e.textContent.includes(${lit(longest)}))`, 'pois projektorilta', 8000);
 await openPoll(admin, 'Stage 2: The vulnerability');
 await part.waitFor(`!!document.querySelector('form.poll')`, 'julkaistu uudelleen', 8000);
-await admin.waitFor(`document.querySelector('.live-now')?.innerText.includes('1 vastaus')`, 'vastaus säilyi', 8000);
+await admin.waitFor(`${card}.querySelector('.run-count').textContent === '1'`, 'vastaus säilyi', 8000);
 step('Issue #39: Palauta luonnokseksi poisti kysymyksen osallistujalta ja projektorilta; uudelleenjulkaisun jälkeen annettu vastaus säilyi (1)');
 process.exit(0);

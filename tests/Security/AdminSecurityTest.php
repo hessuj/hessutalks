@@ -423,8 +423,13 @@ final class AdminSecurityTest extends AppTestCase
         self::assertStringContainsString('new Uint8Array(16)', $admin);
         self::assertStringContainsString("new BroadcastChannel('hessutalks-esitys-' + STAGE_TOKEN + suffix)", $admin);
         self::assertSame(0, preg_match('/postMessage\\([^)]*[\'"]\\*[\'"]/', $admin . $js));
-        // Purettu viesti ei jää selaimen tallennukseen: näytön tila muistaa viestistä vain id:n.
-        self::assertStringContainsString("display.spotlight = Number.isInteger(saved.spotlight) ? saved.spotlight : null", $admin);
+        // Purettu viesti ei jää selaimen tallennukseen: taulun tila muistaa viesteistä vain id:t (issue #60:
+        // useita viestejä taululla). Luettaessa hyväksytään vain kokonaisluvut, ja tallennetaan sama id-lista.
+        self::assertStringContainsString('onBoard = saved.filter(Number.isSafeInteger).slice(0, MAX_ON_BOARD)', $admin);
+        self::assertStringContainsString('window.sessionStorage.setItem(DISPLAY_KEY, JSON.stringify(onBoard))', $admin);
+        self::assertSame(1, substr_count($admin, 'sessionStorage.setItem(DISPLAY_KEY'), 'Taulun tila tallennetaan vain yhdestä kohdasta');
+        // Esitysikkuna hyväksyy viestiruudun vain kokonaislukuavaimella (ei merkkijonoa ruudun tunnisteeksi).
+        self::assertStringContainsString('Number.isSafeInteger(t.id) && t.id > 0', $js);
     }
 
     // ------------------------------------------------------------ turvaotsakkeet
