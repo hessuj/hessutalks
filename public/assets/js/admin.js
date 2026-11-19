@@ -395,6 +395,8 @@
             + (prfDiag ? ' Tekninen syy: ' + prfDiag + '.' : '') }),
         h('label', { for: 'pp', text: 'Tunnuslause' }), input,
         h('p.actions', null, h('button.btn' + (pendingPrf ? '' : '.ghost'), { type: 'submit', text: 'Avaa tunnuslauseella' }), ' ', logoutButton())),
+      state.events && state.events.length ? h('p', null, h('button.btn.ghost', { type: 'button', text: 'Puhelinohjain',
+        title: 'Kysymysten ohjaus puhelimella avaamatta salausavainta', onclick: showRemotePicker })) : null,
       out);
   }
 
@@ -440,7 +442,9 @@
           h('strong', null, ev.title,
             ev.new_count ? h('span.badge.new', { text: ev.new_count + ' uutta' }) : null,
             !ev.open ? h('span.badge.closed', { text: 'suljettu' }) : null),
-          h('button.btn.small.open-btn', { type: 'button', text: 'Avaa', onclick: function () { showEvent(ev.id); } }),
+          h('span.open-btn.event-btns', null,
+            h('button.btn.small', { type: 'button', text: 'Avaa', onclick: function () { showEvent(ev.id); } }),
+            h('button.btn.ghost.small', { type: 'button', text: 'Ohjain', title: 'Puhelinohjain: kysymykset näytölle isoin napein', onclick: function () { showRemote(ev.id); } })),
           h('span.meta', { text: fmtTime(ev.created_at) + ', ' + ev.question_count + ' viestiä' })));
       });
     }
@@ -717,6 +721,7 @@
     var sets = [];
     var polls = [];
     var showQr = false;     // projektorin iso QR-koodi
+    var boardClears = null; // taulun tyhjennysten määrä: kasvaa myös puhelinohjaimen tyhjennyksestä (issue #63)
     var version = null;     // ohjaustilan versio: muuttuu, kun toinen hallintaikkuna (esim. toinen läppäri) ohjaa
     var answers = {};       // kyselyn id -> { vastaaja: vastaus }
     var invalid = {};       // kyselyn id -> hylättyjen vastausten määrä
@@ -760,6 +765,7 @@
       sets = r.sets; polls = r.polls;
       if (typeof r.version === 'number') version = r.version;
       if (typeof r.show_qr === 'boolean') showQr = r.show_qr;
+      if (typeof r.board_clears === 'number') boardClears = r.board_clears;
       polls.forEach(function (p) { mods[p.id] = readModeration(p.moderation); });
       outEl.replaceChildren();
       renderAll();
@@ -1368,6 +1374,7 @@
       stageTiles: function () { return staged().map(pollTile); },
       staged: staged,
       showQr: function () { return showQr; },
+      boardClears: function () { return boardClears; },
       clear: function () { return staged().length ? liveAct({ action: 'activate', poll: null }) : Promise.resolve(); }
     };
   }
@@ -1378,7 +1385,15 @@
     var lastId = 0;
     var lists = { question: h('ul.questions'), feedback: h('ul.questions') };
     var headEl = h('div');
-    var panel = pollsPanel(id, function () { return event; }, function () { renderStageBar(); updateScreens(); }, function () { return items; });
+    // Puhelinohjaimen Tyhjennä taulu (issue #63): palvelin ei tiedä taululla olevista viesteistä (ne puretaan vain
+    // tässä selaimessa), joten tyhjennysten määrän kasvu poistaa ne täältä.
+    var knownClears = null;
+    var panel = pollsPanel(id, function () { return event; }, function () {
+      var c = panel.boardClears();
+      if (knownClears !== null && c !== null && c > knownClears && onBoard.length) { knownClears = c; setBoard([]); return; }
+      if (c !== null) knownClears = c;
+      renderStageBar(); updateScreens();
+    }, function () { return items; });
 
     // Taululla olevat viestit (vapaat kysymykset ja palautteet) muistetaan tämän välilehden ajan
     // (uudelleenlataus). Vain id:t: purettu teksti ei jää selaimen tallennukseen.
@@ -1420,6 +1435,7 @@
 
     // Esitysnäytöstä yksi rivi: ikkunan avaus ja yhteyden tila, iso QR ja taulun tyhjennys (issue #60).
     var stageBarEl = h('div.stage-bar', { 'aria-label': 'Taulu' });
+    var remoteQr = false;
     function renderStageBar() {
       if (!event) return;
       var polls = panel.staged().length;
@@ -1438,7 +1454,15 @@
             setBoard([]);
             panel.clear();
           } }),
+          h('button.btn.ghost.small', { type: 'button', 'aria-expanded': String(remoteQr), text: 'Puhelinohjain',
+            title: 'Avaa ohjain puhelimella QR-koodista', onclick: function () { remoteQr = !remoteQr; renderStageBar(); } }),
           h('span.hint', { text: parts.length ? 'Taululla: ' + parts.join(', ') : 'Taululla: QR-koodi ja liittymisohje' })),
+        remoteQr ? h('div.remote-qr', null,
+          h('img', { src: qrDataUrl(remoteUrl(id), 5), alt: 'QR-koodi puhelinohjaimeen', width: 200, height: 200 }),
+          h('div', null,
+            h('p', { text: 'Skannaa puhelimella ja kirjaudu passkeylla. Ohjain ei pura viestejä, joten salausavainta ei tarvita.' }),
+            h('p.hint.remote-link', { text: remoteUrl(id) }),
+            h('button.btn.ghost.small', { type: 'button', text: 'Sulje', onclick: function () { remoteQr = false; renderStageBar(); } }))) : null,
         panel.showQr() ? notice('Iso QR-koodi peittää nyt koko näytön. Paina QR pieneksi tai Q, niin taulun sisältö tulee näkyviin.', 'warn') : null,
         h('p.hint', null, presenterNote)]);
       renderStageStatus();
@@ -1631,7 +1655,13 @@
     poll().then(function () { return panel.load(); }).then(function () { return panel.refresh(); }).then(function () {
       // Yksi päivitys kerrallaan: hidas vastaus ei kasaa pyyntöjä jonoon.
       var busy = false;
+      // Elonmerkki puhelinohjaimelle: esitysnäyttö on yhteydessä tähän ikkunaan (issue #63).
+      var lastBeat = 0;
       liveRefresh = function () {
+        if (connected(mainScreen) && Date.now() - lastBeat > 5000) {
+          lastBeat = Date.now();
+          api('POST', 'events/' + id + '/screen', {}).catch(function () {});
+        }
         if (busy) return;
         busy = true;
         refreshAll().catch(function () {}).then(function () { busy = false; });
@@ -1644,7 +1674,289 @@
     }).catch(function (e) { if (e.message !== '401') root.appendChild(notice(e.message, 'error')); });
   }
 
+  // ================================================================ näkymä: puhelinohjain (issue #63)
+  //
+  // Samat kysymystoiminnot kuin hallinnan listassa, isoin napein puhelimelle. Ei pura viestejä eikä vastauksia,
+  // joten salausavainta ei tarvita (kirjautuminen passkeylla riittää). Läppärin hallinta huomaa muutokset
+  // ohjaustilan versiosta ja päivittää esitysnäytön.
+  //
+  // Luotettavuus luennolla:
+  // - Näyttö pyydetään pitämään päällä (Screen Wake Lock), ja pyyntö uusitaan, kun sivu palaa näkyviin.
+  // - Tila haetaan heti, kun näyttö palaa, sivu tulee näkyviin tai verkko palaa, ja muuten 2 s välein.
+  // - Komennot antavat tavoitetilan (esim. status: open), eivät vaihda sitä, joten verkkovirheen jälkeen
+  //   komento lähetetään turvallisesti uudelleen.
+  // - Kortit päivitetään paikallaan: säännöllinen päivitys ei vaihda nappia kesken napautuksen.
+
+  var REMOTE_HASH = /^#ohjain=(\d{1,9})$/;
+  var REMOTE_MS = 2000;
+  var REMOTE_TIMEOUT_MS = 8000;
+  var SCREEN_FRESH_S = 15;     // läppäri ilmoittaa esitysnäytöstä 5 s välein
+  var leaveView = null;        // nykyisen näkymän siivous (kuuntelijat, näytön lukitus)
+
+  function remoteTarget() {
+    var m = REMOTE_HASH.exec(window.location.hash);
+    return m ? parseInt(m[1], 10) : null;
+  }
+  function setRemoteHash(eventId) {
+    try { window.history.replaceState(null, '', window.location.pathname + window.location.search + (eventId ? '#ohjain=' + eventId : '')); } catch (e) { /* ei historiaa */ }
+  }
+  function remoteUrl(eventId) {
+    return window.location.origin + window.location.pathname + '#ohjain=' + eventId;
+  }
+  function withTimeout(p, ms) {
+    return new Promise(function (resolve, reject) {
+      var t = setTimeout(function () { reject(new TypeError('Aikakatkaisu')); }, ms);
+      p.then(function (v) { clearTimeout(t); resolve(v); }, function (e) { clearTimeout(t); reject(e); });
+    });
+  }
+
+  function showRemote(eventId) {
+    var data = null;
+    var lastOk = 0;
+    var loading = null;
+    var error = null;          // viimeisin komentovirhe
+    var busy = {};             // kortin avain -> komento kesken
+    var wake = null;
+    var wakeState = 'wakeLock' in navigator ? 'off' : 'unsupported';
+    var structure = null;      // rakenteen allekirjoitus: muuttuessa kortit rakennetaan uudelleen
+    var cards = {};            // kysymyksen id -> { el, count }
+    var TAB_KEY = 'hessutalks.remote.tab';
+    var tab = 'all';
+    try { if (window.sessionStorage.getItem(TAB_KEY) === 'stage') tab = 'stage'; } catch (e) { /* oletus */ }
+
+    var connEl = h('p.remote-conn', { role: 'status' });
+    var errEl = h('div');
+    var tabsEl = h('div.remote-tabs', { role: 'tablist' });
+    var listEl = h('div.remote-list');
+    var barEl = h('div.remote-bar');
+
+    function find(pid) { return (data.polls || []).filter(function (p) { return p.id === pid; })[0] || null; }
+    function staged() { return data.polls.filter(function (p) { return p.on_stage; }); }
+
+    // ---- näytön pito päällä
+    function requestWake() {
+      if (wakeState === 'unsupported' || wake || document.visibilityState !== 'visible') return;
+      navigator.wakeLock.request('screen').then(function (lock) {
+        wake = lock; wakeState = 'on'; renderConn();
+        lock.addEventListener('release', function () { wake = null; wakeState = 'off'; renderConn(); });
+      }).catch(function () { wakeState = 'denied'; renderConn(); });
+    }
+
+    // ---- tila
+    function load() {
+      if (loading) return loading;
+      loading = withTimeout(api('GET', 'events/' + eventId + '/polls'), REMOTE_TIMEOUT_MS).then(function (r) {
+        data = r; lastOk = Date.now(); loading = null; render();
+      }, function (e) {
+        loading = null; renderConn();
+        throw e;
+      });
+      return loading;
+    }
+    function refresh() { requestWake(); load().catch(function () {}); }
+
+    /** Komento: verkkovirheessä uudelleen (enintään 3 yritystä), koska kaikki komennot ovat idempotentteja. */
+    function send(key, path, body, confirmText) {
+      if (busy[key]) return;
+      if (confirmText && !window.confirm(confirmText)) return;
+      requestWake();
+      busy[key] = true; error = null; renderBusy();
+      var attempt = function (n) {
+        return withTimeout(api('POST', path, body), REMOTE_TIMEOUT_MS).catch(function (e) {
+          if (e instanceof TypeError && n < 2) return new Promise(function (r) { setTimeout(r, 700 * (n + 1)); }).then(function () { return attempt(n + 1); });
+          throw e;
+        });
+      };
+      // Komento meni perille: tilan haun virhe näkyy yhteyden tilassa, ei komennon virheenä.
+      attempt(0).then(function () { return load().catch(function () {}); }).catch(function (e) {
+        if (e.message === '401') return;
+        error = e instanceof TypeError ? 'Komento ei mennyt perille (ei yhteyttä). Tarkista verkko ja yritä uudelleen.' : e.message;
+      }).then(function () { delete busy[key]; renderBusy(); });
+    }
+
+    // ---- näkymä
+    function renderConn() {
+      if (!connEl.isConnected) return;
+      var parts = [];
+      var stale = !lastOk || Date.now() - lastOk > 3 * REMOTE_MS + 500;
+      var kind = 'ok';
+      if (navigator.onLine === false) { parts.push('Puhelin ei ole verkossa'); kind = 'bad'; }
+      else if (stale) { parts.push(lastOk ? 'Ei yhteyttä palvelimeen, yritetään uudelleen (viimeksi ' + new Date(lastOk).toLocaleTimeString('fi-FI') + ')' : 'Yhdistetään…'); kind = 'bad'; }
+      else parts.push('Yhteys kunnossa');
+      if (data && !stale) {
+        var age = data.screen_age;
+        if (age === null || age === undefined || age > SCREEN_FRESH_S) { parts.push('esitysnäyttö ei ole yhteydessä: avaa se läppärin hallinnasta'); if (kind === 'ok') kind = 'warn'; }
+        else parts.push('esitysnäyttö yhteydessä');
+      }
+      parts.push(wakeState === 'on' ? 'näyttö pysyy päällä'
+        : wakeState === 'unsupported' ? 'selain ei voi pitää näyttöä päällä (pidennä puhelimen automaattista lukitusta)'
+          : 'näyttö voi sammua: napauta sivua');
+      connEl.className = 'remote-conn ' + kind;
+      connEl.textContent = parts.join(' · ');
+      connEl.setAttribute('data-state', kind);
+    }
+
+    function big(key, text, path, body, primary, confirmText) {
+      return h('button.btn.remote-btn' + (primary ? '' : '.ghost'), { type: 'button', text: text, 'data-key': key,
+        onclick: function () { send(key, path, body, confirmText); } });
+    }
+
+    function pollCard(poll, n, set) {
+      var key = 'p' + poll.id;
+      var shown = poll.status !== 'draft' || poll.on_stage;
+      var count = h('span.remote-count', { text: poll.answer_count + ' vastausta' });
+      var p = 'polls/' + poll.id + '/';
+      var el = h('article.remote-card' + (poll.on_stage ? '.staged' : ''), { 'data-poll': String(poll.id), 'data-status': poll.status },
+        h('div.remote-card-head', null,
+          h('span.run-num', { text: (set ? set.slug + ' · ' : '') + n }),
+          poll.on_stage ? h('span.badge.live', { text: 'Taululla' }) : null,
+          h('span.badge.' + poll.status, { text: POLL_STATUS_LABEL[poll.status] || poll.status }),
+          count),
+        h('p.remote-prompt', { text: poll.prompt }),
+        h('div.remote-grid', null,
+          poll.on_stage
+            ? [poll.status === 'open'
+              ? big(key, 'Sulje vastaukset', p + 'status', { status: 'closed' }, true)
+              : big(key, 'Avaa vastauksille', p + 'status', { status: 'open' }, true),
+            big(key, 'Poista näytöltä', p + 'stage', { on: false })]
+            : big(key, 'Näytölle', p + 'status', { status: 'open' }, true),
+          shown ? big(key, poll.results_visible ? 'Piilota tulokset' : 'Näytä tulokset', p + 'results', { visible: !poll.results_visible }) : null,
+          shown && Array.isArray(poll.config.correct) ? big(key, poll.revealed ? 'Piilota oikea vastaus' : 'Paljasta oikea vastaus', p + 'reveal', { revealed: !poll.revealed }) : null));
+      cards[poll.id] = { el: el, count: count };
+      return el;
+    }
+
+    function renderBusy() {
+      root.querySelectorAll('.remote [data-key]').forEach(function (b) {
+        var on = !!busy[b.getAttribute('data-key')];
+        b.disabled = on;
+        b.classList.toggle('busy', on);
+      });
+      if (error) errEl.replaceChildren(notice(error, 'error')); else errEl.replaceChildren();
+    }
+
+    /** Ensimmäinen näkyvä kortti ja sen paikka: rakennuksen jälkeen sivu vieritetään niin, ettei se siirry. */
+    function anchor() {
+      var els = listEl.querySelectorAll('[data-poll]');
+      for (var i = 0; i < els.length; i++) {
+        var r = els[i].getBoundingClientRect();
+        if (r.bottom > 0) return { id: els[i].getAttribute('data-poll'), top: r.top };
+      }
+      return null;
+    }
+
+    function render() {
+      renderConn();
+      var onStage = staged();
+      var sig = JSON.stringify([tab, data.show_qr, data.sets, data.polls.map(function (p) {
+        return [p.id, p.set_id, p.prompt, p.status, p.on_stage, p.results_visible, p.revealed, Array.isArray(p.config.correct)];
+      })]);
+      if (sig === structure) {
+        data.polls.forEach(function (p) { if (cards[p.id]) cards[p.id].count.textContent = p.answer_count + ' vastausta'; });
+        return;
+      }
+      structure = sig;
+      var keep = anchor();
+      cards = {};
+
+      tabsEl.replaceChildren(
+        h('button.remote-tab', { type: 'button', role: 'tab', 'aria-selected': String(tab === 'stage'), id: 'remote-tab-stage',
+          text: 'Taululla (' + onStage.length + ')', onclick: function () { selectTab('stage'); } }),
+        h('button.remote-tab', { type: 'button', role: 'tab', 'aria-selected': String(tab === 'all'), id: 'remote-tab-all',
+          text: 'Kaikki (' + data.polls.length + ')', onclick: function () { selectTab('all'); } }));
+
+      barEl.replaceChildren(
+        big('qr', data.show_qr ? 'QR pieneksi' : 'QR isona', 'events/' + eventId + '/qr', { show: !data.show_qr }, !!data.show_qr),
+        big('clear', 'Tyhjennä taulu', 'events/' + eventId + '/live', { action: 'activate', poll: null }, false,
+          'Tyhjennetäänkö taulu? Kysymykset ja viestit poistuvat näytöltä ja auki olevat suljetaan. Vastaukset säilyvät.'));
+
+      var n = 0;
+      var numbers = {};
+      data.sets.forEach(function (set) {
+        data.polls.forEach(function (p) { if (p.set_id === set.id) numbers[p.id] = ++n; });
+      });
+      var setOf = function (p) { return data.sets.filter(function (s) { return s.id === p.set_id; })[0] || null; };
+      listEl.replaceChildren();
+      if (tab === 'stage') {
+        if (!onStage.length) listEl.appendChild(h('p.empty', { text: 'Taululla ei ole kysymyksiä. Projektorilla näkyy QR-koodi ja liittymisohje (sekä läppäriltä taululle nostetut viestit).' }));
+        onStage.forEach(function (p) { listEl.appendChild(pollCard(p, numbers[p.id], setOf(p))); });
+      } else {
+        if (!data.polls.length) listEl.appendChild(h('p.empty', { text: 'Luennolla ei ole kysymyksiä. Luo tai tuo ne läppärin hallinnassa.' }));
+        data.sets.forEach(function (set) {
+          var inSet = data.polls.filter(function (p) { return p.set_id === set.id; });
+          if (!inSet.length) return;
+          listEl.appendChild(h('h2.remote-set', null, h('span.code', { text: set.slug }), set.title.indexOf(set.slug) === 0 ? set.title.slice(set.slug.length) : ' ' + set.title));
+          inSet.forEach(function (p) { listEl.appendChild(pollCard(p, numbers[p.id], null)); });
+        });
+      }
+      renderBusy();
+      if (keep) {
+        var again = listEl.querySelector('[data-poll="' + keep.id + '"]');
+        if (again) window.scrollBy(0, again.getBoundingClientRect().top - keep.top);
+      }
+    }
+
+    function selectTab(t) {
+      tab = t;
+      try { window.sessionStorage.setItem(TAB_KEY, t); } catch (e) { /* vain muistissa */ }
+      structure = null;
+      render();
+      window.scrollTo(0, 0);
+    }
+
+    // ---- kuuntelijat: näyttö palaa, verkko palaa, napautus (näytön lukitus vaatii usein käyttäjän eleen)
+    function onVisible() { if (document.visibilityState === 'visible') refresh(); }
+    function onTap() { requestWake(); }
+    document.addEventListener('visibilitychange', onVisible);
+    window.addEventListener('pageshow', refresh);
+    window.addEventListener('online', refresh);
+    window.addEventListener('offline', renderConn);
+    window.addEventListener('focus', refresh);
+    document.addEventListener('resume', refresh);   // Page Lifecycle: jäädytetty sivu palaa (Android)
+    document.addEventListener('click', onTap, true);
+
+    setRemoteHash(eventId);
+    mount(h('div.remote', null,
+      h('div.remote-top', null,
+        h('div.toolbar', null, h('h1', { text: 'Ohjain' }), h('span.spacer'),
+          h('button.btn.ghost.small', { type: 'button', text: 'Hallintaan', title: 'Luentolista (läppärillä luennon näkymä)', onclick: function () {
+            setRemoteHash(null);
+            if (secretKey) showEvent(eventId); else start();
+          } })),
+        connEl, barEl, tabsEl),
+      errEl, listEl,
+      h('p.hint', { text: 'Vapaat kysymykset ja palautteet nostetaan taululle läppärin hallinnasta: ohjain ei pura viestejä, joten salausavainta ei tarvita puhelimessa.' })));
+    leaveView = function () {
+      document.removeEventListener('visibilitychange', onVisible);
+      window.removeEventListener('pageshow', refresh);
+      window.removeEventListener('online', refresh);
+      window.removeEventListener('offline', renderConn);
+      window.removeEventListener('focus', refresh);
+      document.removeEventListener('resume', refresh);
+      document.removeEventListener('click', onTap, true);
+      if (wake) { wake.release().catch(function () {}); wake = null; }
+    };
+    renderConn();
+    load().catch(function (e) { if (e.message !== '401') errEl.replaceChildren(notice(e.message, 'error')); });
+    requestWake();
+    pollTimer = setInterval(function () {
+      renderConn();
+      if (!document.hidden) load().catch(function () {});
+    }, REMOTE_MS);
+  }
+
+  function showRemotePicker() {
+    mount(h('div.toolbar', null, h('h1', { text: 'Ohjain' }), h('span.spacer'),
+      h('button.btn.ghost.small', { type: 'button', text: 'Takaisin', onclick: function () { start(); } })),
+      h('p', { text: 'Valitse luento. Ohjain ei pura viestejä, joten salausavainta ei tarvita.' }),
+      h('ul.event-list', null, state.events.map(function (ev) {
+        return h('li', null, h('span.code', { text: ev.code }), h('strong', { text: ev.title }),
+          h('button.btn.small.open-btn', { type: 'button', text: 'Ohjaa', onclick: function () { showRemote(ev.id); } }));
+      })));
+  }
+
   function stopPolling() {
+    if (leaveView) { var leave = leaveView; leaveView = null; leave(); }
     liveRefresh = null;
     liveCommand = null;
     blankScreens();
@@ -1718,6 +2030,10 @@
   // ================================================================ käynnistys
 
   function start() {
+    var remote = remoteTarget();
+    if (remote !== null) {
+      return loadState().then(function () { showRemote(remote); }).catch(function (e) { if (e.message !== '401') mount(notice(e.message, 'error')); });
+    }
     if (!secretKey) {
       return loadState().then(function () {
         if (!state.keys) { forgetPrf(); showKeySetup(); return; }

@@ -44,7 +44,8 @@ Todennustavat:
 | 8 | SHOULD: CSV-vienti (kaavainjektion esto), sarjan monistus, kysymyksen siirto, esikatselu. (Tulokset osallistujille, teemat, kirosanasuodatin ja puhelinohjain tehtiin vaiheissa 4–6.) | ✅ PR #17 (`should.mjs`) |
 | 9 | Ensimmäisen luentokoeajon korjaukset: yksi esitysikkuna ruudukkona (kysymykset, kysymys- ja palautelista, viesti), useita kysymyksiä näytöllä ja auki yhtä aikaa, yhteys palautuu uudelleenlatauksen jälkeen, vastausten tyhjennys vain Valmistelu-tilassa | ✅ PR #40, #41 ([poikkeamakatselmus](poikkeama-esitysnaytto.md), `stage-multi.mjs`, `testSeveralPollsOnStageAcceptAnswersUntilRemoved`, `testStageMigrationKeepsAnswersAndActivePoll`) |
 | 10 | Luentopalautteen backlog: kaksi tai useampi kysymys auki aina (rivin klikkaus ja Seuraava eivät sulje muita), istunto 3 h toimettomuutta, Markdown-raportti koko luennosta tai luentosarjasta | ✅ PR #43 (`stage-multi.mjs`, `testOpeningAndActivatingKeepOtherQuestionsOpen`, `testSessionSurvivesTwoHoursWithoutActivity`, Node `results.test.mjs`) |
-| 11 | Hallinnan yksinkertaistus ([#60](https://github.com/hessuj/hessutalks/issues/60)): ei tiloja eikä aktiivista kysymystä; kolme välilehteä (Kysymykset, Vapaat kysymykset, Palautteet); kysymyksen rivillä Näytä taululla (näyttää ja avaa), Sulje, Poista taululta, tulokset ja paljastus; rivin klikkaus avaa tulokset ja muokkauksen; viestit taululle rivikohtaisesti. Poistettu Seuraava/Edellinen, sarjan ohitus, ohjauspikanäppäimet, puhelinohjain ja projektorin viestilistat | ✅ tämä PR (`admin-list.mjs`, `stage-messages.mjs`, `tabs.mjs`, `messages.mjs`, `testAdminControlsSetsAndActiveQuestion`) |
+| 11 | Hallinnan yksinkertaistus ([#60](https://github.com/hessuj/hessutalks/issues/60)): ei tiloja eikä aktiivista kysymystä; kolme välilehteä (Kysymykset, Vapaat kysymykset, Palautteet); kysymyksen rivillä Näytä taululla (näyttää ja avaa), Sulje, Poista taululta, tulokset ja paljastus; rivin klikkaus avaa tulokset ja muokkauksen; viestit taululle rivikohtaisesti. Poistettu Seuraava/Edellinen, sarjan ohitus, ohjauspikanäppäimet, puhelinohjain ja projektorin viestilistat | ✅ PR #61 (`admin-list.mjs`, `stage-messages.mjs`, `tabs.mjs`, `messages.mjs`, `testAdminControlsSetsAndActiveQuestion`) |
+| 12 | Puhelinohjain ([#63](https://github.com/hessuj/hessutalks/issues/63)): samat kysymystoiminnot kuin hallinnan listassa isoin napein (Näytölle näyttää ja avaa, Sulje/Avaa, Poista näytöltä, tulokset, paljastus, Tyhjennä taulu, iso QR), useita kysymyksiä näytölle; Taululla- ja Kaikki-välilehdet; yhteyden, esitysnäytön ja näytön lukituksen tila; näytön pito päällä (Wake Lock), päivitys heti näytön tai verkon palatessa, idempotentit komennot; Tyhjennä taulu poistaa myös läppärin nostamat viestit; avaus QR-koodilla ilman salausavainta | ✅ tämä PR (`remote.mjs`, `testRemoteSeesScreenHeartbeatAndBoardClears`, `testPhoneRemoteNeverDecryptsOrStoresContent`) |
 
 ## Vaatimusten kattavuus
 
@@ -52,7 +53,7 @@ Todennustavat:
 |---|---|---|---|
 | 3 Kysymystyypit | T1 ✅ T2 ✅ T3 ✅ | T4 ✅ T5 ✅ | T6 Q&A ✖ (P6: korvattu avoimella tekstillä) |
 | 4 Osallistuja | 1–7, 9 ✅ | 8 tulokset osallistujille ✅ | |
-| 5 Esittäjä | 5.1, 5.2, 5.4 ✅ | 5.1 teemat ✅, 5.3 puhelinohjain ✖ (poistettu, [#60](https://github.com/hessuj/hessutalks/issues/60)), 5.4 CSV ✅ | |
+| 5 Esittäjä | 5.1, 5.2, 5.4 ✅ | 5.1 teemat ✅, 5.3 puhelinohjain ✅ (uusittu, [#63](https://github.com/hessuj/hessutalks/issues/63)), 5.4 CSV ✅ | |
 | 6 Sisältö | luonti ja muokkaus etukäteen ✅ | JSON ✅, monistus ja siirto ✅ | esikatselu ✅ |
 | 7 Tietoturva | 1–5, 7–9 ✅ | 6 kirosanasuodatin ✅ | |
 | 8 Suorituskyky | 443 + varayhteys ✅ (lyhyt pollaus), julkaisujäädytys ✅, 150 osallistujaa ja tulokset alle 2 s ✅ (paikallisesti ja tuotannossa 29.10.) | kuormitustesti 200 ⏳ (siirretty) | |

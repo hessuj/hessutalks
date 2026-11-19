@@ -486,3 +486,31 @@ body.presenter.light .res-open li { background: #f1f0f8; }
 .stage-bar .hint { margin: 0; }
 .stage-status { font: 600 .85rem var(--mono); }
 .stage-status.ok { color: var(--ok); }
+
+/* Puhelinohjain (issue #63): isot napit, tila yhdellä silmäyksellä, ei sivuttaisvieritystä 360 px:llä. */
+.event-btns { display: flex; gap: .4rem; flex-wrap: wrap; justify-content: flex-end; }
+.remote { max-width: 40rem; margin: 0 auto; width: 100%; min-width: 0; }
+.remote-top { position: sticky; top: 0; z-index: 2; background: var(--screen); padding-bottom: .5rem; margin: 0 0 .5rem; border-bottom: 2px solid var(--frame); }
+.remote-top .toolbar { margin-bottom: .3rem; }
+.remote-conn { margin: 0 0 .5rem; padding: .4rem .6rem; font-size: .9rem; border-left: 4px solid var(--ok); color: var(--ok); overflow-wrap: anywhere; }
+.remote-conn.warn { border-color: var(--accent); color: var(--accent); }
+.remote-conn.bad { border-color: var(--bad); color: var(--bad); font-weight: 700; }
+.remote-bar { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: .5rem; margin-bottom: .5rem; }
+.remote-tabs { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: .5rem; }
+.remote-tab { min-height: 48px; font: 700 1rem var(--sans); color: var(--ink); background: transparent; border: 2px solid var(--frame); cursor: pointer; }
+.remote-tab[aria-selected="true"] { background: var(--accent); border-color: var(--accent); color: var(--screen); }
+.remote-set { font-size: 1rem; margin: 1.2rem 0 .4rem; color: var(--ink-dim); overflow-wrap: anywhere; }
+.remote-list { overflow-anchor: none; }
+.remote-card { border: 2px solid var(--frame); padding: .7rem; margin: 0 0 .7rem; min-width: 0; }
+.remote-card.staged { border-color: var(--accent); background: rgba(127, 211, 219, .07); }
+.remote-card-head { display: flex; flex-wrap: wrap; align-items: center; gap: .3rem .4rem; font-size: .9rem; }
+.remote-card-head .badge { margin-left: 0; }
+.remote-count { margin-left: auto; color: var(--ink-dim); }
+.remote-prompt { font-size: 1.15rem; font-weight: 700; margin: .4rem 0 .6rem; overflow-wrap: anywhere; }
+.remote-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: .5rem; }
+.remote-btn { min-height: 52px; font-size: 1rem; width: 100%; white-space: normal; overflow-wrap: anywhere; }
+.remote-btn.busy { cursor: progress; }
+.remote-card:not(.staged) .remote-grid > .remote-btn:first-child:not(.ghost) { grid-column: 1 / -1; }
+.remote-qr { display: flex; flex-wrap: wrap; gap: 1rem; align-items: flex-start; margin: .5rem 0; }
+.remote-qr img { background: #fff; image-rendering: pixelated; }
+.remote-link { overflow-wrap: anywhere; font-family: var(--mono); }

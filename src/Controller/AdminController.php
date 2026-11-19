@@ -136,7 +136,7 @@ final class AdminController
         }
 
         // --- Kirjautuneen ylläpitäjän reitit -------------------------------
-        if (preg_match('#^events/(\d{1,10})/(questions|status|delete|lang|qr|title)$#', $route, $m) === 1) {
+        if (preg_match('#^events/(\d{1,10})/(questions|status|delete|lang|qr|screen|title)$#', $route, $m) === 1) {
             return $this->eventAction($req, (int) $m[1], $m[2], $in, $client);
         }
         if (preg_match('#^events/(\d{1,10})/(polls|poll-answers|sets|live|import|export)$#', $route, $m) === 1) {
@@ -358,6 +358,11 @@ final class AdminController
             // Versio kertoo muille hallintaikkunoille (esim. läppärin projektori), että tila muuttui.
             $this->live->bump($id);
             return Response::json(['event' => $this->eventOut((array) $this->events->find($id))]);
+        }
+        if ($action === 'screen') {
+            // Elonmerkki ei kasvata versiota eikä mene tietoturvalokiin: läppäri lähettää sen muutaman sekunnin välein.
+            $this->events->touchScreen($id, time());
+            return Response::json(['ok' => true]);
         }
         if ($action === 'title') {
             if (!is_string($in['title'] ?? null) || !mb_check_encoding($in['title'], 'UTF-8')) {
@@ -624,6 +629,9 @@ final class AdminController
             // Ohjaustila: versio muuttuu, kun toinen hallintaikkuna (esim. puhelimen ohjain) muuttaa jotain.
             'version' => (int) ($fresh['live_version'] ?? 0),
             'show_qr' => (int) ($fresh['show_qr'] ?? 0) === 1,
+            // Puhelinohjain (issue #63): taulun tyhjennykset (läppäri poistaa silloin viestit) ja esitysnäytön elonmerkin ikä.
+            'board_clears' => (int) ($fresh['board_clears'] ?? 0),
+            'screen_age' => isset($fresh['screen_seen_at']) ? max(0, time() - (int) $fresh['screen_seen_at']) : null,
         ], $status);
     }
 

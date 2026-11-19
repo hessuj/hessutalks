@@ -85,13 +85,13 @@ await admin.click('QR pieneksi');
 await stage.waitFor(`!document.querySelector('.stage-bigqr')`, 'QR pieneksi', 8000);
 step('Nuolet, PageDown, välilyönti, R ja A eivät enää ohjaa; Q (hallinnassa) ja QR pieneksi -nappi toimivat');
 
-// Puhelinohjainta ei enää ole: toisen ikkunan avausnäkymässä ei ole sen nappia.
+// Toisen laitteen avausnäkymässä on Puhelinohjain (issue #63; ohjain itse testataan remote.mjs:ssä).
 const phone = await tab(port);
 await phone.cdp('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 2, mobile: true });
 await phone.cdp('Page.navigate', { url: app + '/admin' });
 await phone.waitFor(phone.hasText('Avaa kysymykset'), 'avausnäkymä');
-if (await phone.js(phone.hasText('Puhelinohjain'))) throw new Error('Puhelinohjaimen nappi näkyy yhä');
-step('Puhelinohjaimen nappi on poistunut avausnäkymästä');
+if (!(await phone.js(phone.hasText('Puhelinohjain')))) throw new Error('Puhelinohjaimen nappi puuttuu avausnäkymästä');
+step('Avausnäkymässä Puhelinohjain-nappi (ohjaus ilman salausavainta)');
 
 const errs = [...admin.logs, ...stage.logs, ...phone.logs];
 if (errs.length) { console.log('Selaimen virheet:\n' + errs.join('\n')); process.exit(1); }
