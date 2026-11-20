@@ -60,6 +60,8 @@ Hallinnassa ei ole erillisiä tiloja eikä aktiivista kysymystä: jokaisen kysym
    avautuvassa osassa. Piilotus katoaa projektorilta heti.
    Kirosanasuodatin (englanti ja suomi) piilottaa osumat automaattisesti, ja ne odottavat hyväksyntää (⚠ … ✓).
    Piilotukset tallennetaan palvelimelle salattuina luennoitsijan avaimella, joten ne säilyvät uudelleenlatauksen yli.
+10. **Arkistointi:** luennon sivun *Arkistoi* sulkee kysymykset, tyhjentää taulun ja siirtää luennon arkistoon. Tiedot säilyvät.
+    Arkistoidaan vain käsin. Arkistosta luennon voi palauttaa suljettuna ja avata sitten tavalliseen tapaan.
 
 Kyselyyn vastataan ilman nimimerkkiä. Vastaukset salataan selaimessa kuten kysymyksetkin, ja tulokset
 lasketaan luennoitsijan selaimessa, joten hallinnan pitää olla auki ja avattuna. Saman selaimen uusi vastaus

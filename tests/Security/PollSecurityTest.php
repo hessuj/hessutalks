@@ -249,6 +249,8 @@ final class PollSecurityTest extends AppTestCase
         yield ['POST', '/admin/api/events/1/lang'];
         yield ['POST', '/admin/api/events/1/qr'];
         yield ['POST', '/admin/api/events/1/screen'];
+        yield ['POST', '/admin/api/events/1/archive'];
+        yield ['POST', '/admin/api/events/1/restore'];
         yield ['POST', '/admin/api/sets/1/update'];
         yield ['POST', '/admin/api/sets/1/move'];
         yield ['POST', '/admin/api/sets/1/delete'];

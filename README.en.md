@@ -60,6 +60,8 @@ The admin view has no separate modes and no active question: the actions for eac
    question's expanded part. A hidden item disappears from the projector immediately.
    The profanity filter (English and Finnish) hides matches automatically, and they wait for approval (⚠ … ✓).
    Hidden items are stored on the server encrypted with the lecturer's key, so they persist across reloads.
+10. **Archiving:** *Arkistoi* (archive) on the lecture page closes questions, clears the board and moves the lecture to the archive. Data is kept.
+    Archiving is manual only. A lecture can be restored from the archive as closed and then reopened as usual.
 
 Polls are answered without a nickname. Answers are encrypted in the browser like questions, and results
 are computed in the lecturer's browser, so the admin view must be open and unlocked. A new answer from the same browser

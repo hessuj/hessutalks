@@ -165,6 +165,56 @@ final class ParticipantSecurityTest extends AppTestCase
         self::assertSame(410, $this->request('GET', '/k/' . $this->code)->status);
     }
 
+    public function testArchivedEventRejectsSubmissionsAndIsInClosedNotice(): void
+    {
+        $claim = $this->claim($this->code, $this->token, 'Arkistoitu');
+        $repo = new EventRepository($this->db, $this->clock);
+        $id = (int) $repo->findByCode($this->code)['id'];
+        self::assertTrue($repo->archive($id, 1_800_000_100));
+        self::assertSame(410, $this->request('POST', '/api/questions', $this->submission($claim))->status);
+        self::assertSame(410, $this->request('GET', '/k/' . $this->code)->status);
+        self::assertSame(410, $this->request('GET', '/api/live?code=' . $this->code)->status);
+    }
+
+    /**
+     * Issue #67, päätös 3: luentoja ei arkistoida automaattisesti, ei myöskään sulkeutumisajan jälkeen.
+     * Aiempi toteutusluonnos arkistoi umpeutuneet luennot jokaisen pyynnön alussa (havaittu katselmoinnissa 20.11.).
+     */
+    public function testExpiredEventIsNeverArchivedAutomatically(): void
+    {
+        $repo = new EventRepository($this->db, $this->clock);
+        $timed = $repo->create('Kolmen tunnin luento', 3);
+        $this->clock->advance(4 * 3600);
+        $csrf = $this->loginAdmin();
+        $this->request('GET', '/k/' . (string) $timed['code']);
+        $this->request('GET', '/api/live?code=' . (string) $timed['code']);
+        $state = $this->json($this->request('GET', '/admin/api/state', null, ['X-CSRF-Token' => $csrf]));
+        $events = $this->json($this->request('GET', '/admin/api/events', null, ['X-CSRF-Token' => $csrf]));
+        $after = $repo->find((int) $timed['id']);
+        self::assertNotSame('archived', $after['status'] ?? null);
+        self::assertNull($after['archived_at'] ?? null);
+        self::assertFalse($repo->isOpen((array) $after), 'Sulkeutumisaika sulkee, mutta ei arkistoi');
+        self::assertSame([], $events['archived'] ?? null);
+        self::assertContains((string) $timed['code'], array_column($state['events'] ?? [], 'code'));
+    }
+
+    public function testArchivedEventCannotBeReopenedWithoutRestore(): void
+    {
+        $csrf = $this->loginAdmin();
+        $repo = new EventRepository($this->db, $this->clock);
+        $id = (int) $repo->findByCode($this->code)['id'];
+        $h = ['X-CSRF-Token' => $csrf];
+        self::assertSame(200, $this->request('POST', '/admin/api/events/' . $id . '/archive', [], $h)->status);
+        self::assertSame(409, $this->request('POST', '/admin/api/events/' . $id . '/archive', [], $h)->status);
+        self::assertSame(422, $this->request('POST', '/admin/api/events/' . $id . '/status', ['status' => 'open'], $h)->status);
+        self::assertSame(410, $this->request('GET', '/k/' . $this->code)->status);
+        $restored = $this->json($this->request('POST', '/admin/api/events/' . $id . '/restore', [], $h));
+        self::assertSame('closed', $restored['event']['status'] ?? null);
+        self::assertSame(409, $this->request('POST', '/admin/api/events/' . $id . '/restore', [], $h)->status);
+        self::assertSame(200, $this->request('POST', '/admin/api/events/' . $id . '/status', ['status' => 'open'], $h)->status);
+        self::assertSame(200, $this->request('GET', '/k/' . $this->code)->status);
+    }
+
     public function testRateLimitPerNickname(): void
     {
         $claim = $this->claim($this->code, $this->token, 'Spämmääjä');

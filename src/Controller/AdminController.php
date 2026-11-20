@@ -136,7 +136,7 @@ final class AdminController
         }
 
         // --- Kirjautuneen ylläpitäjän reitit -------------------------------
-        if (preg_match('#^events/(\d{1,10})/(questions|status|delete|lang|qr|screen|title)$#', $route, $m) === 1) {
+        if (preg_match('#^events/(\d{1,10})/(questions|status|archive|restore|delete|lang|qr|screen|title)$#', $route, $m) === 1) {
             return $this->eventAction($req, (int) $m[1], $m[2], $in, $client);
         }
         if (preg_match('#^events/(\d{1,10})/(polls|poll-answers|sets|live|import|export)$#', $route, $m) === 1) {
@@ -165,7 +165,10 @@ final class AdminController
             ['POST', 'logout'] => $this->logout($client),
             ['POST', 'keys'] => $this->saveKeys($in, $client),
             ['POST', 'keys/rewrap'] => $this->rewrapKeys($in, $client),
-            ['GET', 'events'] => Response::json(['events' => array_map($this->eventOut(...), $this->events->all())]),
+            ['GET', 'events'] => Response::json([
+                'events' => array_map($this->eventOut(...), $this->events->all()),
+                'archived' => array_map($this->eventOut(...), $this->events->archived()),
+            ]),
             ['POST', 'events'] => $this->createEvent($in, $client),
             ['GET', 'audit'] => Response::json(['entries' => $this->audit->recent()]),
             default => Response::error('Ei löytynyt.', 404),
@@ -276,6 +279,7 @@ final class AdminController
             'passkeys' => $this->passkeys->list(),
             'passkey' => $this->auth->sessionPasskeyId(),
             'events' => array_map($this->eventOut(...), $this->events->all()),
+            'archived' => array_map($this->eventOut(...), $this->events->archived()),
             'origin' => $this->config->publicOrigin,
             'basePath' => $this->config->basePath,
         ]);
@@ -392,6 +396,22 @@ final class AdminController
             }
             // Osallistujat (tilatiedosto) näkevät sulkemisen ja uudelleenavauksen.
             $this->live->bump($id);
+            return Response::json(['event' => $this->eventOut((array) $this->events->find($id))]);
+        }
+        if ($action === 'archive') {
+            if (!$this->events->archive($id, time())) {
+                return Response::error('Luento on jo arkistoitu.', 409);
+            }
+            $this->live->bump($id);
+            $this->audit->record('event_archived', $client, (string) $event['code']);
+            return Response::json(['event' => $this->eventOut((array) $this->events->find($id))]);
+        }
+        if ($action === 'restore') {
+            if (!$this->events->restore($id)) {
+                return Response::error('Luentoa ei voi palauttaa.', 409);
+            }
+            $this->live->bump($id);
+            $this->audit->record('event_restored', $client, (string) $event['code']);
             return Response::json(['event' => $this->eventOut((array) $this->events->find($id))]);
         }
         // delete
@@ -774,6 +794,7 @@ final class AdminController
             'open' => $this->events->isOpen($event),
             'created_at' => (int) ($event['created_at'] ?? 0),
             'closes_at' => isset($event['closes_at']) ? (int) $event['closes_at'] : null,
+            'archived_at' => isset($event['archived_at']) ? (int) $event['archived_at'] : null,
             'question_count' => (int) ($event['question_count'] ?? 0),
             'new_count' => (int) ($event['new_count'] ?? 0),
             'url' => $this->config->publicOrigin . $this->config->url('/k/' . (string) ($event['code'] ?? '')),
