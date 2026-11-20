@@ -5,11 +5,15 @@
  *  - Jos osoitteessa on ?lang=fi|en (käyttäjä valitsi kielen), valinta tallennetaan.
  *  - Muuten, jos tallennettu kieli poikkeaa sivun kielestä (esim. QR-koodin linkki
  *    ja selaimen kieli), sivu ladataan uudelleen tallennetulla kielellä.
+ *  - Luennon sivulla valinta muistetaan luentokohtaisesti (issue #72): yhdellä luennolla
+ *    valittu kieli ei saa ohittaa toisen luennon luennoitsijan asettamaa kieltä.
+ *    Etusivu ja tietosuojasivu käyttävät yhteistä avainta.
  */
 (function () {
   'use strict';
 
-  var KEY = 'hessutalks.lang';
+  var event = /\/k\/([A-Z0-9]{4,12})$/.exec(window.location.pathname);
+  var KEY = 'hessutalks.lang' + (event ? '.' + event[1] : '');
   var LANGS = ['fi', 'en'];
   var params = new URLSearchParams(window.location.search);
   var chosen = params.get('lang');

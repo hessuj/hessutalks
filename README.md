@@ -148,9 +148,9 @@ läppärin näytölle. Luennon sivun yläosa kertoo, onko esitysnäyttö yhdiste
 
 ### Kieli
 
-Osallistujan sivut ovat suomeksi ja englanniksi (hallinta aina suomeksi). Kieli tulee selaimen
-asetuksista, ja sen voi vaihtaa yläkulman FI/EN-kytkimestä. Valinta muistetaan vain selaimessa
-(localStorage). Käännökset ovat tiedostossa `src/I18n.php`, ja testi varmistaa, että jokaisella
+Osallistujan sivut ovat suomeksi ja englanniksi (hallinta aina suomeksi). Kieli tulee luennon asetuksesta
+(Osallistujien kieli), muuten selaimen asetuksista, ja sen voi vaihtaa yläkulman FI/EN-kytkimestä. Valinta muistetaan
+luentokohtaisesti vain selaimessa (localStorage), joten se ei vaikuta muihin luentoihin. Käännökset ovat tiedostossa `src/I18n.php`, ja testi varmistaa, että jokaisella
 avaimella on molemmat kielet.
 
 ## Tietoturva lyhyesti
