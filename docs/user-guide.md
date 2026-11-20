@@ -71,7 +71,8 @@ One lecture can cover a whole course: participants use the same code and nicknam
 3. **Link** to the participant page. Open it to see the participant view.
 4. **Sulje kysymykset** (close questions): participants can no longer send messages. On a closed lecture the button reads *Avaa kysymykset* (open questions).
 5. **Poista luento** (delete lecture): deletes the lecture and all its messages permanently.
-6. **Osallistujien kieli** (participants' language): can be changed later. Projector texts change too.
+6. **Arkistoi** (archive): closes questions, clears the board and moves the lecture to the archive without deleting data. A lecture with an elapsed closing time is archived automatically. In the archive it can be restored as closed, opened or permanently deleted.
+7. **Osallistujien kieli** (participants' language): can be changed later. Projector texts change too.
 
 ### 2.3 Toolbar
 

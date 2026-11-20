@@ -71,7 +71,8 @@ Yksi luento voi kattaa koko kurssin: osallistujat käyttävät samaa koodia ja n
 3. **Linkki** osallistujan sivulle. Avaa se, jos haluat nähdä osallistujan näkymän.
 4. **Sulje kysymykset**: osallistujat eivät voi enää lähettää viestejä. Saman napin nimi on suljetulla luennolla *Avaa kysymykset*.
 5. **Poista luento**: poistaa luennon ja kaikki sen viestit pysyvästi.
-6. **Osallistujien kieli**: voit vaihtaa kielen myöhemmin. Myös projektorin tekstit vaihtuvat.
+6. **Arkistoi**: sulkee kysymykset, tyhjentää taulun ja siirtää luennon arkistoon ilman tietojen poistoa. Sulkeutumisaika arkistoituu automaattisesti. Arkistossa luento voidaan palauttaa suljettuna, avata tai poistaa pysyvästi.
+7. **Osallistujien kieli**: voit vaihtaa kielen myöhemmin. Myös projektorin tekstit vaihtuvat.
 
 ### 2.3 Työkalupalkki
 

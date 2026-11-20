@@ -56,6 +56,7 @@ The admin view has no separate modes and no active question: the actions for eac
    mark as handled), which *Palauta uudeksi* (back to new) undoes, and *Poista* (delete).
 8. **The board row** at the top of the lecture page has *Avaa esitysnäyttö* (open presenter display, with the connection status), *QR isona*
    (large QR) and *Tyhjennä taulu* (clear board). The presenter display is a single window showing everything chosen for the board. Empty board: the lecture QR code.
+9. **Archiving:** *Arkistoi* (archive) on the lecture page closes questions, clears the board and moves the lecture to its own archive without deleting data. The lecture is archived automatically when its closing time expires. It can be restored from the archive as closed, reopened or permanently deleted.
 9. **Moderation:** an open-text answer can be hidden with the *Piilota* (hide) button and a word-cloud word by clicking it in the
    question's expanded part. A hidden item disappears from the projector immediately.
    The profanity filter (English and Finnish) hides matches automatically, and they wait for approval (⚠ … ✓).

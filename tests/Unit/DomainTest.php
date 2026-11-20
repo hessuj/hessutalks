@@ -71,6 +71,23 @@ final class DomainTest extends TestCase
         self::assertFalse($repo->isOpen($event));
     }
 
+    public function testEventCanBeArchivedAndRestored(): void
+    {
+        $repo = new EventRepository($this->db, $this->clock);
+        $event = $repo->create('Pidetty luento', null);
+        $id = (int) $event['id'];
+        self::assertTrue($repo->archive($id, 1_800_000_100));
+        $archived = $repo->find($id);
+        self::assertSame('archived', $archived['status']);
+        self::assertSame(1_800_000_100, (int) $archived['archived_at']);
+        self::assertFalse($repo->isOpen($archived));
+        self::assertSame([], array_values(array_filter($repo->all(), static fn (array $row): bool => (int) $row['id'] === $id)));
+        self::assertTrue($repo->restore($id));
+        $restored = $repo->find($id);
+        self::assertSame('closed', $restored['status']);
+        self::assertNull($restored['archived_at']);
+    }
+
     // ------------------------------------------------------------ nimimerkit
 
     /** @return iterable<array{mixed, ?string}> */

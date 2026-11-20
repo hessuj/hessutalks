@@ -165,6 +165,17 @@ final class ParticipantSecurityTest extends AppTestCase
         self::assertSame(410, $this->request('GET', '/k/' . $this->code)->status);
     }
 
+    public function testArchivedEventRejectsSubmissionsAndIsInClosedNotice(): void
+    {
+        $claim = $this->claim($this->code, $this->token, 'Arkistoitu');
+        $repo = new EventRepository($this->db, $this->clock);
+        $id = (int) $repo->findByCode($this->code)['id'];
+        self::assertTrue($repo->archive($id, 1_800_000_100));
+        self::assertSame(410, $this->request('POST', '/api/questions', $this->submission($claim))->status);
+        self::assertSame(410, $this->request('GET', '/k/' . $this->code)->status);
+        self::assertSame(410, $this->request('GET', '/api/live?code=' . $this->code)->status);
+    }
+
     public function testRateLimitPerNickname(): void
     {
         $claim = $this->claim($this->code, $this->token, 'Spämmääjä');

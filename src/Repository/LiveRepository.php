@@ -35,6 +35,26 @@ final class LiveRepository
         $this->publish($eventId);
     }
 
+    /** Arkistoi sulkeutumisajan perusteella sekä sulkee näytöllä olleet kyselyt. */
+    public function archiveExpired(int $now): void
+    {
+        $expired = $this->db->all(
+            'SELECT id FROM events WHERE status = ? AND closes_at IS NOT NULL AND closes_at <= ?',
+            ['open', $now],
+        );
+        foreach ($expired as $row) {
+            $id = (int) $row['id'];
+            $this->db->exec(
+                'UPDATE events SET status = ?, archived_at = ?, closes_at = NULL,
+                        active_poll_id = NULL, board_clears = board_clears + 1,
+                        live_version = live_version + 1 WHERE id = ?',
+                ['archived', $now, $id],
+            );
+            $this->db->exec("UPDATE polls SET status = 'closed', on_stage = 0 WHERE event_id = ? AND status = 'open'", [$id]);
+            $this->publish($id);
+        }
+    }
+
     /**
      * Kirjoittaa osallistujan tilan staattiseen tiedostoon. Suljetun luennon tiedostossa ei ole kysymystä:
      * selain kysyy silloin PHP:ltä, joka vastaa 410 ja kertoo syyn osallistujan kielellä.

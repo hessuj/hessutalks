@@ -89,7 +89,16 @@ final class EventRepository
         return $this->db->all(
             'SELECT e.*, (SELECT COUNT(*) FROM questions q WHERE q.event_id = e.id) AS question_count,
                     (SELECT COUNT(*) FROM questions q WHERE q.event_id = e.id AND q.status = \'new\') AS new_count
-             FROM events e ORDER BY e.created_at DESC, e.id DESC',
+             FROM events e WHERE e.status != \'archived\' ORDER BY e.created_at DESC, e.id DESC',
+        );
+    }
+
+    /** @return list<array<string, mixed>> */
+    public function archived(): array
+    {
+        return $this->db->all(
+            'SELECT e.*, (SELECT COUNT(*) FROM questions q WHERE q.event_id = e.id) AS question_count
+             FROM events e WHERE e.status = \'archived\' ORDER BY e.archived_at DESC, e.id DESC',
         );
     }
 
@@ -108,11 +117,38 @@ final class EventRepository
         if (!in_array($status, ['open', 'closed'], true)) {
             throw new \InvalidArgumentException('Tuntematon tila.');
         }
+        $current = $this->find($id);
+        if ($current !== null && ($current['status'] ?? '') === 'archived') {
+            throw new \InvalidArgumentException('Arkistoitu luento on palautettava ennen uudelleenavausta.');
+        }
         // Avattaessa uudelleen poistetaan mahdollinen vanhentunut sulkeutumisaika.
         $sql = $status === 'open'
             ? 'UPDATE events SET status = ?, closes_at = NULL WHERE id = ?'
             : 'UPDATE events SET status = ? WHERE id = ?';
         return $this->db->exec($sql, [$status, $id]) === 1;
+    }
+
+    public function archive(int $id, int $now): bool
+    {
+        $ok = $this->db->exec(
+            'UPDATE events SET status = ?, archived_at = ?, closes_at = NULL,
+                    active_poll_id = NULL, board_clears = board_clears + 1
+             WHERE id = ? AND status != ?',
+            ['archived', $now, $id, 'archived'],
+        ) === 1;
+        if (!$ok) {
+            return false;
+        }
+        $this->db->exec("UPDATE polls SET status = 'closed', on_stage = 0 WHERE event_id = ? AND status = 'open'", [$id]);
+        return true;
+    }
+
+    public function restore(int $id): bool
+    {
+        return $this->db->exec(
+            'UPDATE events SET status = ?, archived_at = NULL, closes_at = NULL WHERE id = ? AND status = ?',
+            ['closed', $id, 'archived'],
+        ) === 1;
     }
 
     /** Projektorin iso QR-koodi (ohjattavissa myös puhelimen ohjaimesta). */

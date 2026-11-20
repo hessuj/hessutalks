@@ -449,7 +449,7 @@
       });
     }
 
-    mount(toolbar('Luennot'),
+    mount(toolbar('Luennot', h('button.btn.ghost.small', { type: 'button', text: 'Arkisto (' + (state.archived || []).length + ')', onclick: showArchive })),
       h('form.row-form', { onsubmit: function (ev) {
         ev.preventDefault();
         api('POST', 'events', { title: title.value, hours: hours.value ? parseInt(hours.value, 10) : null, lang: lang.value || null })
@@ -462,6 +462,24 @@
         h('button.btn', { type: 'submit', text: 'Luo luento' })),
       out, list);
     render();
+  }
+
+  function showArchive() {
+    var list = h('ul.event-list');
+    (state.archived || []).forEach(function (ev) {
+      list.appendChild(h('li', null,
+        h('span.code', { text: ev.code }),
+        h('strong', { text: ev.title }),
+        h('span.open-btn.event-btns', null,
+          h('button.btn.small', { type: 'button', text: 'Avaa', onclick: function () { showEvent(ev.id); } }),
+          h('button.btn.ghost.small', { type: 'button', text: 'Palauta', onclick: function () {
+            if (!window.confirm('Palautetaanko luento "' + ev.title + '" suljettuna?')) return;
+            api('POST', 'events/' + ev.id + '/restore', {}).then(loadState).then(function () { showEvents('Luento palautettu suljettuna.'); });
+          } })),
+        h('span.meta', { text: 'Luotu ' + fmtTime(ev.created_at) + ', arkistoitu ' + (ev.archived_at ? fmtTime(ev.archived_at) : '-') + ', ' + ev.question_count + ' viestiä' })));
+    });
+    mount(toolbar('Arkisto', h('button.btn.ghost.small', { type: 'button', text: 'Kaikki luennot', onclick: function () { showEvents(); } })),
+      (state.archived || []).length ? list : h('p.empty', { text: 'Arkisto on tyhjä.' }));
   }
 
   // ================================================================ näkymä: yksi luento
@@ -1508,8 +1526,18 @@
             h('p.big-code', { text: event.code }),
             h('p.url', null, h('a', { href: url, target: '_blank', rel: 'noopener', text: url })),
             h('p.actions', null,
-              h('button.btn.ghost.small', { type: 'button', text: event.open ? 'Sulje kysymykset' : 'Avaa kysymykset', onclick: function () {
+              event.status !== 'archived' ? h('button.btn.ghost.small', { type: 'button', text: event.open ? 'Sulje kysymykset' : 'Avaa kysymykset', onclick: function () {
                 api('POST', 'events/' + id + '/status', { status: event.open ? 'closed' : 'open' }).then(function (r) { event = r.event; renderHead(); });
+              } }) : null, ' ',
+              event.status !== 'archived' ? h('button.btn.ghost.small', { type: 'button', text: 'Arkistoi', onclick: function () {
+                if (!window.confirm('Arkistoidaanko luento "' + event.title + '"? Kysymykset suljetaan ja taulu tyhjennetään; tiedot säilyvät.')) return;
+                api('POST', 'events/' + id + '/archive', {}).then(function (r) {
+                  event = r.event;
+                  return loadState();
+                }).then(function () { showEvents('Luento arkistoitu.'); });
+              } }) : h('button.btn.ghost.small', { type: 'button', text: 'Palauta', onclick: function () {
+                if (!window.confirm('Palautetaanko luento "' + event.title + '" suljettuna?')) return;
+                api('POST', 'events/' + id + '/restore', {}).then(function (r) { event = r.event; return loadState(); }).then(function () { showEvent(id); });
               } }), ' ',
               h('button.btn.danger.small', { type: 'button', text: 'Poista luento', onclick: function () {
                 if (!window.confirm('Poistetaanko luento "' + event.title + '" ja kaikki sen viestit pysyvästi?')) return;
