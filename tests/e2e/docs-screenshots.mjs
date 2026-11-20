@@ -24,6 +24,7 @@ const fi = LANG === 'fi';
 
 const C = fi ? {
   event: 'Tietoturvan perusteet, luento 3',
+  past: 'Tietoturvan perusteet, luento 2',
   set1: ['M1', 'M1 Uhkat ja riskit'],
   q1: 'Mikä näistä on kalasteluviestin tyypillisin tunnusmerkki?',
   q1opts: ['Kiireellisyys ja uhkailu', 'Yrityksen logo', 'Allekirjoitus'],
@@ -43,6 +44,7 @@ const C = fi ? {
   messages: [['question', 'Pitääkö varmuuskopiot salata myös pilvessä?'], ['feedback', 'Hyvä esimerkki tuo kalastelutapaus!'], ['question', 'Onko passkey turvallisempi kuin salasana?']],
 } : {
   event: 'Cybersecurity Basics, lecture 3',
+  past: 'Cybersecurity Basics, lecture 2',
   set1: ['M1', 'M1 Threats and risks'],
   q1: 'Which of these is the most typical sign of a phishing message?',
   q1opts: ['Urgency and threats', 'The company logo', 'A signature'],
@@ -236,7 +238,8 @@ const eventUrl = await admin.js(`document.querySelector('.share .url a').href`);
 
 await shot(admin, '04-luennon-sivu', { area: q('.share'), marks: [
   { el: q('.share img'), label: '1', box: true }, { el: q('.big-code'), label: '2', box: true }, { el: q('.share .url a'), label: '3', box: true },
-  { el: el('Sulje kysymykset'), label: '4' }, { el: el('Poista luento'), label: '5' }, { el: q('#event-lang'), label: '6', box: true }] });
+  { el: el('Sulje kysymykset'), label: '4' }, { el: el('Arkistoi'), label: '5' }, { el: el('Poista luento'), label: '6' },
+  { el: q('#event-lang'), label: '7', box: true }] });
 await shot(admin, '05-tyokalupalkki', { area: q('.toolbar'), marks: [
   { el: el('Muokkaa otsikkoa'), label: '1' }, { el: el('Kaikki luennot'), label: '2' },
   { el: el('Asetukset'), label: '3' }, { el: el('Kirjaudu ulos'), label: '4' }] });
@@ -506,8 +509,20 @@ await admin.click('Tyhjennä taulu');
 await admin.js(`document.getElementById('tab-btn-polls').click(); true`);
 await admin.click('Kaikki luennot');
 await admin.waitFor(admin.has('.event-list'), 'luentolista');
+// Pidetty luento arkistoon (issue #67): luodaan, arkistoidaan luennon sivulta ja kuvataan arkisto.
+await admin.fill('#ev-title', C.past);
+await admin.submit('#ev-title');
+await admin.waitFor(admin.has('#tab-polls'), 'arkistoitava luento');
+await admin.click('Arkistoi');
+await admin.waitFor(admin.has('.event-list'), 'luentolista arkistoinnin jälkeen');
 await shot(admin, '37-luentolista', { area: q('main'), marks: [{ el: q('.event-list li'), label: '1', box: true }, { el: el('Avaa', '.event-list'), label: '2' },
-  { el: el('Ohjain', '.event-list'), label: '3' }] });
+  { el: el('Ohjain', '.event-list'), label: '3' }, { el: el('Arkisto (1)'), label: '4' }] });
+await admin.click('Arkisto (1)');
+await admin.waitFor(admin.hasText(C.past), 'arkisto');
+await shot(admin, '44-arkisto', { area: q('main'), marks: [{ el: q('.event-list li'), label: '1', box: true }, { el: el('Avaa', '.event-list'), label: '2' },
+  { el: el('Palauta', '.event-list'), label: '3' }, { el: el('Kaikki luennot'), label: '4' }] });
+await admin.click('Kaikki luennot');
+await admin.waitFor(admin.has('.event-list'), 'luentolista');
 
 await admin.click('Asetukset');
 await admin.waitFor(admin.hasText('Tietoturvaloki'), 'asetukset');

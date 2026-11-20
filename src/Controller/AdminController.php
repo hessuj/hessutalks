@@ -165,13 +165,10 @@ final class AdminController
             ['POST', 'logout'] => $this->logout($client),
             ['POST', 'keys'] => $this->saveKeys($in, $client),
             ['POST', 'keys/rewrap'] => $this->rewrapKeys($in, $client),
-            ['GET', 'events'] => (function (): Response {
-                $this->live->archiveExpired(time());
-                return Response::json([
-                    'events' => array_map($this->eventOut(...), $this->events->all()),
-                    'archived' => array_map($this->eventOut(...), $this->events->archived()),
-                ]);
-            })(),
+            ['GET', 'events'] => Response::json([
+                'events' => array_map($this->eventOut(...), $this->events->all()),
+                'archived' => array_map($this->eventOut(...), $this->events->archived()),
+            ]),
             ['POST', 'events'] => $this->createEvent($in, $client),
             ['GET', 'audit'] => Response::json(['entries' => $this->audit->recent()]),
             default => Response::error('Ei löytynyt.', 404),
@@ -276,7 +273,6 @@ final class AdminController
 
     private function state(): Response
     {
-        $this->live->archiveExpired(time());
         $keys = $this->keys->get();
         return Response::json([
             'keys' => $keys === null ? null : $keys + ['fingerprint' => KeyRepository::fingerprint((string) $keys['public_key'])],

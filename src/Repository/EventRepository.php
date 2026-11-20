@@ -139,7 +139,9 @@ final class EventRepository
         if (!$ok) {
             return false;
         }
-        $this->db->exec("UPDATE polls SET status = 'closed', on_stage = 0 WHERE event_id = ? AND status = 'open'", [$id]);
+        // Kaikki taululta pois (myös suljetut), auki olevat kysymykset suljetaan. Vastauksia ei poisteta.
+        $this->db->exec('UPDATE polls SET on_stage = 0 WHERE event_id = ?', [$id]);
+        $this->db->exec("UPDATE polls SET status = 'closed' WHERE event_id = ? AND status = 'open'", [$id]);
         return true;
     }
 

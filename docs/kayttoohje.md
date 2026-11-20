@@ -70,8 +70,8 @@ Yksi luento voi kattaa koko kurssin: osallistujat käyttävät samaa koodia ja n
 2. **Liittymiskoodi**: kuusi merkkiä, jotka voi kirjoittaa etusivulle.
 3. **Linkki** osallistujan sivulle. Avaa se, jos haluat nähdä osallistujan näkymän.
 4. **Sulje kysymykset**: osallistujat eivät voi enää lähettää viestejä. Saman napin nimi on suljetulla luennolla *Avaa kysymykset*.
-5. **Poista luento**: poistaa luennon ja kaikki sen viestit pysyvästi.
-6. **Arkistoi**: sulkee kysymykset, tyhjentää taulun ja siirtää luennon arkistoon ilman tietojen poistoa. Sulkeutumisaika arkistoituu automaattisesti. Arkistossa luento voidaan palauttaa suljettuna, avata tai poistaa pysyvästi.
+5. **Arkistoi**: sulkee kysymykset, tyhjentää taulun ja siirtää luennon arkistoon. Tiedot säilyvät. Luentoja ei arkistoida automaattisesti. Katso [2.5 Arkisto](#25-arkisto).
+6. **Poista luento**: poistaa luennon ja kaikki sen viestit pysyvästi.
 7. **Osallistujien kieli**: voit vaihtaa kielen myöhemmin. Myös projektorin tekstit vaihtuvat.
 
 ### 2.3 Työkalupalkki
@@ -95,6 +95,20 @@ Yksi luento voi kattaa koko kurssin: osallistujat käyttävät samaa koodia ja n
 1. Luennon rivillä näkyvät koodi, nimi, uusien viestien määrä, luontiaika ja viestien määrä.
 2. **Avaa**: luennon sivu.
 3. **Ohjain**: puhelinohjain (ks. [luku 5.5](#55-puhelinohjain)).
+4. **Arkisto (n)** otsikon vieressä: arkistoidut luennot (ks. [luku 2.5](#25-arkisto)). Arkistoidut luennot eivät näy luentolistalla.
+
+### 2.5 Arkisto
+
+![Arkisto](kuvat/fi/44-arkisto.png)
+
+Pidetyn luennon voi siirtää pois luentolistalta poistamatta sen tietoja. **Arkistoi** luennon sivulla (ks. [luku 2.2](#22-luennon-sivu-koodi-ja-qr-koodi))
+sulkee kysymykset ja kyselyt, tyhjentää taulun ja siirtää luennon arkistoon. Osallistuja näkee luennon linkistä saman
+ilmoituksen kuin suljetusta luennosta. Luentoja ei arkistoida automaattisesti, ei myöskään sulkeutumisajan jälkeen.
+
+1. Arkistoidun luennon rivillä näkyvät koodi, nimi, luonti- ja arkistointiaika sekä viestien määrä.
+2. **Avaa**: arkistoidun luennon sivu. Viestit, tulokset ja vienti ovat käytettävissä.
+3. **Palauta** palauttaa luennon luentolistalle suljettuna. Avaa se tarvittaessa uudelleen napilla *Avaa kysymykset*.
+4. **Kaikki luennot** palaa luentolistalle.
 
 ## 3. Kysymysten valmistelu
 

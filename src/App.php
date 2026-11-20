@@ -31,7 +31,6 @@ final class App
 {
     private ParticipantController $participant;
     private AdminController $admin;
-    private LiveRepository $live;
     private ?\Closure $errorLogger = null;
 
     public function __construct(
@@ -57,7 +56,6 @@ final class App
         $polls = new PollRepository($db, $clock, $config->appSecret);
         $sets = new SetRepository($db, $clock);
         $live = new LiveRepository($db, $liveDir === null ? null : new LiveFile($liveDir, $config->appSecret));
-        $this->live = $live;
         $this->participant = new ParticipantController(
             $config, $view, $events, $questions, $nicknames, $polls, $live, $keys, $limiter, new FormToken($config->appSecret, $clock),
         );
@@ -72,7 +70,6 @@ final class App
     public function handle(Request $req): Response
     {
         try {
-            $this->live->archiveExpired($this->clock->now());
             $response = $this->dispatch($req);
         } catch (\Throwable $e) {
             if ($this->errorLogger !== null) {
