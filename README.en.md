@@ -148,9 +148,9 @@ screen. The top of the lecture page shows whether the presenter display is conne
 
 ### Language
 
-The participant pages are in Finnish and English (the admin view is always in Finnish). The language comes from the browser
-settings and can be switched with the FI/EN toggle in the top corner. The choice is remembered only in the browser
-(localStorage). Translations are in `src/I18n.php`, and a test ensures that every
+The participant pages are in Finnish and English (the admin view is always in Finnish). The language comes from the lecture setting
+(participants' language), otherwise from the browser settings, and can be switched with the FI/EN toggle in the top corner. The choice is
+remembered per lecture only in the browser (localStorage), so it does not affect other lectures. Translations are in `src/I18n.php`, and a test ensures that every
 key has both languages.
 
 ## Security in brief
