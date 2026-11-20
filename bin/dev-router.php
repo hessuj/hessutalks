@@ -15,6 +15,7 @@ const STATIC_TYPES = [
     'txt' => 'text/plain; charset=utf-8',
 ];
 
+// realpath() palauttaa Windowsissa kenoviivat, joten hakemistorajat verrataan DIRECTORY_SEPARATORilla.
 $publicDir = (string) realpath(__DIR__ . '/../public');
 $path = (string) parse_url((string) ($_SERVER['REQUEST_URI'] ?? '/'), PHP_URL_PATH);
 
@@ -22,7 +23,7 @@ if (str_starts_with($path, '/assets/')) {
     $file = realpath($publicDir . $path);
     $ext = $file === false ? '' : strtolower(pathinfo($file, PATHINFO_EXTENSION));
     // Vain public/assets-hakemiston sisällä olevat sallitut tiedostotyypit (ei polkujen läpikulkua).
-    if ($file === false || !str_starts_with($file, $publicDir . '/assets/') || !isset(STATIC_TYPES[$ext]) || !is_file($file)) {
+    if ($file === false || !str_starts_with($file, $publicDir . DIRECTORY_SEPARATOR . 'assets' . DIRECTORY_SEPARATOR) || !isset(STATIC_TYPES[$ext]) || !is_file($file)) {
         http_response_code(404);
         exit;
     }
@@ -44,7 +45,7 @@ if (str_starts_with($path, '/assets/')) {
 if (str_starts_with($path, '/live/')) {
     $file = realpath($publicDir . $path);
     // Vain public/live-hakemiston sovelluksen kirjoittamat tiedostot (ei polkujen läpikulkua), kuten assets yllä.
-    if ($file === false || !str_starts_with($file, $publicDir . '/live/') || preg_match('/^[0-9a-f]{32}\.json$/', basename($file)) !== 1 || !is_file($file)) {
+    if ($file === false || !str_starts_with($file, $publicDir . DIRECTORY_SEPARATOR . 'live' . DIRECTORY_SEPARATOR) || preg_match('/^[0-9a-f]{32}\.json$/', basename($file)) !== 1 || !is_file($file)) {
         http_response_code(404);
         exit;
     }

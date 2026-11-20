@@ -330,6 +330,7 @@ body.presenter { padding: 0; min-height: 0; height: 100vh; overflow: hidden; }
 .poll-detail .results { max-width: 46rem; }
 .poll-detail .res-cloud { height: 16rem; }
 .poll-detail .res-word { cursor: pointer; }
+.poll-detail .res-word:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
 .poll-manage { display: flex; flex-wrap: wrap; gap: .4rem; padding-top: .6rem; border-top: 1px dashed var(--frame); }
 .set-tools { display: flex; flex-wrap: wrap; gap: .4rem; }
 .q.staged { outline: 2px solid var(--accent); outline-offset: -2px; }
@@ -355,7 +356,8 @@ body.presenter { padding: 0; min-height: 0; height: 100vh; overflow: hidden; }
 /* ---- kyselyt: tulokset (hallinta ja projektori) ---- */
 .results { --res-text: 1rem; }
 .res-row { display: grid; grid-template-columns: minmax(6rem, 2fr) 3fr 6.5em; gap: .4rem .8rem; align-items: center; margin: .35rem 0; font-size: var(--res-text); }
-.res-label { overflow-wrap: anywhere; }
+/* break-word: rivitys sanojen välistä; vain sarakkeeseen mahtumaton yksittäinen sana katkeaa. */
+.res-label { overflow-wrap: break-word; min-width: 0; }
 .res-track { height: 1.2em; background: rgba(0, 0, 0, .25); }
 .res-bar { display: block; height: 100%; width: 0; background: var(--accent); transition: width .6s ease; }
 .res-value { font-family: var(--mono); text-align: right; white-space: nowrap; }
@@ -414,10 +416,17 @@ label.check input { width: auto; }
 .poll-choice.correct > span:first-of-type::before { content: '✓ '; color: var(--ok); font-weight: 700; }
 .poll-choice.wrong { opacity: .7; }
 .poll-choice { flex-wrap: wrap; }
+/* Teksti kutistuu pallon viereen eikä rivity sen alle, vaikka ✓-etuliite pidentää sitä (#57). */
+.poll-choices .poll-choice > span:first-of-type { flex: 1 1 0; min-width: 0; overflow-wrap: break-word; }
 .poll-explanation { flex-basis: 100%; font-size: .85rem; color: var(--ink-dim); padding-left: 1.8rem; }
 .poll-results-box { margin-top: 1rem; padding-top: .6rem; border-top: 1px solid var(--frame); }
 .poll-results-box .res-columns { height: 8rem; }
 .poll-results-box .res-row { grid-template-columns: minmax(5rem, 2fr) 2fr 5.5em; }
+/* Kapealla näytöllä (puhelin) vaihtoehdon nimi omalle rivilleen koko leveydelle, palkki ja luku sen alle (#57). */
+@media (max-width: 560px) {
+  .results:not(.poll-stage-results) .res-row { grid-template-columns: minmax(0, 1fr) auto; gap: .2rem .8rem; }
+  .results:not(.poll-stage-results) .res-label { grid-column: 1 / -1; }
+}
 .poll-stage-results .res-explanation { font-size: .7em; }
 
 /* ---- esitysnäkymä: Teams-jako ja salin projektori (vaatimus 5.1) ---- */
