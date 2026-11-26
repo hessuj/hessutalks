@@ -766,7 +766,11 @@
           h('button.btn.ghost.small', { type: 'button', text: 'Tuo JSON', title: 'Tuo sarjat JSON-tiedostosta', onclick: function () { fileInput.click(); } }),
           h('button.btn.ghost.small', { type: 'button', text: 'Vie JSON', title: 'Lataa kaikki sarjat JSON-tiedostona', onclick: function () { exportJson(null); } }),
           h('button.btn.ghost.small', { type: 'button', text: 'Vie CSV', title: 'Tulokset taulukkona (puretaan tässä selaimessa)', onclick: function () { exportCsv(null); } }),
-          h('button.btn.ghost.small', { type: 'button', text: 'Vie Markdown', title: 'Luennon kysymykset, tulokset ja osallistujien viestit raporttina (puretaan tässä selaimessa)', onclick: exportMarkdown }))),
+          h('button.btn.ghost.small', { type: 'button', text: 'Vie Markdown', title: 'Luennon kysymykset, tulokset ja osallistujien viestit raporttina (puretaan tässä selaimessa)', onclick: exportMarkdown }),
+          h('button.btn.ghost.small', { type: 'button', text: 'Pienennä kaikki', title: 'Piilota kaikkien sarjojen kysymykset (vain tässä näkymässä)',
+            onclick: function () { setCollapsed(sets.map(function (x) { return x.id; }), true); } }),
+          h('button.btn.ghost.small', { type: 'button', text: 'Avaa kaikki', title: 'Näytä kaikkien sarjojen kysymykset',
+            onclick: function () { setCollapsed(sets.map(function (x) { return x.id; }), false); } }))),
       outEl, formEl, setsEl);
 
     function findPoll(pid) {
@@ -1087,6 +1091,19 @@
     // vain sieltä vahvistuksella, jotta annettuja vastauksia ei poisteta vahingossa luennon aikana.
 
     var setTools = {};      // sarjan id -> työkalurivi auki
+    // Pienennetyt sarjat (issue #75): vain tämän välilehden näkymä, ei palvelimelle eikä muille laitteille.
+    var COLLAPSE_KEY = 'hessutalks.sets.' + eventId;
+    var collapsed = {};
+    try {
+      (JSON.parse(window.sessionStorage.getItem(COLLAPSE_KEY) || '[]') || []).forEach(function (sid) { if (typeof sid === 'number') collapsed[sid] = true; });
+    } catch (e) { /* oletus: kaikki auki */ }
+    function setCollapsed(ids, on) {
+      ids.forEach(function (sid) { if (on) collapsed[sid] = true; else delete collapsed[sid]; });
+      try {
+        window.sessionStorage.setItem(COLLAPSE_KEY, JSON.stringify(Object.keys(collapsed).map(Number)));
+      } catch (e) { /* vain muistissa */ }
+      renderAll();
+    }
 
     /** Näytä taululla: projektorille muiden rinnalle ja auki vastauksille (avaa esitysikkunan tarvittaessa). */
     function showOnBoard(poll) {
@@ -1191,13 +1208,28 @@
         var list = h('ol.poll-list', { start: String(n + 1) });
         inSet.forEach(function (poll, i) { n++; list.appendChild(pollItem(poll, n, i, inSet.length)); });
         var toolsOpen = !!setTools[set.id];
-        setsEl.appendChild(h('section.set-card', { 'data-set': String(set.id) },
+        var folded = !!collapsed[set.id];
+        var staged = inSet.filter(function (p) { return p.on_stage; }).length;
+        var opened = inSet.filter(function (p) { return p.status === 'open'; }).length;
+        var body = inSet.length ? list : h('p.empty', { text: 'Ei kysymyksiä.' });
+        body.id = 'set-polls-' + set.id;
+        body.hidden = folded;
+        setsEl.appendChild(h('section.set-card' + (folded ? '.folded' : ''), { 'data-set': String(set.id) },
           h('div.set-head', null,
             h('span.code', { text: set.slug }),
-            h('h3', { text: set.title }),
+            // Otsikko on painike: klikkaus tai Enter/välilyönti pienentää ja avaa. Nuoli piirretään CSS:llä,
+            // joten otsikon teksti on pelkkä sarjan nimi.
+            h('h3', null, h('button.set-toggle', { type: 'button', text: set.title, 'aria-expanded': String(!folded), 'aria-controls': body.id,
+              title: folded ? 'Näytä sarjan kysymykset' : 'Pienennä sarja (kysymykset piiloon tästä näkymästä)',
+              onclick: function () { setCollapsed([set.id], !folded); } })),
             h('span.hint', { text: inSet.length + ' kysymystä' }),
+            folded && staged ? h('span.badge.live', { text: staged + ' taululla' }) : null,
+            folded && opened ? h('span.badge.open', { text: opened + ' auki' }) : null,
             h('span.spacer'),
-            h('button.btn.small', { type: 'button', text: 'Uusi kysymys', onclick: function () { showForm(null, set); } }),
+            h('button.btn.small', { type: 'button', text: 'Uusi kysymys', onclick: function () {
+              if (collapsed[set.id]) setCollapsed([set.id], false);
+              showForm(null, set);
+            } }),
             h('button.btn.ghost.small.set-tools-btn', { type: 'button', 'aria-expanded': String(toolsOpen), text: toolsOpen ? 'Sarja ▴' : 'Sarja ▾',
               title: 'Sarjan muokkaus, järjestys, vienti ja poisto', onclick: function () { setTools[set.id] = !toolsOpen; renderAll(); } })),
           toolsOpen ? h('div.q-actions.set-tools', null,
@@ -1210,7 +1242,7 @@
             h('button.btn.danger.small', { type: 'button', text: 'Poista sarja', onclick: function () {
               setAct(set, 'delete', {}, 'Poistetaanko sarja ' + set.slug + ' "' + set.title + '", sen ' + inSet.length + ' kysymystä ja kaikki vastaukset pysyvästi?');
             } })) : null,
-          inSet.length ? list : h('p.empty', { text: 'Ei kysymyksiä.' })));
+          body));
       });
       updateResults();
     }

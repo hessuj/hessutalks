@@ -124,6 +124,8 @@ luentokertaa kohden. Valmistele sarjat ennen luentoa. Samasta listasta näytät 
 3. **Vie JSON**: kaikki sarjat tiedostoon, esimerkiksi seuraavaa toteutusta varten.
 4. **Vie CSV**: tulokset taulukkona (Excel avaa suoraan).
 5. **Vie Markdown**: raportti luennosta: kysymykset, tulokset ja osallistujien viestit.
+6. **Pienennä kaikki**: piilottaa kaikkien sarjojen kysymykset, ja vain sarjojen otsikot jäävät näkyviin (ks. [3.4](#34-sarjan-ja-kysymyksen-painikkeet)).
+7. **Avaa kaikki**: näyttää kaikkien sarjojen kysymykset.
 
 ### 3.2 Uusi kysymyssarja
 
@@ -178,6 +180,16 @@ Avoimella tekstillä on omat asetuksensa:
 6. **Vie CSV**: sarjan tulokset taulukkona.
 7. **Monista**: kopio sarjasta kysymyksineen ilman vastauksia.
 8. **Poista sarja**: sarja, sen kysymykset ja vastaukset pysyvästi.
+
+**Sarjan pienennys:** klikkaa sarjan nimeä, niin sen kysymykset piiloutuvat. Näin käsitellyt sarjat eivät vie tilaa luennon edetessä.
+Toinen klikkaus avaa sarjan. Pienennys koskee vain hallinnan näkymää: kysymykset pysyvät taululla ja auki, eikä osallistujien tai
+esitysnäytön näkymä muutu. Pienennys säilyy, kun sivu ladataan uudelleen samassa välilehdessä.
+
+![Pienennetty sarja](kuvat/fi/45-sarja-pienennetty.png)
+
+1. **Sarjan nimi** (▸ pienennetty, ▾ auki): pienentää ja avaa. Toimii myös näppäimistöllä (Enter).
+2. **n taululla**: pienennetyn sarjan kysymyksiä on taululla.
+3. **n auki**: pienennetyn sarjan kysymyksiä on auki vastauksille.
 
 Kysymyksen muokkaus on kysymyksen alla. Klikkaa kysymyksen riviä, niin sen tulokset ja muokkausnapit avautuvat:
 

@@ -428,6 +428,12 @@ final class AdminSecurityTest extends AppTestCase
         self::assertStringContainsString('onBoard = saved.filter(Number.isSafeInteger).slice(0, MAX_ON_BOARD)', $admin);
         self::assertStringContainsString('window.sessionStorage.setItem(DISPLAY_KEY, JSON.stringify(onBoard))', $admin);
         self::assertSame(1, substr_count($admin, 'sessionStorage.setItem(DISPLAY_KEY'), 'Taulun tila tallennetaan vain yhdestä kohdasta');
+        // Sarjan pienennys (issue #75) muistaa vain sarjojen numeeriset tunnisteet tämän välilehden sessionStorageen.
+        self::assertStringContainsString("var COLLAPSE_KEY = 'hessutalks.sets.' + eventId;", $admin);
+        self::assertStringContainsString('window.sessionStorage.setItem(COLLAPSE_KEY, JSON.stringify(Object.keys(collapsed).map(Number)))', $admin);
+        self::assertStringContainsString("if (typeof sid === 'number') collapsed[sid] = true;", $admin);
+        self::assertSame(1, substr_count($admin, 'setItem(COLLAPSE_KEY'), 'Pienennys tallennetaan vain yhdestä kohdasta');
+        self::assertStringNotContainsString('localStorage.setItem(COLLAPSE_KEY', $admin);
         // Esitysikkuna hyväksyy viestiruudun vain kokonaislukuavaimella (ei merkkijonoa ruudun tunnisteeksi).
         self::assertStringContainsString('Number.isSafeInteger(t.id) && t.id > 0', $js);
     }

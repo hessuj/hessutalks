@@ -303,7 +303,7 @@ rmSync(tmp, { recursive: true, force: true });
 await top(admin);
 await shot(admin, '11-kysymykset-tyokalut', { area: q('.polls-admin > .toolbar'), marks: [
   { el: el('Uusi sarja'), label: '1' }, { el: el('Tuo JSON'), label: '2' }, { el: el('Vie JSON'), label: '3' },
-  { el: el('Vie CSV'), label: '4' }, { el: el('Vie Markdown'), label: '5' }] });
+  { el: el('Vie CSV'), label: '4' }, { el: el('Vie Markdown'), label: '5' }, { el: el('Pienennä kaikki'), label: '6' }, { el: el('Avaa kaikki'), label: '7' }] });
 const set1 = `[...document.querySelectorAll('section.set-card')].find((s) => s.querySelector('h3').textContent === ${lit(C.set1[1])})`;
 await admin.js(`${set1}.querySelector('.set-tools-btn').click(); true`);
 await admin.waitFor(`!!${set1}.querySelector('.set-tools')`, 'sarjan työkalut');
@@ -438,6 +438,16 @@ await shot(admin, '29-useita-taululla', { area: q('.set-list'), marks: [
   { el: `document.querySelectorAll('li.poll-item.staged')[0]`, label: '1', box: true },
   { el: `document.querySelectorAll('li.poll-item.staged')[1]`, label: '2', box: true },
   { el: `document.querySelectorAll('li.poll-item.staged')[2]`, label: '3', box: true }] });
+// Sarjan pienennys (issue #75): taululla olevan kysymyksen sarja pienennettynä, tila näkyy otsikossa.
+const foldSet = `document.querySelector('li.poll-item.staged').closest('section.set-card')`;
+await admin.js(`${foldSet}.querySelector('.set-toggle').click(); true`);
+await admin.waitFor(`!!document.querySelector('section.set-card.folded .badge.live')`, 'sarja pienennetty');
+const folded = `document.querySelector('section.set-card.folded')`;
+await shot(admin, '45-sarja-pienennetty', { area: folded, marks: [
+  { el: `${folded}.querySelector('.set-toggle')`, label: '1', box: true }, { el: `${folded}.querySelector('.badge.live')`, label: '2' },
+  { el: `${folded}.querySelector('.badge.open')`, label: '3' }] });
+await admin.js(`${folded}.querySelector('.set-toggle').click(); true`);
+await admin.waitFor(`!document.querySelector('section.set-card.folded')`, 'sarja auki');
 await shot(stage, '30-esitysnaytto-ruudukko');
 await part.waitFor(`document.querySelectorAll('#polls form.poll, #polls .poll').length >= 2`, 'useita osallistujalla');
 await top(part);

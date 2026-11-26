@@ -124,6 +124,8 @@ session. Prepare the sets before the lecture. You show the questions during the 
 3. **Vie JSON** (export JSON): all sets to a file, for example for the next run of the course.
 4. **Vie CSV** (export CSV): results as a table (Excel opens it directly).
 5. **Vie Markdown** (export Markdown): a lecture report: questions, results and the participants' messages.
+6. **Pienennä kaikki** (collapse all): hides the questions of all sets so that only the set headings remain (see [3.4](#34-set-and-question-buttons)).
+7. **Avaa kaikki** (expand all): shows the questions of all sets.
 
 ### 3.2 New question set
 
@@ -178,6 +180,16 @@ Open text has its own settings:
 6. **Vie CSV** (export CSV): the set's results as a table.
 7. **Monista** (duplicate): a copy of the set and its questions without answers.
 8. **Poista sarja** (delete set): the set, its questions and answers permanently.
+
+**Collapsing a set:** click the set name to hide its questions, so that finished sets do not take up space as the lecture goes on.
+Click again to expand it. Collapsing only affects the admin view: questions stay on the board and open, and the participants' and
+presenter display's views do not change. A collapsed set stays collapsed when the page is reloaded in the same tab.
+
+![Collapsed set](kuvat/en/45-sarja-pienennetty.png)
+
+1. **Set name** (▸ collapsed, ▾ expanded): collapses and expands. Also works with the keyboard (Enter).
+2. **n taululla** (n on the board): questions of the collapsed set are on the board.
+3. **n auki** (n open): questions of the collapsed set are open for answers.
 
 Editing a question happens below it. Click the question's row to open its results and editing buttons:
 
