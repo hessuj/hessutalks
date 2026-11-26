@@ -346,6 +346,14 @@ body.presenter { padding: 0; min-height: 0; height: 100vh; overflow: hidden; }
 .set-card { display: grid; grid-template-columns: minmax(0, 1fr); gap: .75rem; padding: .75rem 0 0; border-top: 1px solid var(--frame); }
 .set-head { display: flex; flex-wrap: wrap; gap: .4rem .7rem; align-items: center; }
 .set-head h3 { margin: 0; }
+.set-toggle { display: inline-flex; align-items: baseline; gap: .45rem; padding: 0; border: 0; background: none;
+  color: inherit; font: inherit; text-align: left; cursor: pointer; }
+.set-toggle::before { content: '▾'; display: inline-block; width: 1em; color: var(--accent); }
+.set-toggle[aria-expanded="false"]::before { content: '▸'; }
+.set-toggle:hover { text-decoration: underline; }
+.set-toggle:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 4px; }
+.set-card.folded { gap: 0; }
+.set-card > [hidden] { display: none; }
 .set-head .spacer { flex: 1; }
 .row-inline { display: flex; flex-wrap: wrap; gap: .5rem; align-items: center; }
 .row-inline select { width: auto; }
